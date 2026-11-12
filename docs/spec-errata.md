@@ -53,3 +53,33 @@ Contradictions and errors in the spec. By rule 2 of section 0, section 5 wins. E
 
 - **Problem.** `final` is a reserved keyword. rustc rejects `#[final]` while parsing the module ("expected identifier, found reserved keyword `final`"), before any macro runs, so the attribute cannot be written as the spec shows.
 - **Resolution** (user decision, bead 4.1). The attribute is named `#[terminal]`. Documentation keeps the term "final state"; `StateKind::Final`, `is_done`, `on_done` and the graph are unchanged.
+
+## 10. 6.5: `microstep` is `#[inline(always)]`
+
+- **Problem.** 6.5 says the generated code does not force `#[inline(always)]`. ADR 0009 allowed an errata entry if BM-01 needed it. The `microstep` of a parser machine is large because every handler and the per-composite dispatch are inlined into it, and without a hint LLVM does not inline it into the `send_batch` loop.
+- **Resolution** (ADR 0012). `Spec::microstep` of the generated impl, `__estado::microstep`, `resolve`, the bubbling functions and `dispatch_<parallel>` carry `#[inline(always)]`; user handlers keep `#[inline]`. Measured on scenario A (1 MB of requests, release, local Apple M-series, a busy machine, so the ratios matter more than the milliseconds): the macro-generated `send_batch` took 2.6 ms without the hint on `Spec::microstep` and 1.6-1.8 ms with it, against 1.0 ms for the hand-written baseline.
+
+## 11. 4.3, 5.9: `cx.in_state` inside an `#[always]` handler
+
+- **Problem.** 4.3 says `in_state` answers from a snapshot of the active configuration. `Machine` builds the `Cx` of `run_always` (spec 4.1) without the snapshot, so `cx.in_state(..)` is `false` there even when `Spec::TRACKS_ACTIVE` is true. Handlers and entries of the microsteps for events do have it.
+- **Resolution.** Documented, not changed: no scenario needs it, and the fix belongs in `estado-core` (take the snapshot in `drain` the way `microstep` does). Until then an `#[always]` or `#[on_done]` handler must not call `cx.in_state`.
+
+## 12. 6.1, 7.1, 7.2: the closures of `#[after]` and `#[invoke]` take the data of the state by reference
+
+- **Problem.** The spec shows `|s: &Connecting| s.timeout()` for a state with a named struct and says nothing for struct-like variants, unit variants, or compound states, and the event of a timer must be built from `&self`, where a `&mut` view cannot exist.
+- **Resolution** (ADR 0012). `&T` for a newtype variant, `&Struct` for a compound or parallel state, a generated `&<Variant>Ref<'_>` for struct-like and tuple variants, `&()` for unit variants.
+
+## 13. 10.3, BM-01: the 5% target is not met, and the gap is the machine layer
+
+- **Problem.** ADR 0009 started M3 with BM-01 open and asked for a re-measurement against the macro-generated parser (`a_http_parser_macro`). Three local release runs of `cargo bench -p estado-examples --bench bm_01_http_parser` (1 MB of requests, Apple M-series, a busy machine, so read the ratios):
+
+  | Measurement | Time per MB | Ratio to the hand-written baseline |
+  | --- | --- | --- |
+  | hand-written baseline | 0.98-1.00 ms | 1.00 |
+  | M2 hand-written estado, `send_batch` | 1.73-1.77 ms | 1.77-1.79 |
+  | macro-generated estado, `send_batch` (`estado_macro_send_batch`) | 1.64-1.83 ms | 1.68-1.83 |
+  | M2 hand-written estado, `microstep` called directly | 1.20-1.39 ms | 1.20-1.41 |
+  | macro-generated estado, `microstep` called directly | 1.23-1.26 ms | 1.25-1.27 |
+
+- **Reading.** The generated code is as fast as the hand-written code of M2 (in-place writes and the forced inline of ADR 0009 are in, see entry 10), and both are about 1.25x of the baseline when `Machine` is left out. The rest of the distance to the baseline, 1.7x in total, is the per-event cost of `Machine::send_batch` (poison guard, report, queue checks around every microstep), which lives in `estado-core`.
+- **Resolution.** Open, for the owner of the spec. Either revise the target of BM-01 for a one-event-per-byte machine to about 2x of a hand-written parser, as ADR 0009 allows, or take the loop of `send_batch` out of `Machine` (one running report, no per-event guard), which touches the BM-02 layout that M2 found sensitive. This entry does neither; the BM-01 test does not assert the ratio.

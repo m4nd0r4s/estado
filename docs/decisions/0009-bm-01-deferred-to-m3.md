@@ -22,3 +22,7 @@ Start M3 with BM-01 open. Bead estado-99i.3.16 moves to M3: the remaining gain i
 - M2 closes with every criterion met except BM-01, which becomes part of M3's definition of done.
 - If the macro-generated parser still misses 5%, the target for a one-event-per-byte machine is revisited in an errata entry, with numbers.
 - Spec 6.5 says generated code does not force `#[inline(always)]`; if the macro needs it on `microstep`, that becomes an errata entry.
+
+## Outcome (M3)
+
+The macro generates the shape this ADR asked for: simple-form edges write in place below the root, `microstep` and the dispatch functions are `#[inline(always)]`, and `Spec::microstep` of the impl is too (without that hint the generated `send_batch` was 2.6x of the baseline; spec errata 10). The macro-generated scenario A (`a_http_parser_macro`, the `estado_macro_*` groups of `bm_01_http_parser`) measures 1.7x of the hand-written baseline with `send_batch` and 1.25x with `microstep` called directly, the same as the hand-written M2 machine. The 5% target is therefore still not met; the remaining gap is in `Machine`, not in generated code. Numbers and the options are in spec errata 13.

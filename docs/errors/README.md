@@ -18,17 +18,20 @@ Every diagnostic reads `estado::<code>: <message>`, with a `help:` line when the
 | E0015 | Substates or region type is not a `#[state]` enum | [E0015](E0015.md) |
 | E0016 | Invalid `#[machine(..)]` option, or unknown code in `allow(..)` | [E0016](E0016.md) |
 | E0017 | Malformed state attribute | [E0017](E0017.md) |
+| E0021 | Transition between sibling regions | [E0021](E0021.md) |
 | E0040 | Transition macro outside `#[handlers]` | [E0040](E0040.md) |
 | E0050 | Regions in typestate mode | [E0050](E0050.md) |
+| E0061 | `Result` handler without `#[on_error]` | [E0061](E0061.md) |
+| E0090 | Feature not supported yet | [E0090](E0090.md) |
 
 ## Warnings
 
 | Code | Condition | Page | Status |
 | --- | --- | --- | --- |
-| W0001 | State unreachable from the initial state | [W0001](W0001.md) | analysis done, enabled with the edges |
-| W0002 | State with no outgoing edges that is not `#[terminal]` | [W0002](W0002.md) | analysis done, enabled with the edges |
+| W0001 | State unreachable from the initial state | [W0001](W0001.md) | emitted |
+| W0002 | State with no outgoing edges that is not `#[terminal]` | [W0002](W0002.md) | emitted |
 | W0004 | Variant larger than `size_warn` bytes | [W0004](W0004.md) | emitted |
 
 ## Not yet implemented
 
-Pages are added with each code: E0003-E0006, E0020-E0022, E0030, E0031, E0041, E0060, E0061, W0003, W0005, W0010.
+Pages are added with each code: E0003-E0006, E0020, E0022, E0030, E0031, E0041, E0060, W0003, W0005, W0010.
