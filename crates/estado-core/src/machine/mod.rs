@@ -524,7 +524,13 @@ fn drain<M: Spec, S: Sink<M::Effect>>(
         }
         if runtime.take_always_pending() {
             let outcome = {
-                let mut cx = Cx::<M, S>::new(ctx, runtime, sink, None);
+                // Same snapshot as an event microstep (spec 4.3, errata 11).
+                let mut snapshot = if M::TRACKS_ACTIVE {
+                    Some(slot.live_mut().path())
+                } else {
+                    None
+                };
+                let mut cx = Cx::<M, S>::new(ctx, runtime, sink, snapshot.as_mut());
                 let outcome = M::run_always(slot, &mut cx);
                 check_fault(cx.fault())?;
                 outcome

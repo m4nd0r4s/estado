@@ -62,7 +62,7 @@ Contradictions and errors in the spec. By rule 2 of section 0, section 5 wins. E
 ## 11. 4.3, 5.9: `cx.in_state` inside an `#[always]` handler
 
 - **Problem.** 4.3 says `in_state` answers from a snapshot of the active configuration. `Machine` builds the `Cx` of `run_always` (spec 4.1) without the snapshot, so `cx.in_state(..)` is `false` there even when `Spec::TRACKS_ACTIVE` is true. Handlers and entries of the microsteps for events do have it.
-- **Resolution.** Documented, not changed: no scenario needs it, and the fix belongs in `estado-core` (take the snapshot in `drain` the way `microstep` does). Until then an `#[always]` or `#[on_done]` handler must not call `cx.in_state`.
+- **Resolution.** Fixed in `estado-core`: `drain` takes the snapshot for `run_always` exactly as `microstep` does when `TRACKS_ACTIVE` (test `in_state_inside_always_sees_sibling_regions`). `#[always]` and `#[on_done]` handlers may call `cx.in_state`.
 
 ## 12. 6.1, 7.1, 7.2: the closures of `#[after]` and `#[invoke]` take the data of the state by reference
 
