@@ -1,8 +1,8 @@
 //! ADR 0013 item 8: feature detection can be forced. The macro finds
 //! `cx.raise(..)` and `cx.in_state(..)` by looking for the method call inside
-//! the machine module; a helper outside the module, or a call written
-//! `Cx::raise(cx, ..)`, is invisible to it. `#[machine(tracks_active)]` and an
-//! explicit `raise_cap` / `defer_cap` switch the features on regardless.
+//! the machine module; a helper outside the module is invisible to it.
+//! `#[machine(tracks_active)]` and an explicit `raise_cap` / `defer_cap`
+//! switch the features on regardless.
 //!
 //! Before, such a machine had no queues (the first `raise` overflowed and
 //! poisoned it) and `in_state` was false for ever.
