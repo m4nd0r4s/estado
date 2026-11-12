@@ -1,0 +1,21 @@
+[package]
+name = "estado-examples"
+description = "Reference scenarios of the estado specification (section 11)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+estado-core = { workspace = true, features = ["std"] }
+
+[dev-dependencies]
+criterion = { version = "0.5", default-features = false, features = ["cargo_bench_support"] }
+
+[lints]
+workspace = true

@@ -162,6 +162,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "estado-examples"
+version = "0.0.0"
+dependencies = [
+ "criterion",
+ "estado-core",
+]
+
+[[package]]
 name = "estado-graph"
 version = "0.0.0"
 dependencies = [
