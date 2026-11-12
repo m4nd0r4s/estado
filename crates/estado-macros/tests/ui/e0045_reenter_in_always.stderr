@@ -1,0 +1,6 @@
+error: estado::E0045: `reenter!` has no meaning in `#[always]` and `#[on_done]`
+         = help: these handlers react to their state, not to an event: only `stay!()` and `goto!` are allowed
+  --> tests/ui/e0045_reenter_in_always.rs:20:13
+   |
+20 |             reenter!()
+   |             ^^^^^^^^^^

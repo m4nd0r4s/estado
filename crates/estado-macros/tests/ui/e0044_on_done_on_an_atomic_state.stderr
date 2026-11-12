@@ -1,0 +1,6 @@
+error: estado::E0044: `Running` has no substates, so it never completes
+         = help: `#[on_done]` reacts to a final substate of a compound state
+  --> tests/ui/e0044_on_done_on_an_atomic_state.rs:20:19
+   |
+20 |         #[on_done(Running)]
+   |                   ^^^^^^^

@@ -3,4 +3,4 @@ error: estado::E0022: `Done` is a terminal state and cannot transition out
   --> tests/ui/e0022_terminal_transition.rs:22:13
    |
 22 |             goto!(Idle)
-   |             ^^^^
+   |             ^^^^^^^^^^^

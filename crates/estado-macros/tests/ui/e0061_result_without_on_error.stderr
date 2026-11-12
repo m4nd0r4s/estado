@@ -3,4 +3,4 @@ error: estado::E0061: a handler returns `Result` but there is no `#[on_error]`
   --> tests/ui/e0061_result_without_on_error.rs:19:53
    |
 19 |         fn on_idle(_cx: &mut Cx<Self>, _event: &Ev) -> Result<Next<Self>, String> {
-   |                                                     ^
+   |                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -1,9 +1,9 @@
 error: estado::E0090: `#[choice]` is not supported yet by this version of `estado`
          = help: it is part of the planned macro language (spec 6.1)
-  --> tests/ui/e0090_not_supported_yet.rs:19:11
+  --> tests/ui/e0090_not_supported_yet.rs:19:9
    |
 19 |         #[choice]
-   |           ^^^^^^
+   |         ^^^^^^^^^
 
 error: estado::E0043: `Playing` records no history
          = help: add `#[history]` or `#[history(deep, keep)]` to the struct of `Playing`

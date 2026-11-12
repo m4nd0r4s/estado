@@ -1,0 +1,6 @@
+error: estado::E0017: `#[on]` must be on a function, not on a constant
+         = help: handlers, entries, exits and the like are functions of the `#[handlers]` impl
+  --> tests/ui/e0017_role_on_a_constant.rs:17:9
+   |
+17 |         #[on(Idle)]
+   |         ^^^^^^^^^^^

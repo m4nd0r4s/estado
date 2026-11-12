@@ -1,3 +1,10 @@
+error: estado::E0012: state `L0` is named like its own id constant `Root::L0`
+         = help: name states in CamelCase (`Io` instead of `IO`) so that the id constant, in SCREAMING_SNAKE_CASE, is a different name
+  --> tests/ui/e0011_too_deep.rs:10:9
+   |
+10 |         L0(S0),
+   |         ^^
+
 error: estado::E0011: `L16` is nested 17 levels deep; the maximum is 16
          = help: flatten the hierarchy, or move a branch into a child machine
    --> tests/ui/e0011_too_deep.rs:202:9

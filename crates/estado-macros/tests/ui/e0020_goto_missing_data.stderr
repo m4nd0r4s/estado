@@ -3,7 +3,7 @@ error: estado::E0020: `goto!(Active)` needs data for `Active`: missing `volume`
   --> tests/ui/e0020_goto_missing_data.rs:36:13
    |
 36 |             goto!(Active { track: 1 })
-   |             ^^^^
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: estado::E0020: note: `Active` is declared here
   --> tests/ui/e0020_goto_missing_data.rs:14:9

@@ -3,4 +3,4 @@ error: estado::E0042: entries and exits cannot transition or return a `Next`
   --> tests/ui/e0042_transition_in_entry.rs:21:13
    |
 21 |             goto!(Playing);
-   |             ^^^^
+   |             ^^^^^^^^^^^^^^

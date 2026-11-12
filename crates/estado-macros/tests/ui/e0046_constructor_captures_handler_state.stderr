@@ -1,0 +1,15 @@
+error: estado::E0046: the constructor of this `goto!` uses `up`, which the handler borrows
+         = help: the constructor runs after the handler returned: copy what it needs into a local before the `goto!` and use a `move` closure
+  --> tests/ui/e0046_constructor_captures_handler_state.rs:39:28
+   |
+39 |                     code: *up.rounds + old.rounds,
+   |                            ^^
+
+error: estado::E0046: note: the constructor form of this `goto!`
+  --> tests/ui/e0046_constructor_captures_handler_state.rs:38:30
+   |
+38 |                   Ev::Crash => goto!(Failed { code: 1 }, |old: Exiting![Active]| Player::Failed {
+   |  ______________________________^
+39 | |                     code: *up.rounds + old.rounds,
+40 | |                 }),
+   | |__________________^

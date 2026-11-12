@@ -1,0 +1,6 @@
+error: estado::E0017: `#[handlers]` must be on an inherent `impl Player`
+         = help: the handlers are functions of the root type `Player`: write `impl Player { .. }`
+  --> tests/ui/e0017_handlers_on_another_type.rs:18:10
+   |
+18 |     impl Other {
+   |          ^^^^^
