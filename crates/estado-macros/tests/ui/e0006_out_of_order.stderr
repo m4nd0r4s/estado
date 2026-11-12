@@ -1,0 +1,6 @@
+error: estado::E0006: parameter is out of order or repeated
+         = help: parameters come in this order, all optional: own data, ancestor `*Fields` (nearest first), `cx`, event
+  --> tests/ui/e0006_out_of_order.rs:19:35
+   |
+19 |         fn idle(_event: &Ev, _cx: &mut Cx<Self>) -> Next<Self> {
+   |                                   ^

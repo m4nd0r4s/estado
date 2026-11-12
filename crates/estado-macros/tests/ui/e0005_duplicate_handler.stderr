@@ -1,0 +1,12 @@
+error: estado::E0005: `Idle` already has a handler for this role
+         = help: a state has at most one `#[on]`, `#[entry]`, `#[exit]`, `#[always]` and `#[on_done]`
+  --> tests/ui/e0005_duplicate_handler.rs:23:14
+   |
+23 |         #[on(Idle)]
+   |              ^^^^
+
+error: estado::E0005: note: the first one
+  --> tests/ui/e0005_duplicate_handler.rs:18:14
+   |
+18 |         #[on(Idle)]
+   |              ^^^^

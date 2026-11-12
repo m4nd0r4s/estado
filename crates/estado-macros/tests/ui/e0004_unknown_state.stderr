@@ -1,0 +1,6 @@
+error: estado::E0004: `Plying` is not a state of this machine
+         = help: did you mean `Playing`?
+  --> tests/ui/e0004_unknown_state.rs:19:14
+   |
+19 |         #[on(Plying)]
+   |              ^^^^^^

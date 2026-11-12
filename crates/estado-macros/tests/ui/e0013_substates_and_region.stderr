@@ -10,3 +10,16 @@ error: estado::E0013: note: the `#[substates]` field
    |
 16 |         sub: Sub,
    |         ^^^
+
+error: estado::E0020: `Active` is entered through its `#[initial]` and needs data for `extra`
+         = help: add `#[initial(with = constructor)]` to `Active` so the macro can build it
+  --> tests/ui/e0013_substates_and_region.rs:10:9
+   |
+10 |         Active(Active),
+   |         ^^^^^^
+
+error: estado::E0020: note: `Active` is declared here
+  --> tests/ui/e0013_substates_and_region.rs:10:9
+   |
+10 |         Active(Active),
+   |         ^^^^^^

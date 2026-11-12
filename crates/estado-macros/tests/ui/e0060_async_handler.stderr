@@ -1,0 +1,6 @@
+error: estado::E0060: handlers cannot be `async`
+         = help: do asynchronous work with `#[invoke]` and let the result arrive as an event (spec 7)
+  --> tests/ui/e0060_async_handler.rs:19:9
+   |
+19 |         async fn idle(_cx: &mut Cx<Self>, _event: &Ev) -> Next<Self> {
+   |         ^^^^^

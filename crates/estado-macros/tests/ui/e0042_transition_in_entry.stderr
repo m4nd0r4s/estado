@@ -1,0 +1,6 @@
+error: estado::E0042: entries and exits cannot transition or return a `Next`
+         = help: do the work here and let a handler decide the transition (spec 5.3)
+  --> tests/ui/e0042_transition_in_entry.rs:21:13
+   |
+21 |             goto!(Playing);
+   |             ^^^^

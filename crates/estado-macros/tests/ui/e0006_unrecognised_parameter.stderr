@@ -1,0 +1,6 @@
+error: estado::E0006: parameter type `u32` is not recognised
+         = help: a handler takes, in this order and all optional: the data of its state, the `*Fields` of its ancestors, `&mut Cx<Self>` and `&Event` (spec 6.2)
+  --> tests/ui/e0006_unrecognised_parameter.rs:19:58
+   |
+19 |         fn idle(_cx: &mut Cx<Self>, _event: &Ev, _extra: u32) -> Next<Self> {
+   |                                                          ^^^

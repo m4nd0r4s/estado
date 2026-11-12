@@ -1,0 +1,6 @@
+error: estado::E0003: `Playin` is not a state of this machine
+         = help: did you mean `Playing`?
+  --> tests/ui/e0003_unknown_target.rs:22:19
+   |
+22 |             goto!(Playin)
+   |                   ^^^^^^

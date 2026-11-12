@@ -1,0 +1,12 @@
+error: estado::E0020: `Playing` is entered through its `#[initial]` and needs data for `pos`
+         = help: add `#[initial(with = constructor)]` to `Playing` so the macro can build it
+  --> tests/ui/e0020_initial_needs_data.rs:14:9
+   |
+14 |         Playing {
+   |         ^^^^^^^
+
+error: estado::E0020: note: `Playing` is declared here
+  --> tests/ui/e0020_initial_needs_data.rs:14:9
+   |
+14 |         Playing {
+   |         ^^^^^^^

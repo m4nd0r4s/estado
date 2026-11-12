@@ -7,7 +7,7 @@ use estado_macros::machine;
 pub struct Ev;
 
 #[machine(event = Ev, size_warn = 32)]
-mod player {
+mod player { use super::*;
     #[root]
     pub enum Player {
         #[initial]

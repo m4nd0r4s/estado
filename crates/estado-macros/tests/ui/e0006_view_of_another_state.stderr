@@ -1,0 +1,6 @@
+error: estado::E0006: `PausedMut` is the view of `Paused`, but this function belongs to `Playing`
+         = help: a handler takes the view of its own state only
+  --> tests/ui/e0006_view_of_another_state.rs:27:29
+   |
+27 |         fn playing(_paused: PausedMut<'_>, _cx: &mut Cx<Self>, _event: &Ev) -> Next<Self> {
+   |                             ^^^^^^^^^

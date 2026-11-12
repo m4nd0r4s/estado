@@ -1,0 +1,5 @@
+error: estado::E0043: `external` needs a target that is the state itself or one of its ancestors, and `Playing` is neither
+  --> tests/ui/e0043_external_target_not_an_ancestor.rs:21:28
+   |
+21 |             goto!(Playing, external)
+   |                            ^^^^^^^^

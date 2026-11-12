@@ -1,0 +1,6 @@
+error: estado::E0006: `Playing` is a state, not a parameter type
+         = help: `Playing` has fields in its variant: take the view `PlayingMut<'_>`
+  --> tests/ui/e0006_struct_like_state_by_reference.rs:24:30
+   |
+24 |         fn playing(_playing: &mut Playing, _cx: &mut Cx<Self>, _event: &Ev) -> Next<Self> {
+   |                              ^

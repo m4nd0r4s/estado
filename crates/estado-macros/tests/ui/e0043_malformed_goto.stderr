@@ -1,0 +1,12 @@
+error: estado::E0043: this transition exits `Active`, not `Playing`
+         = help: write `Exiting![Active]`
+  --> tests/ui/e0043_malformed_goto.rs:37:33
+   |
+37 |             goto!(Failed, |old: Exiting![Playing]| Player::Failed)
+   |                                 ^^^^^^^
+
+error: estado::E0043: `Failed` is not below `Idle` in the hierarchy
+  --> tests/ui/e0043_malformed_goto.rs:43:26
+   |
+43 |             goto!(Idle / Failed)
+   |                          ^^^^^^

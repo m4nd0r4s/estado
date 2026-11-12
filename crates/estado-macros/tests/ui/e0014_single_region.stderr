@@ -4,3 +4,16 @@ error: estado::E0014: `Active` has a single `#[region]` field; a parallel state 
    |
 16 |         output: Output,
    |         ^^^^^^
+
+error: estado::E0020: `Active` is entered through its `#[initial]` and needs data for `0`
+         = help: add `#[initial(with = constructor)]` to `Active` so the macro can build it
+  --> tests/ui/e0014_single_region.rs:10:9
+   |
+10 |         Active(Active),
+   |         ^^^^^^
+
+error: estado::E0020: note: `Active` is declared here
+  --> tests/ui/e0014_single_region.rs:10:9
+   |
+10 |         Active(Active),
+   |         ^^^^^^
