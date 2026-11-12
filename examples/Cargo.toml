@@ -18,5 +18,9 @@ estado-core = { workspace = true, features = ["std"] }
 estado-test = { path = "../crates/estado-test" }
 criterion = { version = "0.5", default-features = false, features = ["cargo_bench_support"] }
 
+[[bench]]
+name = "bm_01_http_parser"
+harness = false
+
 [lints]
 workspace = true
