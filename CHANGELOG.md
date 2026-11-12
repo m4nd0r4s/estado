@@ -1,5 +1,14 @@
 # Changelog
 
+## M2 — hand-written core
+
+- `estado-core`: `Spec`, `Machine` with the run-to-completion algorithm (queues, defer, policies, livelock, poisoning through `Slot`), `Cx`, effects and sinks, `fire`/`complete` with epochs and stale keys, `Driver`/`drive`. `no_std` without alloc, no dependencies.
+- `estado-test`: `Harness` with a virtual clock, `assert_state!`.
+- Acceptance tests AC-01 to AC-10, AC-15, AC-16, AC-18 on hand-written machines.
+- Scenarios A (HTTP/1 parser), B (connection), D (game character) and I (media player) written by hand in `estado-examples`.
+- BM-02 at parity with hand-written `enum` + `match`. BM-01 at 1.6-1.7x, carried to M3 (ADR 0009).
+- ADRs 0004-0009; spec errata 5-6.
+
 ## M1 — risk prototypes
 
 - Typed edges `Next<M, impl Edge<M>>` work on stable; plan B for R1 is not needed (ADR 0001).
