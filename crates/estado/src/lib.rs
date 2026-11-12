@@ -56,3 +56,8 @@ pub mod prelude {
 
     pub use crate::{Exiting, bubble, defer, edges, goto, goto_dyn, reenter, stay, unhandled};
 }
+
+/// The README's examples, compiled and run as doctests.
+#[cfg(doctest)]
+#[doc = include_str!("../../../README.md")]
+mod readme {}
