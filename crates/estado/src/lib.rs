@@ -40,6 +40,13 @@ pub use estado_macros::{handlers, machine, root, state};
 
 mod transitions;
 
+/// Not public API: the generated code of `#[machine]` reaches `estado-core`
+/// through here, so a crate that depends on `estado` alone can use it.
+#[doc(hidden)]
+pub mod __private {
+    pub use estado_core as core;
+}
+
 /// Common imports: `use estado::prelude::*;`.
 pub mod prelude {
     pub use estado_core::{

@@ -1,0 +1,15 @@
+[package]
+name = "estado-facade-check"
+description = "Compiles machines against the estado facade alone (no estado-core, no estado-macros)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+estado = { path = "../estado" }
+
+[lints]
+workspace = true
