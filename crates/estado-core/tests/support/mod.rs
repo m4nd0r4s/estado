@@ -4,5 +4,6 @@
 #![allow(dead_code)]
 
 pub mod connection;
+pub mod fetch;
 pub mod probe;
 pub mod tree;
