@@ -1,0 +1,23 @@
+error: use of deprecated associated function `player::__estado_warnings::WarnIf::<true>::W0004_Big`: estado::W0004: variant `Big` holds more than 32 bytes (`size_warn`); consider boxing its data with `Box<..>`, or raise `size_warn` (silence with `#[machine(allow(W0004))]`)
+  --> tests/warnings/w0004_emits.rs:15:9
+   |
+15 |         Big { buffer: [u8; 64], length: usize },
+   |         ^^^
+   |
+note: the lint level is defined here
+  --> tests/warnings/w0004_emits.rs:2:9
+   |
+ 2 | #![deny(deprecated)]
+   |         ^^^^^^^^^^
+
+error: use of deprecated associated function `player::__estado_warnings::WarnIf::<true>::W0004_Tuple`: estado::W0004: variant `Tuple` holds more than 32 bytes (`size_warn`); consider boxing its data with `Box<..>`, or raise `size_warn` (silence with `#[machine(allow(W0004))]`)
+  --> tests/warnings/w0004_emits.rs:16:9
+   |
+16 |         Tuple([u8; 40], u8),
+   |         ^^^^^
+
+error: use of deprecated associated function `player::__estado_warnings::WarnIf::<true>::W0004_Wrapped`: estado::W0004: variant `Wrapped` holds more than 32 bytes (`size_warn`); consider boxing its data with `Box<..>`, or raise `size_warn` (silence with `#[machine(allow(W0004))]`)
+  --> tests/warnings/w0004_emits.rs:17:9
+   |
+17 |         Wrapped(Wrapper),
+   |         ^^^^^^^

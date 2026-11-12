@@ -1,6 +1,8 @@
 //! Checks of the `#[machine(..)]` options against the tree (E0002, E0050).
 
 use crate::model::{Diagnostic, MachineModel, StateKind};
+use crate::suggest::did_you_mean;
+use crate::warnings::WarningCode;
 
 pub fn check(model: &MachineModel, diagnostics: &mut Vec<Diagnostic>) {
     if !model.options.event_declared {
@@ -29,5 +31,31 @@ pub fn check(model: &MachineModel, diagnostics: &mut Vec<Diagnostic>) {
                 .with_help("remove `typestate`, or split the regions into separate machines"),
             );
         }
+    }
+    check_allowed_warnings(model, diagnostics);
+}
+
+/// `allow(W....)` must name a warning that exists (E0016).
+fn check_allowed_warnings(model: &MachineModel, diagnostics: &mut Vec<Diagnostic>) {
+    for code in &model.options.allowed_warnings {
+        let written = code.to_string();
+        if WarningCode::from_label(&written).is_some() {
+            continue;
+        }
+        let help = match did_you_mean(&written, WarningCode::labels()) {
+            Some(suggestion) => format!("did you mean `{suggestion}`?"),
+            None => format!(
+                "the warnings are: {}",
+                WarningCode::labels().collect::<Vec<_>>().join(", ")
+            ),
+        };
+        diagnostics.push(
+            Diagnostic::new(
+                "E0016",
+                code.span(),
+                format!("unknown warning code `{written}` in `allow(..)`"),
+            )
+            .with_help(help),
+        );
     }
 }

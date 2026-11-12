@@ -10,6 +10,7 @@ use crate::analysis;
 use crate::generate;
 use crate::model::{Diagnostic, MachineModel, TypeDecl};
 use crate::parse;
+use crate::warnings;
 
 /// `#[machine(..)]`.
 pub fn machine(attribute: TokenStream, item: TokenStream) -> TokenStream {
@@ -56,6 +57,7 @@ fn machine_items(model: &MachineModel) -> Vec<Item> {
     items.extend(model.passthrough.iter().cloned());
     items.extend(model.handlers.iter().cloned().map(Item::Impl));
     items.push(Item::Verbatim(generate::generated_items(model)));
+    items.push(Item::Verbatim(warnings::warning_items(model)));
     items
 }
 

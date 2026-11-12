@@ -10,6 +10,7 @@ mod model;
 mod naming;
 mod parse;
 mod suggest;
+mod warnings;
 
 use proc_macro::TokenStream;
 

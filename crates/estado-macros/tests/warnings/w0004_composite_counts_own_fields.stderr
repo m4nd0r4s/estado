@@ -1,0 +1,11 @@
+error: use of deprecated associated function `player::__estado_warnings::WarnIf::<true>::W0004_Loud`: estado::W0004: variant `Loud` holds more than 32 bytes (`size_warn`); consider boxing its data with `Box<..>`, or raise `size_warn` (silence with `#[machine(allow(W0004))]`)
+  --> tests/warnings/w0004_composite_counts_own_fields.rs:29:9
+   |
+29 |         Loud { samples: [u8; 128] },
+   |         ^^^^
+   |
+note: the lint level is defined here
+  --> tests/warnings/w0004_composite_counts_own_fields.rs:3:9
+   |
+ 3 | #![deny(deprecated)]
+   |         ^^^^^^^^^^

@@ -1,0 +1,13 @@
+error: estado::E0016: unknown warning code `W0044` in `allow(..)`
+         = help: did you mean `W0004`?
+ --> tests/ui/e0016_unknown_warning_code.rs:5:36
+  |
+5 | #[machine(event = Ev, allow(W0001, W0044, Z0001))]
+  |                                    ^^^^^
+
+error: estado::E0016: unknown warning code `Z0001` in `allow(..)`
+         = help: did you mean `W0001`?
+ --> tests/ui/e0016_unknown_warning_code.rs:5:43
+  |
+5 | #[machine(event = Ev, allow(W0001, W0044, Z0001))]
+  |                                           ^^^^^
