@@ -1,0 +1,413 @@
+//! `Machine<M>` and the run-to-completion `send` algorithm (spec 4.5, 5.4).
+
+use crate::context::{Cx, Fault};
+use crate::effect::Effect;
+use crate::error::SendError;
+use crate::ids::{StateId, StatePath};
+use crate::report::{IgnoreReason, Outcome, Report, Step};
+use crate::runtime::{EventQueues, Runtime};
+use crate::sink::{FnSink, Sink};
+use crate::slot::Slot;
+use crate::spec::{DeferOverflowPolicy, Spec, UnhandledPolicy};
+
+/// A running instance of the machine `M`.
+///
+/// Holds exactly the root state, the context and the runtime; the runtime
+/// is zero-sized when no optional feature is used (spec 3.5, errata 1).
+pub struct Machine<M: Spec> {
+    slot: Slot<M>,
+    ctx: M::Ctx,
+    runtime: M::Runtime,
+}
+
+/// Leaves the slot poisoned unless disarmed with `mem::forget` (spec 5.11).
+struct PoisonGuard<'machine, M> {
+    slot: &'machine mut Slot<M>,
+}
+
+impl<M> Drop for PoisonGuard<'_, M> {
+    fn drop(&mut self) {
+        *self.slot = Slot::Poisoned;
+    }
+}
+
+impl<M> PoisonGuard<'_, M> {
+    fn disarm(self) {
+        core::mem::forget(self);
+    }
+}
+
+/// Which event a microstep processes.
+enum Source {
+    External,
+    Internal,
+}
+
+impl<M: Spec> Machine<M> {
+    /// A machine that has not run any entry yet.
+    pub const fn new(ctx: M::Ctx) -> Self {
+        Self {
+            slot: Slot::Unstarted,
+            ctx,
+            runtime: M::Runtime::NEW,
+        }
+    }
+
+    /// Runs the initial entries. Does nothing when already started.
+    ///
+    /// # Errors
+    ///
+    /// [`SendError::Poisoned`], or a fault raised by an entry.
+    pub fn start(&mut self) -> Result<Step<M::Effects>, SendError<M::Event>> {
+        let mut effects = M::Effects::default();
+        let report = self.start_into(&mut effects)?;
+        Ok(Step { effects, report })
+    }
+
+    /// [`start`](Self::start) writing effects into `sink`.
+    ///
+    /// # Errors
+    ///
+    /// See [`start`](Self::start).
+    pub fn start_into<S: Sink<M::Effect>>(
+        &mut self,
+        sink: &mut S,
+    ) -> Result<Report, SendError<M::Event>> {
+        match self.slot {
+            Slot::Poisoned => return Err(SendError::Poisoned),
+            Slot::Live(_) => return Ok(Report::default()),
+            Slot::Unstarted => {}
+        }
+        let guard = PoisonGuard {
+            slot: &mut self.slot,
+        };
+        let mut report = Report::default();
+        start_in(guard.slot, &mut self.ctx, &mut self.runtime, sink)?;
+        drain::<M, S>(
+            guard.slot,
+            &mut self.ctx,
+            &mut self.runtime,
+            sink,
+            &mut report,
+        )?;
+        guard.disarm();
+        Ok(report)
+    }
+
+    /// Processes one event to completion; effects are returned in the step.
+    ///
+    /// # Errors
+    ///
+    /// See [`SendError`].
+    pub fn send(&mut self, event: M::Event) -> Result<Step<M::Effects>, SendError<M::Event>> {
+        let mut effects = M::Effects::default();
+        let report = self.send_into(event, &mut effects)?;
+        Ok(Step { effects, report })
+    }
+
+    /// Processes one event to completion, writing effects into `sink`.
+    ///
+    /// # Errors
+    ///
+    /// See [`SendError`].
+    pub fn send_into<S: Sink<M::Effect>>(
+        &mut self,
+        event: M::Event,
+        sink: &mut S,
+    ) -> Result<Report, SendError<M::Event>> {
+        if self.slot.is_poisoned() {
+            return Err(SendError::Poisoned);
+        }
+        let guard = PoisonGuard {
+            slot: &mut self.slot,
+        };
+        if matches!(guard.slot, Slot::Unstarted) {
+            if let Err(error) = start_in(guard.slot, &mut self.ctx, &mut self.runtime, sink) {
+                return finish_error(guard, error);
+            }
+        }
+        let mut report = Report::default();
+        if guard.slot.live().is_some_and(M::is_done) {
+            report.ignored = Some(IgnoreReason::Unhandled);
+            guard.disarm();
+            return Ok(report);
+        }
+        let first = microstep(
+            guard.slot,
+            &mut self.ctx,
+            &mut self.runtime,
+            sink,
+            event,
+            Source::External,
+            &mut report,
+        );
+        if let Err(error) = first {
+            return finish_error(guard, error);
+        }
+        if let Err(error) = drain::<M, S>(
+            guard.slot,
+            &mut self.ctx,
+            &mut self.runtime,
+            sink,
+            &mut report,
+        ) {
+            return finish_error(guard, error);
+        }
+        guard.disarm();
+        Ok(report)
+    }
+
+    /// [`send_into`](Self::send_into) with a closure as the sink.
+    ///
+    /// # Errors
+    ///
+    /// See [`SendError`].
+    pub fn send_with(
+        &mut self,
+        event: M::Event,
+        on_effect: impl FnMut(Effect<M::Effect>),
+    ) -> Result<Report, SendError<M::Event>> {
+        self.send_into(event, &mut FnSink(on_effect))
+    }
+
+    /// Sends every event in order; stops at the first error. The report
+    /// accumulates counters; `handled` and `ignored` describe the last event.
+    ///
+    /// # Errors
+    ///
+    /// See [`SendError`].
+    pub fn send_batch<S: Sink<M::Effect>>(
+        &mut self,
+        events: impl IntoIterator<Item = M::Event>,
+        sink: &mut S,
+    ) -> Result<Report, SendError<M::Event>> {
+        let mut total = Report::default();
+        for event in events {
+            let report = self.send_into(event, sink)?;
+            total.handled = report.handled;
+            total.ignored = report.ignored;
+            total.transitions = total.transitions.saturating_add(report.transitions);
+            total.microsteps = total.microsteps.saturating_add(report.microsteps);
+            total.unhandled_internal = total
+                .unhandled_internal
+                .saturating_add(report.unhandled_internal);
+        }
+        Ok(total)
+    }
+
+    /// The root state.
+    ///
+    /// # Panics
+    ///
+    /// If the machine is poisoned or not started.
+    pub fn state(&self) -> &M {
+        match &self.slot {
+            Slot::Live(state) => state,
+            Slot::Unstarted => panic!(
+                "estado: machine `{}` has not started; call start() or send()",
+                M::NAME
+            ),
+            Slot::Poisoned => panic!(
+                "estado: machine `{}` is poisoned by an earlier panic or fatal error",
+                M::NAME
+            ),
+        }
+    }
+
+    /// The root state, unless poisoned or not started.
+    pub fn try_state(&self) -> Option<&M> {
+        self.slot.live()
+    }
+
+    /// The global context.
+    pub fn ctx(&self) -> &M::Ctx {
+        &self.ctx
+    }
+
+    /// The global context, mutably.
+    pub fn ctx_mut(&mut self) -> &mut M::Ctx {
+        &mut self.ctx
+    }
+
+    /// Whether `state` is active. `false` when not live.
+    pub fn is_in(&self, state: StateId) -> bool {
+        self.slot
+            .live()
+            .is_some_and(|root| root.path().contains(state))
+    }
+
+    /// The active configuration.
+    ///
+    /// # Panics
+    ///
+    /// If the machine is poisoned or not started.
+    pub fn path(&self) -> StatePath {
+        self.state().path()
+    }
+
+    /// Whether the root reached a `#[final]` state.
+    pub fn is_done(&self) -> bool {
+        self.slot.live().is_some_and(M::is_done)
+    }
+
+    /// Moves the output out of the root `#[final]` state.
+    pub fn take_output(&mut self) -> Option<M::Output> {
+        match &mut self.slot {
+            Slot::Live(state) => state.take_output(),
+            _ => None,
+        }
+    }
+
+    /// Whether the machine is poisoned.
+    pub fn is_poisoned(&self) -> bool {
+        self.slot.is_poisoned()
+    }
+
+    /// The runtime, for generated code and tests.
+    #[doc(hidden)]
+    pub fn runtime(&self) -> &M::Runtime {
+        &self.runtime
+    }
+}
+
+fn finish_error<M, Event>(
+    guard: PoisonGuard<'_, M>,
+    error: SendError<Event>,
+) -> Result<Report, SendError<Event>> {
+    let poisons = matches!(error, SendError::RaiseOverflow | SendError::Livelock { .. });
+    if poisons {
+        drop(guard);
+    } else {
+        guard.disarm();
+    }
+    Err(error)
+}
+
+fn start_in<M: Spec, S: Sink<M::Effect>>(
+    slot: &mut Slot<M>,
+    ctx: &mut M::Ctx,
+    runtime: &mut M::Runtime,
+    sink: &mut S,
+) -> Result<(), SendError<M::Event>> {
+    slot.put(M::initial());
+    let mut cx = Cx::<M, S>::new(ctx, runtime, sink, None);
+    slot.live_mut().enter_initial(&mut cx);
+    check_fault(cx.fault())
+}
+
+fn check_fault<Event>(fault: Option<Fault>) -> Result<(), SendError<Event>> {
+    match fault {
+        None => Ok(()),
+        Some(Fault::EffectOverflow) => Err(SendError::EffectOverflow),
+        Some(Fault::RaiseOverflow) => Err(SendError::RaiseOverflow),
+    }
+}
+
+/// One microstep of `event`, then the policy for its outcome (spec 5.4).
+fn microstep<M: Spec, S: Sink<M::Effect>>(
+    slot: &mut Slot<M>,
+    ctx: &mut M::Ctx,
+    runtime: &mut M::Runtime,
+    sink: &mut S,
+    event: M::Event,
+    source: Source,
+    report: &mut Report,
+) -> Result<(), SendError<M::Event>> {
+    let snapshot = if M::TRACKS_ACTIVE {
+        Some(slot.live_mut().path())
+    } else {
+        None
+    };
+    let outcome = {
+        let mut cx = Cx::<M, S>::new(ctx, runtime, sink, snapshot.as_ref());
+        let outcome = M::microstep(slot, &mut cx, &event);
+        check_fault(cx.fault())?;
+        outcome
+    };
+    count(report, outcome, &source);
+    match outcome {
+        Outcome::Stayed => {}
+        Outcome::Transitioned { changed } => {
+            if changed {
+                runtime.queues().requeue_deferred();
+            }
+        }
+        Outcome::Deferred => defer::<M>(runtime, event)?,
+        Outcome::Unhandled(policy) => match (policy, source) {
+            (UnhandledPolicy::Panic, _) => panic!(
+                "estado: machine `{}` has no handler for the event in {}",
+                M::NAME,
+                slot.live_mut().path()
+            ),
+            (UnhandledPolicy::Error, Source::External) => return Err(SendError::Unhandled(event)),
+            (UnhandledPolicy::Ignore, Source::External) => {
+                report.ignored = Some(IgnoreReason::Unhandled)
+            }
+            (_, Source::Internal) => report.unhandled_internal += 1,
+        },
+    }
+    Ok(())
+}
+
+fn count(report: &mut Report, outcome: Outcome, source: &Source) {
+    report.microsteps += 1;
+    if let Outcome::Transitioned { .. } = outcome {
+        report.transitions += 1;
+    }
+    if matches!(source, Source::External) {
+        report.handled = !matches!(outcome, Outcome::Unhandled(_));
+    }
+}
+
+fn defer<M: Spec>(runtime: &mut M::Runtime, event: M::Event) -> Result<(), SendError<M::Event>> {
+    let queues = runtime.queues();
+    match queues.defer(event) {
+        Ok(()) => Ok(()),
+        Err(event) => match M::DEFER_OVERFLOW {
+            DeferOverflowPolicy::Error => Err(SendError::DeferOverflow(event)),
+            DeferOverflowPolicy::DropOldest => {
+                queues.drop_oldest_deferred();
+                queues.defer(event).map_err(SendError::DeferOverflow)
+            }
+        },
+    }
+}
+
+/// Runs pending always > internal > requeued events until none is left.
+fn drain<M: Spec, S: Sink<M::Effect>>(
+    slot: &mut Slot<M>,
+    ctx: &mut M::Ctx,
+    runtime: &mut M::Runtime,
+    sink: &mut S,
+    report: &mut Report,
+) -> Result<(), SendError<M::Event>> {
+    loop {
+        if report.microsteps > M::MAX_MICROSTEPS {
+            return Err(SendError::Livelock {
+                microsteps: report.microsteps,
+                last: slot.live_mut().path(),
+            });
+        }
+        if runtime.take_always_pending() {
+            let outcome = {
+                let mut cx = Cx::<M, S>::new(ctx, runtime, sink, None);
+                let outcome = M::run_always(slot, &mut cx);
+                check_fault(cx.fault())?;
+                outcome
+            };
+            count(report, outcome, &Source::Internal);
+            if let Outcome::Transitioned { changed: true } = outcome {
+                runtime.queues().requeue_deferred();
+            }
+            continue;
+        }
+        let next = {
+            let queues = runtime.queues();
+            queues.pop_raised().or_else(|| queues.pop_requeued())
+        };
+        match next {
+            Some(event) => microstep(slot, ctx, runtime, sink, event, Source::Internal, report)?,
+            None => return Ok(()),
+        }
+    }
+}
