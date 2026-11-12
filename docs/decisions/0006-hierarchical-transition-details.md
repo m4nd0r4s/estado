@@ -11,7 +11,7 @@ Writing the `Tree` test machine by hand (`crates/estado-core/tests/support/tree/
 ## Decision
 
 1. **`reenter!()` keeps the state's own data.** Table 5.2 says `reenter!()` exits and enters `H` and its initials, but `reenter!()` carries no data to rebuild `H`. The state's own fields stay as they are; its substates restart from their `#[initial]`. To rebuild the data, write `goto!(H { .. })` instead, which has the same exit/entry order.
-2. **Self-transitions do not change the configuration.** `goto!(H)` on the handler's own state and `reenter!()` report `Transitioned { changed: false }`, so deferred events are not requeued (spec 5.4 requeues only when the configuration changes).
+2. **A self-transition changes the configuration only if the active states differ afterwards.** `goto!(H)` and `reenter!()` on an atomic state, or on a compound already in its initial substates, report `Transitioned { changed: false }`, so deferred events are not requeued (spec 5.4 requeues only when the configuration changes). On a compound that was in another substate they report `changed: true`. Generated code compares the active leaf ids before and after.
 3. **A local transition to an ancestor enters its initial, never its history.** The "(or history)" of table 5.2 row 3 applies only with `goto!(T, history)`. The ancestor does not exit, so its history would not have been recorded by this transition anyway.
 
 Deep history combined with a constructor is spec errata 5.

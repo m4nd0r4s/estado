@@ -111,10 +111,14 @@ fn reenter_playing<S: Sink<()>>(slot: &mut Slot<Tree>, cx: &mut TreeCx<'_, S>) -
     let ActiveSub::Playing(playing) = &mut active.sub else {
         unreachable!("Playing is active")
     };
+    let leaf_before = playing.sub;
     exit_playing(playing, cx);
     playing.sub = PlayingSub::Normal;
     enter_playing(playing, cx);
-    Outcome::Transitioned { changed: false }
+    // The configuration changes when the substate was not the initial (ADR 0006).
+    Outcome::Transitioned {
+        changed: leaf_before != PlayingSub::Normal,
+    }
 }
 
 fn bubble_to_active<S: Sink<()>>(
