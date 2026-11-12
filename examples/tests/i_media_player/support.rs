@@ -1,9 +1,10 @@
-//! Shared helpers of the scenario I tests.
+// Shared helpers of the scenario I tests.
 
 use std::time::Duration;
 
 use estado_core::Machine;
-use estado_examples::i_media_player::{Active, AudioBuffer, Command, Event, Player, TrackId};
+
+use super::scenario::{Active, AudioBuffer, Command, Event, Player, TrackId};
 
 pub const SECOND: Duration = Duration::from_secs(1);
 
@@ -61,4 +62,14 @@ pub fn failed_of(machine: &Machine<Player>) -> (&str, &AudioBuffer) {
         Player::Failed { reason, buffer } => (reason, buffer),
         other => panic!("expected Failed, got {other:?}"),
     }
+}
+
+/// The expected log, without the `construct ..` lines when the version under
+/// test does not log them (a generated constructor is the user's closure).
+pub fn logged<'a>(lines: &[&'a str]) -> Vec<&'a str> {
+    lines
+        .iter()
+        .copied()
+        .filter(|line| super::LOGS_CONSTRUCTORS || !line.starts_with("construct "))
+        .collect()
 }

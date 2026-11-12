@@ -13,6 +13,7 @@ path = "lib.rs"
 
 [dependencies]
 estado-core = { workspace = true, features = ["std"] }
+estado-macros = { workspace = true }
 
 [dev-dependencies]
 estado-test = { path = "../crates/estado-test" }

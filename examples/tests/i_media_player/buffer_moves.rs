@@ -1,11 +1,11 @@
-//! The buffer moves: `Active -> Failed` and `Failed -> Active`, both through
-//! constructor-form edges, and the restart of `Active` with a new buffer.
+// The buffer moves: `Active -> Failed` and `Failed -> Active`, both through
+// constructor-form edges, and the restart of `Active` with a new buffer.
 
 use std::time::Duration;
 
-use estado_examples::i_media_player::{ActiveSub, AudioBuffer, Command, Event, Player, TrackId};
+use super::scenario::{ActiveSub, AudioBuffer, Command, Event, Player, TrackId};
 
-use super::support::{SECOND, active_of, failed_of, paused, playing, send};
+use super::support::{SECOND, active_of, failed_of, logged, paused, playing, send};
 
 #[test]
 fn an_error_moves_the_buffer_into_failed_without_cloning_it() {
@@ -19,7 +19,7 @@ fn an_error_moves_the_buffer_into_failed_without_cloning_it() {
     let (log, commands) = send(&mut machine, Event::Error("disk unplugged".to_owned()));
     assert_eq!(
         log,
-        [
+        logged(&[
             "handler Playing",
             "handler Active",
             "exit Playing",
@@ -29,7 +29,7 @@ fn an_error_moves_the_buffer_into_failed_without_cloning_it() {
             "construct Failed",
             "entry Failed",
             "emit ShowError(\"disk unplugged\")",
-        ]
+        ])
     );
     assert_eq!(
         commands,
@@ -54,7 +54,7 @@ fn an_error_while_paused_skips_the_output_stop() {
     let (log, _) = send(&mut machine, Event::Error("late".to_owned()));
     assert_eq!(
         log,
-        [
+        logged(&[
             "handler Paused",
             "handler Active",
             "exit Paused",
@@ -63,7 +63,7 @@ fn an_error_while_paused_skips_the_output_stop() {
             "construct Failed",
             "entry Failed",
             "emit ShowError(\"late\")",
-        ]
+        ])
     );
     assert_eq!(failed_of(&machine).0, "late");
 }
@@ -80,7 +80,7 @@ fn retry_moves_the_buffer_out_of_failed_into_a_new_active() {
     let (log, commands) = send(&mut machine, Event::Play(TrackId(9)));
     assert_eq!(
         log,
-        [
+        logged(&[
             "handler Failed",
             "exit Failed",
             "construct Active",
@@ -88,7 +88,7 @@ fn retry_moves_the_buffer_out_of_failed_into_a_new_active() {
             "emit OpenTrack(TrackId(9))",
             "entry Playing",
             "emit StartOutput",
-        ]
+        ])
     );
     assert_eq!(
         commands,

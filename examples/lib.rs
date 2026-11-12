@@ -6,3 +6,4 @@ pub mod a_http_parser;
 pub mod b_connection;
 pub mod d_game_character;
 pub mod i_media_player;
+pub mod i_media_player_macro;
