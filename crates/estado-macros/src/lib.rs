@@ -4,8 +4,10 @@
 //! (ADR 0010); the other attributes are markers it consumes.
 
 mod analysis;
+mod construct;
 mod expand;
 mod generate;
+mod handlers;
 mod model;
 mod naming;
 mod parse;

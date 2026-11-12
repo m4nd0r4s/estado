@@ -37,6 +37,12 @@ pub fn state_constant_name(name: &Ident) -> String {
     screaming_snake_case(&name.unraw().to_string())
 }
 
+/// `ActiveSub` -> `active_sub`, `keep_alive` -> `keep_alive`: the base of the
+/// names of generated functions and bindings.
+pub fn snake_case_name(name: &Ident) -> String {
+    screaming_snake_case(&name.unraw().to_string()).to_lowercase()
+}
+
 #[cfg(test)]
 mod tests {
     use super::screaming_snake_case;
@@ -49,5 +55,11 @@ mod tests {
         assert_eq!(screaming_snake_case("HTTPServer"), "HTTP_SERVER");
         assert_eq!(screaming_snake_case("Idle2"), "IDLE2");
         assert_eq!(screaming_snake_case("State2Done"), "STATE2_DONE");
+    }
+
+    #[test]
+    fn snake_case_of_identifiers() {
+        let name: syn::Ident = syn::parse_quote!(ActiveSub);
+        assert_eq!(super::snake_case_name(&name), "active_sub");
     }
 }

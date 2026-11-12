@@ -13,6 +13,7 @@ mod tree;
 #[allow(unused_imports)] // consumed by the generators of beads 4.2 and 4.3
 pub use handlers::{
     GotoForm, GotoOccurrence, HandlerModel, HandlerParameter, HandlerRole, HandlerUses,
+    TransitionKind,
 };
 pub use options::{DeferOverflow, MachineOptions, UnhandledPolicy};
 pub use tree::{
@@ -36,6 +37,10 @@ pub struct MachineModel {
     pub tree: StateTree,
     /// The `#[handlers]` impl blocks, untouched (parsing output).
     pub handlers: Vec<ItemImpl>,
+    /// The `#[handlers]` impl blocks with every handler rewritten (bead 4.2);
+    /// what is emitted when the machine has no errors. Until then
+    /// [`Self::handlers`] holds the degraded versions.
+    pub rewritten_handlers: Vec<ItemImpl>,
     /// The analysed handlers (bead 4.2), consumed by the generators (4.3).
     pub analysed_handlers: Vec<HandlerModel>,
     /// Items of the module that are not part of the machine; emitted as is.

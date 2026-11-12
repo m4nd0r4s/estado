@@ -176,6 +176,50 @@ impl StateTree {
         ancestor == 0 || self.ancestors(node).contains(&ancestor)
     }
 
+    /// The `#[state]` struct declaration called `name`.
+    pub fn struct_declaration(&self, name: &Ident) -> Option<&ItemStruct> {
+        self.types.iter().find_map(|declaration| match declaration {
+            TypeDecl::Struct(item) if item.ident == *name => Some(item),
+            _ => None,
+        })
+    }
+
+    /// The enum declaration (root or `#[state]`) called `name`.
+    pub fn enum_declaration(&self, name: &Ident) -> Option<&ItemEnum> {
+        self.types.iter().find_map(|declaration| match declaration {
+            TypeDecl::Enum(item) if item.ident == *name => Some(item),
+            _ => None,
+        })
+    }
+
+    /// The fields of a compound or parallel state's struct that are shared
+    /// data: every field except `#[substates]` and `#[region]` ones.
+    pub fn shared_fields(&self, id: StateId) -> Vec<&Field> {
+        let node = self.node(id);
+        let Some(declaration) = node
+            .composite_struct
+            .as_ref()
+            .and_then(|name| self.struct_declaration(name))
+        else {
+            return Vec::new();
+        };
+        let region_names: Vec<&Ident> = node
+            .children
+            .iter()
+            .filter(|&&child| self.node(child).kind == StateKind::Region)
+            .map(|&child| &self.node(child).name)
+            .collect();
+        declaration
+            .fields
+            .iter()
+            .filter(|field| {
+                let name = field.ident.as_ref();
+                name != node.children_field.as_ref()
+                    && !name.is_some_and(|name| region_names.contains(&name))
+            })
+            .collect()
+    }
+
     /// Graph ids: every node but the root, shifted by one, so the first
     /// top-level state is `StateId(0)` at runtime.
     pub fn runtime_id(&self, id: StateId) -> u16 {

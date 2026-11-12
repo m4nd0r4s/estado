@@ -8,6 +8,7 @@ use syn::{Item, ItemMod};
 
 use crate::analysis;
 use crate::generate;
+use crate::handlers;
 use crate::model::{Diagnostic, MachineModel, TypeDecl};
 use crate::parse;
 use crate::warnings;
@@ -22,12 +23,13 @@ pub fn machine(attribute: TokenStream, item: TokenStream) -> TokenStream {
         return without_body(&module);
     };
 
-    let parsed = parse::parse_machine(attribute, &module, module_items);
+    let mut parsed = parse::parse_machine(attribute, &module, module_items);
     let mut diagnostics = parsed.diagnostics;
     let mut items = parsed.fallback_items;
-    if let Some(model) = &parsed.model {
+    if let Some(model) = parsed.model.as_mut() {
         diagnostics.extend(analysis::validate(model));
-        items = machine_items(model);
+        diagnostics.extend(handlers::analyse(model));
+        items = machine_items(model, diagnostics.is_empty());
     }
     items.extend(
         diagnostics
@@ -43,8 +45,9 @@ pub fn machine(attribute: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 /// The items of a machine module: cleaned types, passthrough, handlers and
-/// the generated code.
-fn machine_items(model: &MachineModel) -> Vec<Item> {
+/// the generated code. With `valid == false` (the machine has errors) the
+/// handlers keep their degraded form and only the state ids are generated.
+fn machine_items(model: &MachineModel, valid: bool) -> Vec<Item> {
     let mut items: Vec<Item> = model
         .tree
         .types
@@ -55,8 +58,13 @@ fn machine_items(model: &MachineModel) -> Vec<Item> {
         })
         .collect();
     items.extend(model.passthrough.iter().cloned());
-    items.extend(model.handlers.iter().cloned().map(Item::Impl));
-    items.push(Item::Verbatim(generate::generated_items(model)));
+    let handlers = if valid {
+        &model.rewritten_handlers
+    } else {
+        &model.handlers
+    };
+    items.extend(handlers.iter().cloned().map(Item::Impl));
+    items.push(Item::Verbatim(generate::generated_items(model, valid)));
     items.push(Item::Verbatim(warnings::warning_items(model)));
     items
 }

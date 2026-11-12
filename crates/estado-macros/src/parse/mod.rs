@@ -85,6 +85,7 @@ pub fn parse_machine(attribute: TokenStream, module: &ItemMod, module_items: Vec
         module_name: module.ident.clone(),
         tree: StateTree { nodes, types },
         handlers: items.handlers.iter().map(clean_handlers).collect(),
+        rewritten_handlers: Vec::new(),
         analysed_handlers: Vec::new(),
         passthrough: items.passthrough,
     };

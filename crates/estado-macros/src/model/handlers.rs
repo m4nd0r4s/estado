@@ -2,12 +2,12 @@
 //! (bead 4.2) and the transition and dispatch generators (bead 4.3).
 //! See ADR 0011.
 
-use syn::{Expr, ExprClosure, Ident, ItemFn};
+use syn::{Ident, ItemFn};
 
 use super::tree::StateId;
 
 /// What a function in a `#[handlers]` impl is for (spec 6.1).
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum HandlerRole {
     /// `#[on(S)]`: reacts to events.
     On,
@@ -33,37 +33,54 @@ pub enum HandlerParameter {
     /// `<Composite>Fields<'_>` of the ancestor `ancestor` (nearest first);
     /// for the own state of a compound or parallel state, its own fields.
     Fields { ancestor: StateId },
+    /// `&Output` of `#[on_done]`: the payload of the final substate.
+    Output,
     /// `&mut Cx<Self>`.
     Context,
     /// `&Event`.
     Event,
 }
 
-/// How a `goto!` builds its target (spec 6.3).
+/// How a `goto!` is carried by its edge variant (spec 6.3, ADR 0011).
 pub enum GotoForm {
-    /// `goto!(T)`, `goto!(T { .. })`, `goto!(T(x))`, `goto!(A { .. } / B { .. })`:
-    /// one expression per level from the LCA child down to `target`
-    /// (missing intermediate levels are E0020, unit levels need none).
-    Simple { levels: Vec<(StateId, Option<Expr>)> },
-    /// `goto!(T, |old: Exiting![X]| expr)`.
-    Constructor { closure: ExprClosure },
-    /// `goto!(T, history)`, with optional data for `T` itself.
-    History { data: Option<Expr> },
-    /// `goto!(T, external)`, with optional data for `T`.
-    External { data: Option<Expr> },
+    /// Simple form (`goto!(T)`, `goto!(T { .. })`, `goto!(T(x))`,
+    /// `goto!(A { .. } / B { .. })`): the handler builds the value of the
+    /// child of the LCA in the decision phase and the edge carries it.
+    Value,
+    /// `goto!(T, |old: Exiting![X]| expr)`: the edge carries the closure;
+    /// `exiting` is `X`, the child of the LCA on the active path, whose value
+    /// the constructor receives by value.
+    Constructor { exiting: StateId },
+}
+
+/// The flavour of a transition, for the graph and for entry resolution.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum TransitionKind {
+    /// Plain `goto!(T)` (local or external by geometry, table 5.2).
+    Normal,
+    /// `goto!(T, external)`.
+    External,
+    /// `goto!(T, history)`.
+    History,
 }
 
 /// One `goto!` occurrence; becomes one variant of the handler's edge enum.
 pub struct GotoOccurrence {
-    /// Variant name in the edge enum, e.g. `ToPaused`, `ToFailed1`.
+    /// Variant name in the edge enum, e.g. `ToPaused`, `ToFailed2`.
     pub variant: Ident,
-    /// Destination state (a choice node for `goto!(Choice)`).
+    /// Destination state.
     pub target: StateId,
     /// The LCA of the transition, resolved per spec table 5.2 from the
     /// handler's state and `target` (0 = root).
     pub lca: StateId,
-    /// How the target is built.
+    /// How the edge carries the new value.
     pub form: GotoForm,
+    /// The flavour of the transition.
+    pub kind: TransitionKind,
+    /// Whether the target is the handler's own state or one of its
+    /// ancestors: `Transitioned { changed }` then compares the active leaf
+    /// before and after (ADR 0006).
+    pub compares_leaf: bool,
     /// Event pattern of the enclosing `match` arm, for the graph (spec 8.1).
     pub event_hint: Option<String>,
 }
@@ -86,7 +103,8 @@ pub struct HandlerModel {
     pub gotos: Vec<GotoOccurrence>,
     /// Whether it returns `Result<Next<Self>, E>` (spec 6.4).
     pub returns_result: bool,
-    /// Whether the body calls `cx.raise`, `defer!()` or `cx.in_state`.
+    /// Whether the body calls `cx.raise`, `defer!()`, `cx.in_state` or
+    /// `reenter!()`.
     pub uses: HandlerUses,
 }
 
@@ -100,4 +118,6 @@ pub struct HandlerUses {
     pub defer: bool,
     /// `cx.in_state(..)`.
     pub in_state: bool,
+    /// `reenter!()`.
+    pub reenter: bool,
 }
