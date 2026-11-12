@@ -21,3 +21,8 @@ Contradictions and errors in the spec. By rule 2 of section 0, section 5 wins. E
 
 - **Problem.** The generated dispatch cannot name a handler's hidden edge type, so it cannot run the transition code for it.
 - **Resolution** (ADR 0001). `Edge` gets a `#[doc(hidden)]` `apply` method holding the transition code of 5.3. Handler return types are `Next<Self, impl Edge<Self> + use<'event, S>>`, and the macro generates one edge variant per `goto!` occurrence.
+
+## 5. 3.4 and 6.3: deep history and constructors both want the substate value
+
+- **Problem.** `#[history(deep, keep)]` stores the full substate value when the compound exits (3.4, 5.3 step 3), and a constructor receives the exit segment by value, substates included (`Exiting![Active]` is `Active` with `sub`, 6.3). Both cannot own the same value without `Clone`.
+- **Resolution** (ADR 0006). For a compound with `#[history(deep, keep)]`, the substate value moves into the history and `Exiting![X]` is a generated struct with the remaining fields only. Compounds without deep history keep the spec's shape.
