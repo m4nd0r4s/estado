@@ -3,6 +3,20 @@
 use crate::ids::StateId;
 
 /// The whole graph of one machine.
+///
+/// ```
+/// use estado_core::{Graph, StateId, StateInfo, StateKind};
+///
+/// static STATES: [StateInfo; 2] = [
+///     StateInfo::new(StateId::new(0), "Active", None, StateKind::Compound, 0),
+///     StateInfo::new(StateId::new(1), "Playing", Some(StateId::new(0)), StateKind::Atomic, 1),
+/// ];
+/// static GRAPH: Graph = Graph { machine: "Player", states: &STATES, edges: &[] };
+///
+/// let playing = GRAPH.find("Playing").unwrap();
+/// assert!(GRAPH.is_ancestor_or_self(StateId::new(0), playing.id));
+/// assert!(!GRAPH.is_ancestor_or_self(playing.id, StateId::new(0)));
+/// ```
 #[derive(Debug)]
 pub struct Graph {
     /// Machine name.

@@ -2,6 +2,9 @@
 //! run-to-completion [`Machine`], [`Next`] and typed [`Edge`]s, [`Cx`],
 //! [`Effect`]s, sinks and the static [`Graph`].
 //!
+//! A complete hand-written machine, the code the `#[machine]` macro generates,
+//! is shown on [`Machine`].
+//!
 //! Builds as `no_std` without `alloc` when the default `std` feature is off.
 #![no_std]
 #![forbid(unsafe_code)]

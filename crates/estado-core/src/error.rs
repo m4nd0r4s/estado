@@ -5,6 +5,12 @@ use core::fmt;
 use crate::ids::StatePath;
 
 /// Why a `send` failed.
+///
+/// ```
+/// use estado_core::SendError;
+/// let error = SendError::Unhandled(7u8);
+/// assert_eq!(error.to_string(), "no state handled the event");
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SendError<Event> {
     /// A previous panic or fatal error poisoned the machine.
