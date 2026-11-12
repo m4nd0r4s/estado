@@ -40,6 +40,9 @@ pub use estado_macros::{handlers, machine, root, state};
 
 mod transitions;
 
+#[cfg(test)]
+mod own_machine_tests;
+
 /// Not public API: the generated code of `#[machine]` reaches `estado-core`
 /// through here, so a crate that depends on `estado` alone can use it.
 #[doc(hidden)]
