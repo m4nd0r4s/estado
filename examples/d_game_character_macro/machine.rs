@@ -30,13 +30,47 @@ fn note<S: Sink<Command>>(cx: &mut Cx<'_, character::Character, S>, line: &'stat
     cx.ctx_mut().note(line);
 }
 
+// Helpers of the handlers, outside the machine module (ADR 0013 item 15): the
+// module is one inline unit, so only the machine itself lives in it. `cx.in_state`
+// below is out of the macro's sight, hence `tracks_active`.
+/// The events after which a pose may have to change: the ones `movement`
+/// and `weapon` react to by changing state.
+const fn changes_pose(event: &Event) -> bool {
+    matches!(
+        event,
+        Event::Move
+            | Event::Stop
+            | Event::Jump
+            | Event::Land
+            | Event::Crouch
+            | Event::Stand
+            | Event::Fire
+            | Event::CooldownElapsed
+    )
+}
+
+/// The pose the character should have right now: shooting wins over
+/// jumping, which wins over running.
+fn desired_pose<S: Sink<Command>>(cx: &Cx<'_, character::Character, S>) -> character::Anim {
+    if cx.in_state(character::Character::FIRING) {
+        character::Anim::Shoot
+    } else if cx.in_state(character::Character::JUMPING) {
+        character::Anim::Jump
+    } else if cx.in_state(character::Character::WALKING) {
+        character::Anim::Run
+    } else {
+        character::Anim::Idle
+    }
+}
+
 #[estado_macros::machine(
     event = Event,
     effect = Command,
     ctx = GameCtx,
     defer_cap = 2,
     raise_cap = 0,
-    defer_overflow = drop_oldest
+    defer_overflow = drop_oldest,
+    tracks_active
 )]
 pub mod character {
     use super::*;
@@ -130,36 +164,6 @@ pub mod character {
         Jump,
         /// Firing; wins over every other pose.
         Shoot,
-    }
-
-    /// The events after which a pose may have to change: the ones `movement`
-    /// and `weapon` react to by changing state.
-    const fn changes_pose(event: &Event) -> bool {
-        matches!(
-            event,
-            Event::Move
-                | Event::Stop
-                | Event::Jump
-                | Event::Land
-                | Event::Crouch
-                | Event::Stand
-                | Event::Fire
-                | Event::CooldownElapsed
-        )
-    }
-
-    /// The pose the character should have right now: shooting wins over
-    /// jumping, which wins over running.
-    fn desired_pose<S: Sink<Command>>(cx: &Cx<'_, Character, S>) -> Anim {
-        if cx.in_state(Character::FIRING) {
-            Anim::Shoot
-        } else if cx.in_state(Character::JUMPING) {
-            Anim::Jump
-        } else if cx.in_state(Character::WALKING) {
-            Anim::Run
-        } else {
-            Anim::Idle
-        }
     }
 
     #[handlers]

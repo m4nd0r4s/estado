@@ -30,8 +30,9 @@ ADR 0011 fixed the shape of generated code and M3 built it up to hierarchy, hist
 
 ### Completion and `#[always]`
 
+- **Amended by ADR 0013 item 4:** the single `completion_pending` flag is replaced by one pending flag per state that can complete (`<state>_done_pending`), so a completion fires exactly once per entry into a final configuration and a sibling region completing does not run it again. The next two bullets describe the original design.
 - The runtime keeps `completion_pending` (set when a `#[terminal]` below the root is entered) and one `<state>_always_pending` flag per state with an `#[always]` handler (set by `start_*` when the state enters, cleared by `cancel_*` when it exits, so a set flag always names an active state). `take_always_pending` reports whether any is set; `run_always` clears the flag it serves.
-- `run_always` serves one thing per call: the completion check first (innermost completion first: a compound state inside a region before the parallel state, which is checked again in the next microstep), then the `#[always]` of the deepest state that is due. An `#[always]` runs once per entry, not on every later pending flag.
+- `run_always` serves one thing per call: the completion check first (innermost completion first: a compound state inside a region before the parallel state; since ADR 0013 each has its own flag, nothing is "checked again"), then the `#[always]` of the deepest state that is due. An `#[always]` runs once per entry, not on every later pending flag.
 - `#[on_done(P)]` on a parallel state fires when every region's active child is a `#[terminal]`; a region without a terminal never completes. It receives the `*Fields` of `P` and no `Output` (ADR 0005).
 
 ### Inline

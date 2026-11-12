@@ -83,3 +83,20 @@ Contradictions and errors in the spec. By rule 2 of section 0, section 5 wins. E
 
 - **Reading.** The generated code is as fast as the hand-written code of M2 (in-place writes and the forced inline of ADR 0009 are in, see entry 10), and both are about 1.25x of the baseline when `Machine` is left out. The rest of the distance to the baseline, 1.7x in total, is the per-event cost of `Machine::send_batch` (poison guard, report, queue checks around every microstep), which lives in `estado-core`.
 - **Resolution.** Open, for the owner of the spec. Either revise the target of BM-01 for a one-event-per-byte machine to about 2x of a hand-written parser, as ADR 0009 allows, or take the loop of `send_batch` out of `Machine` (one running report, no per-event guard), which touches the BM-02 layout that M2 found sensitive. This entry does neither; the BM-01 test does not assert the ratio.
+
+## 14. 6.7: new error codes E0042-E0046 and E0090 (not in the table of 6.7)
+
+- **Problem.** The macro reports six conditions the table of 6.7 has no code for, or whose code the spec uses for something else (E0041 is the constructor form in `#[edges]`, which this version does not support).
+- **Resolution** (ADR 0013 item 13). Each has a page in `docs/errors/` and a `trybuild` snapshot in `crates/estado-macros/tests/ui/`:
+  - `E0042`: a transition macro in an `#[entry]` or `#[exit]` function (spec 5.3: they MUST NOT transition).
+  - `E0043`: a malformed `goto!`: the target path is not nested, `external` with a target that is not the state or an ancestor, `history` on a state without history, an `Exiting![X]` that names the wrong state, a constructor with other than one parameter, or arguments given to `stay!()` and the other macros without any.
+  - `E0044`: `#[on_done(S)]` on a state without substates or regions, which never completes (spec 5.10).
+  - `E0045`: `reenter!()`, `defer!()`, `bubble!()` or `unhandled!()` in an `#[always]` or `#[on_done]` handler. Those handlers react to their state, not to an event, so only `stay!()` and `goto!` mean something (ADR 0013 item 3).
+  - `E0046`: the constructor closure of `goto!(T, |old: Exiting![X]| ..)` uses the data, view or `*Fields` parameters of its handler. The constructor runs after the handler returned (5.3 step 5); rustc would say E0700 with advice that cannot be followed (ADR 0013 item 11).
+  - `E0090`: the feature is part of the planned macro language but not generated yet (`#[choice]`, nested parallel states, a handler on a region, nested deep histories, counts that do not fit the `u8` of an index, ..). It is the code of every "not supported yet", so that an unsupported case never compiles to something half working.
+- E0012 also reports a state whose name equals its own id constant (`IO`), and E0017 a `#[handlers]` block on a type other than the root and a role attribute on a non-function (ADR 0013 item 10; review finding 21).
+
+## 15. 6.1: `#[initial(with = path)]` takes no arguments
+
+- **Problem.** 6.1 gives the initializer the signature `fn(&mut Cx, &ParentFields) -> Self`. A constructor that needs `cx` and the parent's fields can only run inside the transition, after the exits, when the parent value does not exist yet; the edge would have to carry a generated "parts" struct per `goto!`. A root-level initial has no `Cx` at all, since `Spec::initial()` runs before the machine starts.
+- **Resolution** (lead decision, ADR 0013 item 12 and its amendments). In v0, `with = path` names a function with no arguments that returns the state's value; it is called when the state is entered through its initial. The signature of the spec is left for a later version, as an additive change (a second attribute form), so machines written today keep compiling.
