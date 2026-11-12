@@ -31,3 +31,8 @@ Contradictions and errors in the spec. By rule 2 of section 0, section 5 wins. E
 
 - **Problem.** 4.3 suggests a snapshot of the active discriminants "updated at the start of each microstep". 5.6 item 2 applies a region-internal transition immediately, before the next region is evaluated, in the same microstep. A later region that asks `cx.in_state(..)` about an earlier region would see the configuration from before the transition, although the transition already ran (its exits and entries are in the log).
 - **Resolution** (ADR 0005). Section 5 wins: after every region-internal transition the generated code refreshes the snapshot with `Cx::refresh_active(M::path(..))` (`#[doc(hidden)]`, only needed when `TRACKS_ACTIVE`), so `in_state` always reflects the applied transitions of the current microstep. Test: `ac_02_a_region_internal_transition_is_applied_before_the_next_region_is_evaluated`.
+
+## 7. 3.2 and 6.1: `#[machine]` is applied to an inline module
+
+- **Problem.** The spec applies `#[machine]` to the root enum and `#[state]`/`#[handlers]` to separate items, but an attribute proc-macro sees only its own item, and generating typed edges, linear exit/entry code and the graph needs the whole machine.
+- **Resolution** (ADR 0010). `#[machine(..)]` goes on an inline `mod` containing every item of the machine; the root enum is marked `#[root]`. All other attributes keep their names and meaning. E0001 now means "`#[machine]` not on an inline module with exactly one `#[root]` enum".
