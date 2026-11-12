@@ -17,7 +17,8 @@ pub fn dispatch_items(generation: &Generation<'_>) -> TokenStream {
     let bubbles = bubble_functions(generation);
     let reenters = reenter_functions(generation);
     let microstep = microstep_function(generation);
-    quote! { #resolution #bubbles #reenters #microstep }
+    let regions = super::regions::region_items(generation);
+    quote! { #resolution #bubbles #reenters #regions #microstep }
 }
 
 /// What the dispatch does after a handler returned its `Next`.
@@ -25,6 +26,22 @@ fn resolution_items(generation: &Generation<'_>) -> TokenStream {
     let root = generation.root;
     let sink_parameter = generation.sink_parameter();
     let cx_type = generation.cx_type();
+    // A machine without `reenter!()` has no such variant: no handler site
+    // needs a panic for it.
+    let (reenter_variant, reenter_arm) = if generation.uses_reenter() {
+        (
+            quote! {
+                /// Exit and enter the handler's own state.
+                Reenter,
+            },
+            quote! { ::estado_core::Next::Reenter => Resolution::Reenter, },
+        )
+    } else {
+        (
+            TokenStream::new(),
+            quote! { ::estado_core::Next::Reenter => ::core::unreachable!(), },
+        )
+    };
     quote! {
         /// What the dispatch does after a handler returned.
         pub enum Resolution {
@@ -32,8 +49,7 @@ fn resolution_items(generation: &Generation<'_>) -> TokenStream {
             Done(::estado_core::Outcome),
             /// Delegate to the parent.
             Bubble,
-            /// Exit and enter the handler's own state.
-            Reenter,
+            #reenter_variant
         }
 
         /// Turns the `Next` of a handler into a [`Resolution`], executing the edge.
@@ -50,7 +66,7 @@ fn resolution_items(generation: &Generation<'_>) -> TokenStream {
                     <#root as ::estado_core::Spec>::UNHANDLED,
                 )),
                 ::estado_core::Next::Defer => Resolution::Done(::estado_core::Outcome::Deferred),
-                ::estado_core::Next::Reenter => Resolution::Reenter,
+                #reenter_arm
                 ::estado_core::Next::Goto(edge) => Resolution::Done(::estado_core::Outcome::Transitioned {
                     changed: edge.apply(slot, cx),
                 }),
@@ -83,12 +99,17 @@ fn microstep_function(generation: &Generation<'_>) -> TokenStream {
 }
 
 /// The arms of a `match` over the children enum of `owner`.
-fn children_arms(generation: &Generation<'_>, owner: StateId) -> TokenStream {
+pub fn children_arms(generation: &Generation<'_>, owner: StateId) -> TokenStream {
     let tree = generation.tree;
     let arms = tree.node(owner).children.iter().map(|&child| {
         let state = tree.node(child);
         if state.kind == StateKind::Compound {
             return compound_arm(generation, child);
+        }
+        if state.kind == StateKind::Parallel {
+            let pattern = variant_pattern(generation, child, Binding::Nothing);
+            let function = super::regions::dispatch_function(generation, child);
+            return quote! { #pattern => #function(slot, cx, event), };
         }
         let handler = generation.handler(HandlerRole::On, child);
         let binding = if handler.is_some() {

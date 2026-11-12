@@ -9,6 +9,7 @@ use syn::Ident;
 
 use super::context::Generation;
 use super::naming::{enter_function, exit_function, exiting_struct, payload_binding};
+use super::tasks::{cancel_call, start_call};
 use super::walk::{
     Binding, borrowed_walk, fields_references, owned_pattern, owned_rebuild, variant_pattern,
 };
@@ -68,15 +69,19 @@ fn edge_enum(generation: &Generation<'_>, handler: &HandlerModel) -> TokenStream
         .iter()
         .map(|goto| constructor_parameter(goto))
         .collect();
-    let bounds = constructors.iter().map(|goto| {
-        let GotoForm::Constructor { exiting } = goto.form else {
-            unreachable!("filtered")
-        };
-        let parameter = constructor_parameter(goto);
-        let exiting_ty = exiting_type(tree, exiting);
-        let returned = children_type(generation, goto.lca);
-        quote! { #parameter: ::core::ops::FnOnce(#exiting_ty) -> #returned }
-    });
+    let bounds_list: Vec<TokenStream> = constructors
+        .iter()
+        .map(|goto| {
+            let GotoForm::Constructor { exiting } = goto.form else {
+                unreachable!("filtered")
+            };
+            let parameter = constructor_parameter(goto);
+            let exiting_ty = exiting_type(tree, exiting);
+            let returned = children_type(generation, goto.lca);
+            quote! { #parameter: ::core::ops::FnOnce(#exiting_ty) -> #returned }
+        })
+        .collect();
+    let bounds = bounds_list.iter();
 
     let variants = handler.gotos.iter().map(|goto| {
         let variant = &goto.variant;
@@ -100,7 +105,10 @@ fn edge_enum(generation: &Generation<'_>, handler: &HandlerModel) -> TokenStream
         .gotos
         .iter()
         .map(|goto| state_constant(generation, goto.target));
-    let arms = handler.gotos.iter().map(|goto| apply_arm(generation, goto));
+    let arms = handler
+        .gotos
+        .iter()
+        .map(|goto| apply_arm(generation, goto, handler.state));
     let sink_parameter = generation.sink_parameter();
     let cx_type = generation.cx_type();
     let generics = if parameters.is_empty() {
@@ -110,6 +118,7 @@ fn edge_enum(generation: &Generation<'_>, handler: &HandlerModel) -> TokenStream
     };
     let documentation =
         format!("The edges of the handler of `{handler_state}`, one variant per `goto!`.");
+    let region_edge = region_edge_impl(generation, handler, &generics, &bounds_list);
     quote! {
         #[doc = #documentation]
         #[allow(clippy::enum_variant_names)]
@@ -130,19 +139,65 @@ fn edge_enum(generation: &Generation<'_>, handler: &HandlerModel) -> TokenStream
                 }
             }
         }
+
+        #region_edge
+    }
+}
+
+/// `impl RegionEdge`: for a handler inside a region, which of its edges
+/// leave the parallel state (spec 5.6 item 3).
+fn region_edge_impl(
+    generation: &Generation<'_>,
+    handler: &HandlerModel,
+    generics: &TokenStream,
+    bounds: &[TokenStream],
+) -> TokenStream {
+    let tree = generation.tree;
+    let Some(region) = tree.region_of(handler.state) else {
+        return TokenStream::new();
+    };
+    let name = &handler.edges_enum;
+    let arms = handler.gotos.iter().map(|goto| {
+        let variant = &goto.variant;
+        let leaves = !tree.is_ancestor_or_self(region, goto.lca);
+        quote! { Self::#variant(..) => #leaves, }
+    });
+    quote! {
+        impl<#(#bounds),*> RegionEdge for #name #generics {
+            fn leaves_parallel(&self) -> bool {
+                match self {
+                    #(#arms)*
+                }
+            }
+        }
     }
 }
 
 /// The code of one variant: exits, take or write, constructor, entries.
-fn apply_arm(generation: &Generation<'_>, goto: &GotoOccurrence) -> TokenStream {
+fn apply_arm(
+    generation: &Generation<'_>,
+    goto: &GotoOccurrence,
+    handler_state: StateId,
+) -> TokenStream {
     let tree = generation.tree;
     let root = generation.root;
     let variant = &goto.variant;
-    let before = goto.compares_leaf.then(|| {
-        quote! { let leaf_before = <#root as ::estado_core::Spec>::state_id(slot.live_mut()); }
-    });
+    // Inside a region the active leaf is the region's, not the machine's.
+    let leaf = match tree
+        .region_of(handler_state)
+        .filter(|&region| tree.is_ancestor_or_self(region, goto.lca))
+    {
+        Some(region) => {
+            let function = super::regions::region_leaf_function(generation, region);
+            quote! { #function(slot) }
+        }
+        None => quote! { <#root as ::estado_core::Spec>::state_id(slot.live_mut()) },
+    };
+    let before = goto
+        .compares_leaf
+        .then(|| quote! { let leaf_before = #leaf; });
     let changed = if goto.compares_leaf {
-        quote! { <#root as ::estado_core::Spec>::state_id(slot.live_mut()) != leaf_before }
+        quote! { #leaf != leaf_before }
     } else {
         quote! { true }
     };
@@ -152,6 +207,8 @@ fn apply_arm(generation: &Generation<'_>, goto: &GotoOccurrence) -> TokenStream 
     let prelude = &walk.prelude;
     let children = &walk.children;
     let ancestors = fields_references(generation, &walk.chain);
+    let cancel = cancel_call(generation, goto.lca, children);
+    let start = start_call(generation, goto.lca, children);
 
     match goto.form {
         GotoForm::Value => {
@@ -165,13 +222,13 @@ fn apply_arm(generation: &Generation<'_>, goto: &GotoOccurrence) -> TokenStream 
                 .then(|| history_override(generation, goto.target));
             let (leave, arrive) = if restore.is_some() {
                 (
-                    quote! { { #prelude #exit(#children, #(#ancestors,)* cx); #write } },
-                    quote! { { #prelude #enter(#children, #(#ancestors,)* cx); } },
+                    quote! { { #prelude #exit(#children, #(#ancestors,)* cx); #cancel #write } },
+                    quote! { { #prelude #enter(#children, #(#ancestors,)* cx); #start } },
                 )
             } else {
                 (
-                    quote! { #prelude #exit(#children, #(#ancestors,)* cx); #write },
-                    quote! { #enter(#children, #(#ancestors,)* cx); },
+                    quote! { #prelude #exit(#children, #(#ancestors,)* cx); #cancel #write },
+                    quote! { #enter(#children, #(#ancestors,)* cx); #start },
                 )
             };
             quote! {
@@ -202,6 +259,7 @@ fn apply_arm(generation: &Generation<'_>, goto: &GotoOccurrence) -> TokenStream 
                     {
                         #prelude
                         #exit(#children, #(#ancestors,)* cx);
+                        #cancel
                     }
                     #take
                     let exiting = match #old_children {
@@ -214,6 +272,7 @@ fn apply_arm(generation: &Generation<'_>, goto: &GotoOccurrence) -> TokenStream 
                     {
                         #prelude
                         #enter(#children, #(#ancestors,)* cx);
+                        #start
                     }
                     #changed
                 }

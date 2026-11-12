@@ -21,6 +21,9 @@ pub enum EdgeType {
     Named(syn::Path),
     /// A constructor `goto!`: `impl Edge<Self> + use<..>`.
     Opaque,
+    /// A constructor `goto!` in a handler inside a region: the edges must
+    /// also say whether they leave the parallel state.
+    OpaqueRegion,
 }
 
 /// Rewrites `function` in place. `effect` is the effect type of the machine.
@@ -31,7 +34,8 @@ pub fn rewrite_signature(
     edges: &EdgeType,
 ) {
     let sink = syn::Ident::new(SINK_PARAMETER, proc_macro2::Span::call_site());
-    let name_event_lifetime = matches!(edges, EdgeType::Opaque) && parameters.event_index.is_some();
+    let name_event_lifetime = matches!(edges, EdgeType::Opaque | EdgeType::OpaqueRegion)
+        && parameters.event_index.is_some();
     let generics = &mut function.sig.generics;
     if name_event_lifetime {
         let lifetime: Lifetime = parse_quote!('event);
@@ -66,12 +70,24 @@ pub fn rewrite_signature(
             EdgeType::Opaque => Some(parse_quote!(
                 impl ::estado_core::Edge<Self> + use<#sink>
             )),
+            EdgeType::OpaqueRegion if name_event_lifetime => Some(parse_quote!(
+                impl __estado::RegionEdge + use<'event, #sink>
+            )),
+            EdgeType::OpaqueRegion => Some(parse_quote!(
+                impl __estado::RegionEdge + use<#sink>
+            )),
         };
         if let Some(edge_type) = edge_type {
             AddEdgeType { edge_type }.visit_type_mut(return_type);
         }
     }
 
+    // A handler without `cx` does not use the sink parameter it is given.
+    if parameters.context_index.is_none() {
+        function
+            .attrs
+            .push(parse_quote!(#[allow(clippy::extra_unused_type_parameters)]));
+    }
     if !function
         .attrs
         .iter()

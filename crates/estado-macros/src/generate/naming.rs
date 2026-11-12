@@ -94,3 +94,10 @@ pub fn exiting_struct(tree: &StateTree, node: StateId) -> Ident {
     let name = &tree.node(node).name;
     ident(&format!("{name}Exiting"), name.span())
 }
+
+/// `BackoffRef`: the shared view of a struct-like or tuple variant that
+/// timer and invoke closures receive (spec 7.1).
+pub fn ref_view_type(tree: &StateTree, node: StateId) -> Ident {
+    let name = &tree.node(node).name;
+    ident(&format!("{name}Ref"), name.span())
+}

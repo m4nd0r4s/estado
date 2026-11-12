@@ -68,9 +68,19 @@ pub fn graph_items(generation: &Generation<'_>) -> TokenStream {
         for goto in &handler.gotos {
             let from = constant(generation, handler.state);
             let to = constant(generation, goto.target);
+            let is_timer = handler.role == HandlerRole::On
+                && goto.event_hint.as_ref().is_some_and(|hint| {
+                    generation
+                        .tree
+                        .node(handler.state)
+                        .timers
+                        .iter()
+                        .any(|timer| timer_event_hint(&timer.event).as_ref() == Some(hint))
+                });
             let kind = match (handler.role, goto.kind) {
                 (HandlerRole::Always, _) => quote! { Always },
                 (HandlerRole::OnDone, _) => quote! { Done },
+                (_, TransitionKind::Normal) if is_timer => quote! { Timer },
                 (_, TransitionKind::External) => quote! { External },
                 (_, TransitionKind::History) => quote! { History },
                 (_, TransitionKind::Normal) => quote! { Normal },
@@ -108,6 +118,29 @@ pub fn graph_items(generation: &Generation<'_>) -> TokenStream {
     }
 }
 
+/// The event a timer fires, as the text of its path (`Event::Retry`), when
+/// the expression is a path, a call of one, or a closure returning either:
+/// the same text the handler's `match` arm has as `event_hint` (spec 8.1).
+fn timer_event_hint(expression: &syn::Expr) -> Option<String> {
+    let path = match expression {
+        syn::Expr::Path(inner) => &inner.path,
+        syn::Expr::Call(call) => match &*call.func {
+            syn::Expr::Path(inner) => &inner.path,
+            _ => return None,
+        },
+        syn::Expr::Closure(closure) => return timer_event_hint(&closure.body),
+        syn::Expr::Paren(inner) => return timer_event_hint(&inner.expr),
+        _ => return None,
+    };
+    Some(
+        path.segments
+            .iter()
+            .map(|segment| segment.ident.to_string())
+            .collect::<Vec<_>>()
+            .join("::"),
+    )
+}
+
 /// The body of `Spec::path`: pushes the active states, top down.
 pub fn path_body(generation: &Generation<'_>) -> TokenStream {
     let arms = path_arms(generation, 0);
@@ -122,15 +155,29 @@ fn path_arms(generation: &Generation<'_>, owner: StateId) -> TokenStream {
     let tree = generation.tree;
     let arms = tree.node(owner).children.iter().map(|&child| {
         let id = constant(generation, child);
-        if tree.node(child).kind == StateKind::Compound {
-            let pattern = variant_pattern(generation, child, Binding::Everything);
-            let payload = payload_binding(tree, child);
-            let field = tree.node(child).children_field.as_ref().expect("substates");
-            let inner = path_arms_over(generation, child, quote! { &#payload.#field });
-            quote! { #pattern => { path.push(#id); #inner } }
-        } else {
-            let pattern = variant_pattern(generation, child, Binding::Nothing);
-            quote! { #pattern => path.push(#id), }
+        match tree.node(child).kind {
+            StateKind::Compound => {
+                let pattern = variant_pattern(generation, child, Binding::Everything);
+                let payload = payload_binding(tree, child);
+                let field = tree.node(child).children_field.as_ref().expect("substates");
+                let inner = path_arms_over(generation, child, quote! { &#payload.#field });
+                quote! { #pattern => { path.push(#id); #inner } }
+            }
+            StateKind::Parallel => {
+                let pattern = variant_pattern(generation, child, Binding::Everything);
+                let payload = payload_binding(tree, child);
+                let regions = tree.node(child).children.iter().map(|&region| {
+                    let region_id = constant(generation, region);
+                    let field = tree.node(region).children_field.as_ref().expect("region");
+                    let inner = path_arms_over(generation, region, quote! { &#payload.#field });
+                    quote! { path.push(#region_id); #inner }
+                });
+                quote! { #pattern => { path.push(#id); #(#regions)* } }
+            }
+            _ => {
+                let pattern = variant_pattern(generation, child, Binding::Nothing);
+                quote! { #pattern => path.push(#id), }
+            }
         }
     });
     quote! { #(#arms)* }
@@ -151,7 +198,7 @@ pub fn state_id_body(generation: &Generation<'_>) -> TokenStream {
     quote! { match self { #arms } }
 }
 
-fn leaf_arms(generation: &Generation<'_>, owner: StateId) -> TokenStream {
+pub fn leaf_arms(generation: &Generation<'_>, owner: StateId) -> TokenStream {
     let tree = generation.tree;
     let arms = tree.node(owner).children.iter().map(|&child| {
         if tree.node(child).kind == StateKind::Compound {

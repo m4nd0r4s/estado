@@ -8,9 +8,13 @@
 //! | `edges` | one edge enum per handler with `Edge::apply` |
 //! | `entries` | `exit_*` / `enter_*` per children enum |
 //! | `dispatch`, `bubble` | the nested `match`, bubbling, `reenter!()` |
+//! | `regions` | parallel states: the tally, region edges, `dispatch_<parallel>` |
+//! | `tasks` | timers, invokes, epochs; `timer_event`, `accepts_invoke` |
+//! | `completion`, `always` | `on_done`, `is_done`, `run_always` |
 //! | `graph` | `GRAPH`, `path()`, `state_id()` |
 //! | `spec` | the `Spec` impl |
 
+mod always;
 mod bubble;
 mod completion;
 mod context;
@@ -19,18 +23,21 @@ mod edges;
 mod entries;
 mod graph;
 mod history;
+mod lookups;
 mod naming;
+mod regions;
 mod runtime;
 mod spec;
 mod state_ids;
 mod stub;
+mod tasks;
 mod views;
 mod walk;
 
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use crate::model::{MachineModel, StateKind};
+use crate::model::MachineModel;
 use context::Generation;
 
 /// Everything generated for a machine, in the machine module. With
@@ -48,14 +55,6 @@ pub fn generated_items(model: &MachineModel, valid: bool) -> TokenStream {
             pub mod __estado {}
         };
     }
-    if unsupported(model) {
-        return quote! {
-            #state_ids
-
-            #[doc(hidden)]
-            pub mod __estado {}
-        };
-    }
     let generation = Generation::new(model);
     let views = views::view_items(&generation);
     let edges = edges::edge_items(&generation);
@@ -65,6 +64,10 @@ pub fn generated_items(model: &MachineModel, valid: bool) -> TokenStream {
     let spec = spec::spec_impl(&generation);
     let completion = completion::has_completion(&generation)
         .then(|| completion::completion_function(&generation));
+    let always = always::always_items(&generation);
+    let task_helpers = tasks::helper_items(&generation);
+    let lifecycle = tasks::lifecycle_functions(&generation);
+    let lookups = lookups::lookup_functions(&generation);
     let runtime = runtime::runtime_items(&generation);
     let history_functions = history::discriminant_functions(&generation);
     let retire_functions = history::retire_functions(&generation);
@@ -78,6 +81,7 @@ pub fn generated_items(model: &MachineModel, valid: bool) -> TokenStream {
             unused_variables,
             unused_mut,
             unreachable_code,
+            private_interfaces,
             clippy::too_many_arguments,
             clippy::large_enum_variant
         )]
@@ -86,30 +90,18 @@ pub fn generated_items(model: &MachineModel, valid: bool) -> TokenStream {
             use ::estado_core::Edge as _;
 
             #runtime
+            #task_helpers
             #history_functions
             #retire_functions
             #edges
             #entries
+            #lifecycle
+            #lookups
             #dispatch
             #completion
+            #always
             #graph
             #spec
         }
     }
-}
-
-/// Features of the macro language the generators do not cover yet; a machine
-/// that uses one gets its state ids and nothing else (see the report of 4.3).
-fn unsupported(model: &MachineModel) -> bool {
-    let tree = &model.tree;
-    let uses_runtime = model
-        .analysed_handlers
-        .iter()
-        .any(|handler| handler.uses.raise || handler.uses.defer);
-    uses_runtime
-        || tree.nodes.iter().any(|node| {
-            matches!(node.kind, StateKind::Parallel | StateKind::Region)
-                || !node.timers.is_empty()
-                || !node.invokes.is_empty()
-        })
 }

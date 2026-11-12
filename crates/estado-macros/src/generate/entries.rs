@@ -10,7 +10,7 @@ use super::context::Generation;
 use super::naming::{
     children_binding, enter_function, exit_function, fields_binding, fields_type, payload_binding,
 };
-use super::walk::{Binding, chain_to, handler_arguments, variant_pattern};
+use super::walk::{Binding, handler_arguments, variant_pattern};
 use crate::model::{HandlerRole, StateId, StateKind};
 
 /// Every `exit_*` and `enter_*` function of the machine.
@@ -18,8 +18,7 @@ pub fn entry_exit_functions(generation: &Generation<'_>) -> TokenStream {
     let tree = generation.tree;
     let mut functions = TokenStream::new();
     for node in &tree.nodes {
-        let owns_children = node.id == 0 || node.kind == StateKind::Compound;
-        if !owns_children {
+        if !tree.owns_children(node.id) {
             continue;
         }
         functions.extend(sequence_function(generation, node.id, Direction::Exit));
@@ -52,7 +51,7 @@ fn sequence_function(
         .expect("children enum");
     let documentation =
         format!("{verb} the active child of `{enum_name}` and everything below it.");
-    let ancestors = chain_to(generation, owner);
+    let ancestors = tree.fields_chain(owner);
     let ancestor_parameters = ancestors.iter().map(|&ancestor| {
         let binding = fields_binding(tree, ancestor);
         let view = fields_type(tree, ancestor);
@@ -92,7 +91,7 @@ fn arm(
     let tree = generation.tree;
     let state = tree.node(child);
     let handler = generation.handler(role, child);
-    let is_compound = state.kind == StateKind::Compound;
+    let is_composite = matches!(state.kind, StateKind::Compound | StateKind::Parallel);
 
     let own_call = handler.map(|handler| {
         let root = generation.root;
@@ -110,8 +109,8 @@ fn arm(
     // Entering a final state below the root schedules the completion
     // microstep of its parent (ADR 0005).
     let completion = (direction == Direction::Enter && state.is_final && owner != 0)
-        .then(|| quote! { cx.runtime_mut().always_pending = true; });
-    if !is_compound {
+        .then(|| quote! { cx.runtime_mut().completion_pending = true; });
+    if !is_composite {
         let binding = if own_call.is_some() {
             Binding::Everything
         } else {
@@ -124,15 +123,42 @@ fn arm(
     let pattern = variant_pattern(generation, child, Binding::Everything);
     let payload = payload_binding(tree, child);
     let own_fields = fields_binding(tree, child);
-    let substates = children_binding(tree, child);
-    let recursion = match direction {
-        Direction::Exit => exit_function(tree, child),
-        Direction::Enter => enter_function(tree, child),
-    };
-    let inherited = ancestors
+    let inherited: Vec<_> = ancestors
         .iter()
-        .map(|&ancestor| fields_binding(tree, ancestor));
-    let recurse = quote! { #recursion(#substates, #(#inherited,)* &mut #own_fields, cx); };
+        .map(|&ancestor| fields_binding(tree, ancestor))
+        .collect();
+    let recursion = |target: StateId| {
+        let function = match direction {
+            Direction::Exit => exit_function(tree, target),
+            Direction::Enter => enter_function(tree, target),
+        };
+        let binding = children_binding(tree, target);
+        quote! { #function(#binding, #(#inherited,)* &mut #own_fields, cx); }
+    };
+    if state.kind == StateKind::Parallel {
+        let mut regions = state.children.clone();
+        if direction == Direction::Exit {
+            regions.reverse();
+        }
+        let recurse: Vec<TokenStream> = regions.iter().map(|&region| recursion(region)).collect();
+        let bindings: Vec<_> = state
+            .children
+            .iter()
+            .map(|&region| children_binding(tree, region))
+            .collect();
+        let body = match direction {
+            Direction::Exit => quote! { #(#recurse)* #own_call },
+            Direction::Enter => quote! { #own_call #(#recurse)* },
+        };
+        return quote! {
+            #pattern => {
+                let (mut #own_fields, #(#bindings),*) = #payload.split();
+                #body
+            }
+        };
+    }
+    let substates = children_binding(tree, child);
+    let recurse = recursion(child);
     let record = super::history::record_shallow(generation, child);
     let body = match direction {
         Direction::Exit => quote! { #recurse #own_call #record },

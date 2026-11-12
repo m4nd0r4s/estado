@@ -39,7 +39,10 @@ pub fn has_deep_below(generation: &Generation<'_>, owner: StateId) -> bool {
     tree.node(owner).children.iter().any(|&child| {
         let node = tree.node(child);
         node.history == HistoryKind::DeepKeep
-            || (node.kind == StateKind::Compound && has_deep_below(generation, child))
+            || (matches!(
+                node.kind,
+                StateKind::Compound | StateKind::Parallel | StateKind::Region
+            ) && has_deep_below(generation, child))
     })
 }
 
@@ -148,8 +151,7 @@ pub fn retire_functions(generation: &Generation<'_>) -> TokenStream {
     let cx_type = generation.cx_type();
     let mut functions = TokenStream::new();
     for node in &tree.nodes {
-        let owns_children = node.id == 0 || node.kind == StateKind::Compound;
-        if !owns_children || !has_deep_below(generation, node.id) {
+        if !tree.owns_children(node.id) || !has_deep_below(generation, node.id) {
             continue;
         }
         let enum_name = node.children_enum.as_ref().expect("children enum");
@@ -167,6 +169,20 @@ pub fn retire_functions(generation: &Generation<'_>) -> TokenStream {
                     let field = state.children_field.as_ref().expect("substates");
                     let inner = retire_function(state.children_enum.as_ref().expect("enum"));
                     quote! { #pattern => #inner(#payload.#field, cx), }
+                }
+                (StateKind::Parallel, _) if has_deep_below(generation, child) => {
+                    let retire = state
+                        .children
+                        .iter()
+                        .filter(|&&region| has_deep_below(generation, region))
+                        .map(|&region| {
+                            let region_state = tree.node(region);
+                            let field = region_state.children_field.as_ref().expect("region");
+                            let inner =
+                                retire_function(region_state.children_enum.as_ref().expect("enum"));
+                            quote! { #inner(#payload.#field, cx); }
+                        });
+                    quote! { #pattern => { #(#retire)* } }
                 }
                 _ => {
                     let nothing = variant_pattern(generation, child, Binding::Nothing);

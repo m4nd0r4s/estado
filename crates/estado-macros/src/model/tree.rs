@@ -220,6 +220,40 @@ impl StateTree {
             .collect()
     }
 
+    /// Whether the node holds an enum of children it matches on: the root, a
+    /// compound state or a region.
+    pub fn owns_children(&self, id: StateId) -> bool {
+        self.node(id).children_enum.is_some()
+    }
+
+    /// The region `id` is in, or is: the nearest `Region` among its
+    /// ancestors, itself included.
+    pub fn region_of(&self, id: StateId) -> Option<StateId> {
+        self.ancestors(id)
+            .into_iter()
+            .find(|&node| self.node(node).kind == StateKind::Region)
+    }
+
+    /// The states from the top down to `at` (inclusive) that carry a
+    /// `*Fields` view: compound and parallel states, no regions.
+    pub fn fields_chain(&self, at: StateId) -> Vec<StateId> {
+        let mut chain: Vec<StateId> = self
+            .ancestors(at)
+            .into_iter()
+            .filter(|&node| self.node(node).composite_struct.is_some())
+            .collect();
+        chain.reverse();
+        chain
+    }
+
+    /// Whether the subtree below `id` (a state, not inclusive) holds a
+    /// parallel state.
+    pub fn has_parallel_below(&self, id: StateId) -> bool {
+        self.node(id).children.iter().any(|&child| {
+            self.node(child).kind == StateKind::Parallel || self.has_parallel_below(child)
+        })
+    }
+
     /// Graph ids: every node but the root, shifted by one, so the first
     /// top-level state is `StateId(0)` at runtime.
     pub fn runtime_id(&self, id: StateId) -> u16 {

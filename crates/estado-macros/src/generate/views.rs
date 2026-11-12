@@ -9,7 +9,7 @@ use quote::quote;
 use syn::{Field, Visibility};
 
 use super::context::Generation;
-use super::naming::{exiting_struct, fields_type, view_type};
+use super::naming::{exiting_struct, fields_type, ref_view_type, view_type};
 use crate::model::{GotoForm, HistoryKind, Payload, StateId, StateKind};
 
 /// Every view of the machine.
@@ -17,12 +17,15 @@ pub fn view_items(generation: &Generation<'_>) -> TokenStream {
     let tree = generation.tree;
     let mut items = TokenStream::new();
     for node in tree.nodes.iter().skip(1) {
-        if node.kind == StateKind::Compound {
+        if matches!(node.kind, StateKind::Compound | StateKind::Parallel) {
             items.extend(fields_view(generation, node.id));
         }
         match &node.payload {
             Payload::Struct(fields) | Payload::Tuple(fields) => {
                 items.extend(variant_view(generation, node.id, fields));
+                if !node.timers.is_empty() || !node.invokes.is_empty() {
+                    items.extend(ref_view(generation, node.id, fields));
+                }
             }
             _ => {}
         }
@@ -62,8 +65,26 @@ fn fields_view(generation: &Generation<'_>, node: StateId) -> TokenStream {
     let tree = generation.tree;
     let state = tree.node(node);
     let struct_name = state.composite_struct.as_ref().expect("composite");
-    let children_field = state.children_field.as_ref().expect("substates");
-    let children_enum = state.children_enum.as_ref().expect("children enum");
+    // What `split` returns next to the fields: the substates of a compound
+    // state, the regions of a parallel state, in declaration order.
+    let (children_fields, children_enums): (Vec<_>, Vec<_>) = if state.kind == StateKind::Parallel {
+        state
+            .children
+            .iter()
+            .map(|&region| {
+                let region = tree.node(region);
+                (
+                    region.children_field.clone().expect("region field"),
+                    region.children_enum.clone().expect("region enum"),
+                )
+            })
+            .unzip()
+    } else {
+        (
+            vec![state.children_field.clone().expect("substates")],
+            vec![state.children_enum.clone().expect("children enum")],
+        )
+    };
     let view = fields_type(tree, node);
     let visibility = struct_visibility(generation, node);
     let shared = tree.shared_fields(node);
@@ -73,7 +94,7 @@ fn fields_view(generation: &Generation<'_>, node: StateId) -> TokenStream {
         .collect();
     let types: Vec<_> = shared.iter().map(|field| &field.ty).collect();
     let documentation = format!(
-        "The fields of [`{struct_name}`] without its `#[substates]` field: the split borrow of ADR 0007."
+        "The fields of [`{struct_name}`] without its `#[substates]` or `#[region]` fields: the split borrow of ADR 0007."
     );
     let field_docs: Vec<_> = names
         .iter()
@@ -104,10 +125,10 @@ fn fields_view(generation: &Generation<'_>, node: StateId) -> TokenStream {
         }
 
         impl #struct_name {
-            /// Splits the borrow: the shared fields and the substates.
-            pub fn split(&mut self) -> (#view<'_>, &mut #children_enum) {
-                let Self { #(#names,)* #children_field } = self;
-                (#view { #(#names,)* #marker_value }, #children_field)
+            /// Splits the borrow: the shared fields, then the substates or the regions.
+            pub fn split(&mut self) -> (#view<'_>, #(&mut #children_enums),*) {
+                let Self { #(#names,)* #(#children_fields,)* } = self;
+                (#view { #(#names,)* #marker_value }, #(#children_fields),*)
             }
         }
     }
@@ -138,6 +159,39 @@ fn variant_view(generation: &Generation<'_>, node: StateId, fields: &[Field]) ->
         quote! {
             #[doc = #documentation]
             #visibility struct #view<'a>( #( pub &'a mut #types, )* );
+        }
+    }
+}
+
+/// `BackoffRef<'a>`: the shared view of a variant that the closures of its
+/// `#[after]` and `#[invoke]` receive (they also run from `&self`, when a
+/// timer fires).
+fn ref_view(generation: &Generation<'_>, node: StateId, fields: &[Field]) -> TokenStream {
+    let tree = generation.tree;
+    let view = ref_view_type(tree, node);
+    let visibility = enum_visibility(generation, node);
+    let variant = &tree.node(node).name;
+    let documentation = format!(
+        "Shared view of the variant `{variant}`, for the closures of its `#[after]` and `#[invoke]`."
+    );
+    let types: Vec<_> = fields.iter().map(|field| &field.ty).collect();
+    if matches!(tree.node(node).payload, Payload::Struct(_)) {
+        let names: Vec<_> = fields
+            .iter()
+            .filter_map(|field| field.ident.as_ref())
+            .collect();
+        let docs: Vec<_> = names
+            .iter()
+            .map(|name| format!("`{name}` of the variant."))
+            .collect();
+        quote! {
+            #[doc = #documentation]
+            #visibility struct #view<'a> { #( #[doc = #docs] pub #names: &'a #types, )* }
+        }
+    } else {
+        quote! {
+            #[doc = #documentation]
+            #visibility struct #view<'a>( #( pub &'a #types, )* );
         }
     }
 }

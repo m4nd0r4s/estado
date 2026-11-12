@@ -35,12 +35,15 @@ pub struct MissingData {
 }
 
 /// The value of `node` as a variant of the enum that owns it. `below` is the
-/// value of the children enum of a compound state (its `#[substates]` field).
+/// value of the children enum of a compound state (its `#[substates]` field);
+/// `regions` holds the values the path chose for some regions of a parallel
+/// state, the others start in their `#[initial]`.
 pub fn variant_value(
     tree: &StateTree,
     node: StateId,
     data: &SuppliedData,
     below: Option<TokenStream>,
+    regions: &[(StateId, TokenStream)],
     through_initial: bool,
 ) -> Result<TokenStream, MissingData> {
     let state = tree.node(node);
@@ -55,8 +58,10 @@ pub fn variant_value(
         through_initial,
     };
 
-    if state.composite_struct.is_some() && state.kind == StateKind::Compound {
-        return composite_value(tree, node, data, below, through_initial);
+    if state.composite_struct.is_some()
+        && matches!(state.kind, StateKind::Compound | StateKind::Parallel)
+    {
+        return composite_value(tree, node, data, below, regions, through_initial);
     }
     match (&state.payload, data) {
         (Payload::Unit | Payload::None, _) => Ok(quote! { #owner::#variant }),
@@ -92,19 +97,20 @@ pub fn variant_value(
     }
 }
 
-/// A compound state: `Owner::Variant(Struct { shared fields, sub: below })`.
+/// A compound state: `Owner::Variant(Struct { shared fields, sub: below })`;
+/// a parallel one: `Owner::Variant(Struct { shared fields, region: .. })`.
 fn composite_value(
     tree: &StateTree,
     node: StateId,
     data: &SuppliedData,
     below: Option<TokenStream>,
+    regions: &[(StateId, TokenStream)],
     through_initial: bool,
 ) -> Result<TokenStream, MissingData> {
     let state = tree.node(node);
     let owner = state.owner_enum.as_ref().expect("owner enum");
     let variant = &state.name;
     let struct_name = state.composite_struct.as_ref().expect("composite struct");
-    let children_field = state.children_field.as_ref().expect("substates field");
     let shared = tree.shared_fields(node);
     let (values, base): (&[FieldValue], Option<&Expr>) = match data {
         SuppliedData::Fields { values, base } => (values, base.as_deref()),
@@ -121,10 +127,29 @@ fn composite_value(
             through_initial,
         });
     }
-    let below = below.expect("a compound level has a value below it");
     let base = base.map(|base| quote! { ..#base });
+    let children = if state.kind == StateKind::Parallel {
+        let mut pairs = Vec::new();
+        for &region in &state.children {
+            let field = tree
+                .node(region)
+                .children_field
+                .as_ref()
+                .expect("region field");
+            let value = match regions.iter().find(|(id, _)| *id == region) {
+                Some((_, value)) => value.clone(),
+                None => initial_value(tree, region)?,
+            };
+            pairs.push(quote! { #field: #value });
+        }
+        quote! { #(#pairs),* }
+    } else {
+        let children_field = state.children_field.as_ref().expect("substates field");
+        let below = below.expect("a compound level has a value below it");
+        quote! { #children_field: #below }
+    };
     Ok(quote! {
-        #owner::#variant(#struct_name { #(#values,)* #children_field: #below, #base })
+        #owner::#variant(#struct_name { #(#values,)* #children, #base })
     })
 }
 
@@ -160,7 +185,7 @@ pub fn initial_value(tree: &StateTree, owner: StateId) -> Result<TokenStream, Mi
         StateKind::Compound => Some(initial_value(tree, initial)?),
         _ => None,
     };
-    variant_value(tree, initial, &SuppliedData::None, below, true)
+    variant_value(tree, initial, &SuppliedData::None, below, &[], true)
 }
 
 /// The type of `Exiting![X]` (spec 6.3, ADR 0007): the owned value of the

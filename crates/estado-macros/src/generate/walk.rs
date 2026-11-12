@@ -8,7 +8,7 @@ use syn::Ident;
 
 use super::context::Generation;
 use super::naming::{children_binding, field_binding, fields_binding, payload_binding, view_type};
-use crate::model::{HandlerModel, HandlerParameter, Payload, StateId};
+use crate::model::{HandlerModel, HandlerParameter, Payload, StateId, StateKind};
 
 /// Which parts of a variant a pattern binds.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -138,19 +138,52 @@ pub fn chain_to(generation: &Generation<'_>, at: StateId) -> Vec<StateId> {
     chain
 }
 
-/// A borrowed walk from the slot down to the children enum of `at`.
+/// A borrowed walk from the slot down to a state that owns children: the
+/// root, a compound state, a parallel state or a region.
 pub struct Walk {
-    /// `let` statements binding the `*Fields` of every compound state on the
-    /// way and the children enum of `at`.
+    /// `let` statements binding the `*Fields` of every compound and parallel
+    /// state on the way, the regions of the parallel states and the children
+    /// enum of `at`.
     pub prelude: TokenStream,
-    /// The compound states on the way, top down, ending with `at`.
+    /// The states with a `*Fields` view on the way, top down (ending with
+    /// `at` when it has one): the ancestors argument list of the entry and
+    /// exit functions.
     pub chain: Vec<StateId>,
-    /// The binding of `&mut` children enum of `at`.
+    /// The binding of the `&mut` children enum of `at` (a compound state,
+    /// a region or the root).
     pub children: Ident,
 }
 
-/// Walks from `slot` to the children enum of `at` (the root or a compound
-/// state), splitting the borrow at every level.
+/// The statement that destructures the variant of `node` and splits its
+/// borrow: `(fields, substates)` of a compound, `(fields, region, ..)` of a
+/// parallel state.
+fn split_statement(
+    generation: &Generation<'_>,
+    node: StateId,
+    scrutinee: &TokenStream,
+) -> TokenStream {
+    let tree = generation.tree;
+    let state = tree.node(node);
+    let pattern = variant_pattern(generation, node, Binding::Everything);
+    let payload = payload_binding(tree, node);
+    let fields = fields_binding(tree, node);
+    let message = format!("`{}` is active", state.name);
+    let parts: Vec<Ident> = match state.kind {
+        StateKind::Parallel => state
+            .children
+            .iter()
+            .map(|&region| children_binding(tree, region))
+            .collect(),
+        _ => vec![children_binding(tree, node)],
+    };
+    quote! {
+        let #pattern = #scrutinee else { ::core::unreachable!(#message) };
+        let (mut #fields, #(#parts),*) = #payload.split();
+    }
+}
+
+/// Walks from `slot` to `at` (the root, a compound state, a parallel state
+/// or a region), splitting the borrow at every level.
 pub fn borrowed_walk(generation: &Generation<'_>, at: StateId) -> Walk {
     let tree = generation.tree;
     let chain = chain_to(generation, at);
@@ -159,27 +192,31 @@ pub fn borrowed_walk(generation: &Generation<'_>, at: StateId) -> Walk {
         let root = generation.root;
         return Walk {
             prelude: quote! { let #children: &mut #root = slot.live_mut(); },
-            chain,
+            chain: Vec::new(),
             children,
         };
     }
     let mut statements = TokenStream::new();
     let mut scrutinee = quote! { slot.live_mut() };
     for &node in &chain {
-        let pattern = variant_pattern(generation, node, Binding::Everything);
-        let payload = payload_binding(tree, node);
-        let fields = fields_binding(tree, node);
-        let substates = children_binding(tree, node);
-        let message = format!("`{}` is active", tree.node(node).name);
-        statements.extend(quote! {
-            let #pattern = #scrutinee else { ::core::unreachable!(#message) };
-            let (mut #fields, #substates) = #payload.split();
-        });
-        scrutinee = quote! { #substates };
+        match tree.node(node).kind {
+            // Bound by the `split` of the parallel state above it.
+            StateKind::Region => {
+                scrutinee = {
+                    let region = children_binding(tree, node);
+                    quote! { #region }
+                }
+            }
+            _ => {
+                statements.extend(split_statement(generation, node, &scrutinee));
+                let substates = children_binding(tree, node);
+                scrutinee = quote! { #substates };
+            }
+        }
     }
     Walk {
         prelude: statements,
-        chain,
+        chain: tree.fields_chain(at),
         children,
     }
 }
@@ -217,27 +254,47 @@ pub fn owned_rebuild(
     owned_levels(generation, &chain, new_children)
 }
 
+/// Nests the variants of `chain` (top down) around `innermost`. The same
+/// text is a pattern when destructuring and an expression when rebuilding;
+/// the regions of a parallel state off the path are bound by name and moved
+/// back.
 fn owned_levels(
     generation: &Generation<'_>,
     chain: &[StateId],
     innermost: TokenStream,
 ) -> TokenStream {
+    let Some((&node, rest)) = chain.split_first() else {
+        return innermost;
+    };
     let tree = generation.tree;
-    let mut inner = innermost;
-    for &node in chain.iter().rev() {
-        let state = tree.node(node);
-        let struct_name = state.composite_struct.as_ref().expect("a compound state");
+    let state = tree.node(node);
+    let struct_name = state.composite_struct.as_ref().expect("a composite state");
+    let shared = tree.shared_fields(node);
+    let mut pairs: Vec<TokenStream> = shared
+        .iter()
+        .filter_map(|field| field.ident.as_ref())
+        .map(|name| {
+            let binding = field_binding(tree, node, &name.to_string());
+            quote! { #name: #binding }
+        })
+        .collect();
+    if state.kind == StateKind::Parallel {
+        let on_path = rest.first().copied();
+        let below = owned_levels(generation, rest.get(1..).unwrap_or(&[]), innermost);
+        for &region in &state.children {
+            let field = tree.node(region).children_field.as_ref().expect("region");
+            if Some(region) == on_path {
+                pairs.push(quote! { #field: #below });
+            } else {
+                let binding = field_binding(tree, node, &field.to_string());
+                pairs.push(quote! { #field: #binding });
+            }
+        }
+    } else {
         let children_field = state.children_field.as_ref().expect("substates field");
-        let shared = tree.shared_fields(node);
-        let pairs = shared
-            .iter()
-            .filter_map(|field| field.ident.as_ref())
-            .map(|name| {
-                let binding = field_binding(tree, node, &name.to_string());
-                quote! { #name: #binding }
-            });
-        let path = variant_path(generation, node);
-        inner = quote! { #path(#struct_name { #(#pairs,)* #children_field: #inner }) };
+        let below = owned_levels(generation, rest, innermost);
+        pairs.push(quote! { #children_field: #below });
     }
-    inner
+    let path = variant_path(generation, node);
+    quote! { #path(#struct_name { #(#pairs,)* }) }
 }

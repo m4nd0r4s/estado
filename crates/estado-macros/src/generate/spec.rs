@@ -33,6 +33,11 @@ pub fn spec_impl(generation: &Generation<'_>) -> TokenStream {
     let initial =
         initial_value(generation.tree, 0).unwrap_or_else(|_| quote! { ::core::unreachable!() });
     let enter_root = enter_function(generation.tree, 0);
+    let start_root = super::tasks::start_call(
+        generation,
+        0,
+        &proc_macro2::Ident::new("self", proc_macro2::Span::call_site()),
+    );
     let sink_parameter = generation.sink_parameter();
     let cx_type = generation.cx_type();
     let path = path_body(generation);
@@ -40,7 +45,8 @@ pub fn spec_impl(generation: &Generation<'_>) -> TokenStream {
     let runtime = super::runtime::runtime_type(generation);
     let output = super::completion::output_type(generation);
     let done_methods = super::completion::done_methods(generation);
-    let run_always = super::completion::has_completion(generation).then(|| {
+    let task_methods = super::lookups::spec_methods(generation);
+    let run_always = super::always::has_run_always(generation).then(|| {
         quote! {
             fn run_always<#sink_parameter>(
                 slot: &mut ::estado_core::Slot<Self>,
@@ -82,8 +88,10 @@ pub fn spec_impl(generation: &Generation<'_>) -> TokenStream {
 
             fn enter_initial<#sink_parameter>(&mut self, cx: &mut #cx_type) {
                 #enter_root(self, cx);
+                #start_root
             }
 
+            #[inline(always)]
             fn microstep<#sink_parameter>(
                 slot: &mut ::estado_core::Slot<Self>,
                 cx: &mut #cx_type,
@@ -94,6 +102,7 @@ pub fn spec_impl(generation: &Generation<'_>) -> TokenStream {
 
             #run_always
             #done_methods
+            #task_methods
         }
     }
 }

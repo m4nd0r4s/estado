@@ -12,6 +12,15 @@ use super::walk::{borrowed_walk, call_handler, fields_references};
 use crate::construct::initial_value;
 use crate::model::{HandlerRole, StateId, StateKind, UnhandledPolicy};
 
+/// `::estado_core::UnhandledPolicy::Error` and its siblings.
+fn policy_expression(policy: UnhandledPolicy) -> TokenStream {
+    match policy {
+        UnhandledPolicy::Ignore => quote! { ::estado_core::UnhandledPolicy::Ignore },
+        UnhandledPolicy::Error => quote! { ::estado_core::UnhandledPolicy::Error },
+        UnhandledPolicy::Panic => quote! { ::estado_core::UnhandledPolicy::Panic },
+    }
+}
+
 /// `Outcome::Unhandled(policy)` with the machine default or an override.
 pub fn unhandled_outcome(
     generation: &Generation<'_>,
@@ -22,14 +31,9 @@ pub fn unhandled_outcome(
         None => {
             quote! { ::estado_core::Outcome::Unhandled(<#root as ::estado_core::Spec>::UNHANDLED) }
         }
-        Some(UnhandledPolicy::Ignore) => {
-            quote! { ::estado_core::Outcome::Unhandled(::estado_core::UnhandledPolicy::Ignore) }
-        }
-        Some(UnhandledPolicy::Error) => {
-            quote! { ::estado_core::Outcome::Unhandled(::estado_core::UnhandledPolicy::Error) }
-        }
-        Some(UnhandledPolicy::Panic) => {
-            quote! { ::estado_core::Outcome::Unhandled(::estado_core::UnhandledPolicy::Panic) }
+        Some(policy) => {
+            let policy = policy_expression(policy);
+            quote! { ::estado_core::Outcome::Unhandled(#policy) }
         }
     }
 }
@@ -38,47 +42,75 @@ pub fn unhandled_outcome(
 /// the nearest ancestor that has a handler (an `Outcome` expression).
 pub fn bubble_out_of(generation: &Generation<'_>, node: StateId) -> TokenStream {
     let tree = generation.tree;
+    let in_region = tree.region_of(node).is_some();
     if let Some(policy) = tree.node(node).unhandled {
-        return unhandled_outcome(generation, Some(policy));
+        return if in_region {
+            let policy = policy_expression(policy);
+            quote! { tally.stop(#policy) }
+        } else {
+            unhandled_outcome(generation, Some(policy))
+        };
     }
     let parent = tree.node(node).parent.unwrap_or(0);
-    if parent == 0 {
+    if parent == 0 || tree.node(parent).kind == StateKind::Region {
+        // At the top of a region the event goes back to the parallel state,
+        // which asks the other regions (spec 5.6).
         return unhandled_outcome(generation, None);
     }
-    if generation.handler(HandlerRole::On, parent).is_some() {
+    if generation.handler(HandlerRole::On, parent).is_some()
+        && tree.node(parent).kind != StateKind::Parallel
+    {
         let function = bubble_function(tree, parent);
-        return quote! { #function(slot, cx, event) };
+        return if in_region {
+            quote! { #function(slot, cx, event, tally) }
+        } else {
+            quote! { #function(slot, cx, event) }
+        };
     }
     bubble_out_of(generation, parent)
 }
 
 /// Calls `call` (the handler of `node`), resolves its `Next` and applies the
-/// bubbling rules. An expression of type `Outcome`.
+/// bubbling rules. An expression of type `Outcome`. Inside a region the
+/// `tally` of the parallel state is in scope (spec 5.6).
 pub fn handle_at(generation: &Generation<'_>, node: StateId, call: TokenStream) -> TokenStream {
     let tree = generation.tree;
+    let in_region = tree.region_of(node).is_some();
     let override_policy = tree.node(node).unhandled;
     let handler = generation
         .handler(HandlerRole::On, node)
         .expect("handle_at is called for a state with a handler");
     let mapped = override_policy.map(|policy| {
-        let outcome = unhandled_outcome(generation, Some(policy));
+        let outcome = if in_region {
+            let policy = policy_expression(policy);
+            quote! { tally.stop(#policy) }
+        } else {
+            unhandled_outcome(generation, Some(policy))
+        };
         quote! { Resolution::Done(::estado_core::Outcome::Unhandled(_)) => #outcome, }
     });
     let bubble = bubble_out_of(generation, node);
-    let reenter = if handler.uses.reenter {
+    let reenter = if !generation.uses_reenter() {
+        TokenStream::new()
+    } else if handler.uses.reenter {
         let function = reenter_function(tree, node);
-        quote! { #function(slot, cx) }
+        quote! { Resolution::Reenter => #function(slot, cx), }
     } else {
-        quote! { ::core::unreachable!("this handler never returns `reenter!()`") }
+        quote! { Resolution::Reenter => ::core::unreachable!(), }
+    };
+    let resolve = if in_region {
+        quote! { resolve_region(next, slot, cx, tally) }
+    } else {
+        quote! { resolve(next, slot, cx) }
     };
     quote! {
         {
             let next = #call;
-            match resolve(next, slot, cx) {
+            match #resolve {
                 #mapped
                 Resolution::Done(outcome) => outcome,
                 Resolution::Bubble => #bubble,
-                Resolution::Reenter => #reenter,
+                #reenter
             }
         }
     }
@@ -101,8 +133,17 @@ pub fn bubble_functions(generation: &Generation<'_>) -> TokenStream {
             continue;
         };
         let name = bubble_function(tree, node.id);
+        // A handler that takes no data of any state needs no borrows.
+        let needs_data = handler.parameters.iter().any(|parameter| {
+            matches!(
+                parameter,
+                crate::model::HandlerParameter::OwnData { .. }
+                    | crate::model::HandlerParameter::OwnView
+                    | crate::model::HandlerParameter::Fields { .. }
+            )
+        });
         let walk = borrowed_walk(generation, node.id);
-        let prelude = &walk.prelude;
+        let prelude = needs_data.then_some(&walk.prelude);
         let fields = |ancestor: StateId| {
             let binding = fields_binding(tree, ancestor);
             quote! { #binding }
@@ -113,13 +154,18 @@ pub fn bubble_functions(generation: &Generation<'_>) -> TokenStream {
             "Runs the handler of `{}` after its substates bubbled.",
             node.name
         );
+        let tally = tree
+            .region_of(node.id)
+            .is_some()
+            .then(|| quote! { , tally: &mut RegionTally });
         functions.extend(quote! {
             #[doc = #documentation]
             #[inline(always)]
             pub fn #name<#sink_parameter>(
                 slot: &mut ::estado_core::Slot<#root>,
                 cx: &mut #cx_type,
-                event: &#event,
+                event: &#event
+                #tally
             ) -> ::estado_core::Outcome {
                 #prelude
                 #body
@@ -149,32 +195,9 @@ pub fn reenter_functions(generation: &Generation<'_>) -> TokenStream {
         let prelude = &walk.prelude;
         let children = &walk.children;
         let ancestors = fields_references(generation, &walk.chain);
-        let reset = (tree.node(node).kind == StateKind::Compound).then(|| {
-            let state = tree.node(node);
-            let variant =
-                super::walk::variant_pattern(generation, node, super::walk::Binding::Everything);
-            let payload = super::naming::payload_binding(tree, node);
-            let field = state.children_field.as_ref().expect("substates field");
-            let initial =
-                initial_value(tree, node).unwrap_or_else(|_| quote! { ::core::unreachable!() });
-            let message = format!("`{}` is active", state.name);
-            // The substates that leave are consumed: deep histories record them.
-            let retired = if state.history == crate::model::HistoryKind::DeepKeep {
-                let history = super::runtime::history_field(generation, node);
-                quote! { cx.runtime_mut().#history = ::core::option::Option::Some(old_substates); }
-            } else if super::history::has_deep_below(generation, node) {
-                let retire =
-                    super::history::retire_function(state.children_enum.as_ref().expect("enum"));
-                quote! { #retire(old_substates, cx); }
-            } else {
-                quote! { drop(old_substates); }
-            };
-            quote! {
-                let #variant = &mut *#children else { ::core::unreachable!(#message) };
-                let old_substates = ::core::mem::replace(&mut #payload.#field, #initial);
-                #retired
-            }
-        });
+        let reset = reset_statements(generation, node, children);
+        let cancel = super::tasks::cancel_call(generation, parent, children);
+        let start = super::tasks::start_call(generation, parent, children);
         let documentation = format!(
             "`reenter!()` of `{}`: exits and enters it, its data kept (ADR 0006).",
             tree.node(node).name
@@ -189,8 +212,10 @@ pub fn reenter_functions(generation: &Generation<'_>) -> TokenStream {
                 {
                     #prelude
                     #exit(#children, #(#ancestors,)* cx);
+                    #cancel
                     #reset
                     #enter(#children, #(#ancestors,)* cx);
+                    #start
                 }
                 ::estado_core::Outcome::Transitioned {
                     changed: <#root as ::estado_core::Spec>::state_id(slot.live_mut()) != leaf_before,
@@ -199,4 +224,51 @@ pub fn reenter_functions(generation: &Generation<'_>) -> TokenStream {
         });
     }
     functions
+}
+
+/// What `reenter!()` does to the substates of a compound state or to the
+/// regions of a parallel one: they restart from their `#[initial]`, the
+/// values that leave are consumed (deep histories record them).
+fn reset_statements(
+    generation: &Generation<'_>,
+    node: StateId,
+    children: &proc_macro2::Ident,
+) -> TokenStream {
+    let tree = generation.tree;
+    let state = tree.node(node);
+    if !matches!(state.kind, StateKind::Compound | StateKind::Parallel) {
+        return TokenStream::new();
+    }
+    let variant = super::walk::variant_pattern(generation, node, super::walk::Binding::Everything);
+    let payload = super::naming::payload_binding(tree, node);
+    let message = format!("`{}` is active", state.name);
+    let owners: Vec<StateId> = if state.kind == StateKind::Parallel {
+        state.children.clone()
+    } else {
+        vec![node]
+    };
+    let replacements = owners.iter().map(|&owner| {
+        let owner_state = tree.node(owner);
+        let field = owner_state.children_field.as_ref().expect("children field");
+        let initial =
+            initial_value(tree, owner).unwrap_or_else(|_| quote! { ::core::unreachable!() });
+        let retired = if owner_state.history == crate::model::HistoryKind::DeepKeep {
+            let history = super::runtime::history_field(generation, owner);
+            quote! { cx.runtime_mut().#history = ::core::option::Option::Some(old_substates); }
+        } else if super::history::has_deep_below(generation, owner) {
+            let retire =
+                super::history::retire_function(owner_state.children_enum.as_ref().expect("enum"));
+            quote! { #retire(old_substates, cx); }
+        } else {
+            quote! { drop(old_substates); }
+        };
+        quote! {
+            let old_substates = ::core::mem::replace(&mut #payload.#field, #initial);
+            #retired
+        }
+    });
+    quote! {
+        let #variant = &mut *#children else { ::core::unreachable!(#message) };
+        #(#replacements)*
+    }
 }

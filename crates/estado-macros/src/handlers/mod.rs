@@ -8,6 +8,7 @@
 mod body;
 mod goto_resolve;
 mod goto_syntax;
+mod parallel_geometry;
 mod parameters;
 mod roles;
 mod signature;
@@ -74,6 +75,7 @@ pub fn analyse(model: &mut MachineModel) -> Vec<Diagnostic> {
     }
     check_root_initial(model, &mut diagnostics);
     check_history_nesting(model, &mut diagnostics);
+    check_parallel_support(model, &analysed, &mut diagnostics);
     model.handlers = degraded_impls;
     model.rewritten_handlers = full_impls;
     model.analysed_handlers = analysed;
@@ -121,6 +123,46 @@ fn check_history_nesting(model: &MachineModel, diagnostics: &mut Vec<Diagnostic>
                     ),
                 )
                 .with_help("nested deep histories are not supported yet; use `#[history]` (shallow) for the inner one"),
+            );
+        }
+    }
+}
+
+/// What parallel states do not support yet: a parallel state inside a region
+/// of another one (the short-circuit of spec 5.6 item 3 is tracked for one
+/// level), and a handler or `#[after]`-style attribute on a region itself.
+fn check_parallel_support(
+    model: &MachineModel,
+    analysed: &[HandlerModel],
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    use crate::model::StateKind;
+    let tree = &model.tree;
+    for node in tree.nodes.iter().skip(1) {
+        if node.kind == StateKind::Parallel && tree.region_of(node.id).is_some() {
+            diagnostics.push(
+                Diagnostic::new(
+                    "E0090",
+                    node.name.span(),
+                    format!("the parallel state `{}` is inside a region", node.name),
+                )
+                .with_help("nested parallel states are not supported yet; flatten the regions"),
+            );
+        }
+    }
+    for handler in analysed {
+        let state = tree.node(handler.state);
+        if state.kind == StateKind::Region {
+            diagnostics.push(
+                Diagnostic::new(
+                    "E0090",
+                    handler.function.sig.ident.span(),
+                    format!(
+                        "`{}` is a region: it has no handlers of its own",
+                        state.name
+                    ),
+                )
+                .with_help("put the handler on a state of the region, or on the parallel state"),
             );
         }
     }
@@ -233,6 +275,8 @@ fn analyse_function(
         .any(|goto| matches!(goto.form, crate::model::GotoForm::Constructor { .. }));
     let edge_type = if report.gotos.is_empty() {
         EdgeType::None
+    } else if has_constructor && tree.region_of(state).is_some() {
+        EdgeType::OpaqueRegion
     } else if has_constructor {
         EdgeType::Opaque
     } else {
@@ -247,6 +291,19 @@ fn analyse_function(
             if matches!(&**returned, Type::Path(path)
                 if path.path.segments.last().is_some_and(|segment| segment.ident == "Result"))
     );
+    if returns_result {
+        diagnostics.push(
+            Diagnostic::new(
+                "E0061",
+                full.sig.output.span(),
+                "a handler returns `Result` but there is no `#[on_error]`",
+            )
+            .with_help(
+                "`#[on_error]` is not supported yet by this version of `estado`: return \
+                 `Next<Self>` and turn the error into a transition in the body",
+            ),
+        );
+    }
     let handler_model = HandlerModel {
         role: attribute.role,
         state,

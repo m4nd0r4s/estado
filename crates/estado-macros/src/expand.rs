@@ -65,7 +65,7 @@ fn machine_items(model: &MachineModel, valid: bool) -> Vec<Item> {
     };
     items.extend(handlers.iter().cloned().map(Item::Impl));
     items.push(Item::Verbatim(generate::generated_items(model, valid)));
-    items.push(Item::Verbatim(warnings::warning_items(model)));
+    items.push(Item::Verbatim(warnings::warning_items(model, valid)));
     items
 }
 

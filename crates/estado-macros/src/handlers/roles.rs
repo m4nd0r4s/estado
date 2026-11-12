@@ -10,8 +10,7 @@ use crate::model::{Diagnostic, HandlerRole};
 const FACADE_CRATES: [&str; 2] = ["estado", "estado_macros"];
 
 /// Attributes that are part of the macro language but not supported yet.
-const UNSUPPORTED_ROLES: [&str; 7] = [
-    "always",
+const UNSUPPORTED_ROLES: [&str; 6] = [
     "choice",
     "on_child_done",
     "on_resume",
@@ -59,6 +58,7 @@ fn role_of(name: &str) -> Option<HandlerRole> {
         "entry" => HandlerRole::Entry,
         "exit" => HandlerRole::Exit,
         "on_done" => HandlerRole::OnDone,
+        "always" => HandlerRole::Always,
         _ => return None,
     })
 }

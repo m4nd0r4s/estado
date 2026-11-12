@@ -5,7 +5,8 @@
 //! | `queues` | a handler calls `cx.raise` or `defer!()` |
 //! | `<state>_history` | the state has `#[history]` (`Option<u8>`) or `#[history(deep, keep)]` (`Option<Substates>`) |
 //! | `<state>_epoch` | the state has `#[after]` or `#[invoke]` |
-//! | `always_pending` | the machine has `#[always]` or `#[on_done]` |
+//! | `completion_pending` | the machine has a final state below the root or an `#[on_done]` |
+//! | `<state>_always_pending` | the state has an `#[always]` handler |
 //!
 //! With none of them the runtime is `NoRuntime<Event>` and `Machine` keeps
 //! its AC-15 size.
@@ -15,7 +16,7 @@ use quote::{format_ident, quote};
 use syn::Ident;
 
 use super::context::Generation;
-use crate::model::{HistoryKind, StateId};
+use crate::model::{HandlerRole, HistoryKind, StateId};
 use crate::naming::snake_case_name;
 
 /// What the runtime holds, derived from the model.
@@ -26,25 +27,27 @@ pub struct RuntimePlan {
     pub histories: Vec<StateId>,
     /// States with timers or invokes, in tree order.
     pub epochs: Vec<StateId>,
-    /// `#[always]` / completion flag.
-    pub always: bool,
+    /// Completion flag.
+    pub completion: bool,
+    /// States with an `#[always]` handler, in tree order.
+    pub always_states: Vec<StateId>,
 }
 
 impl RuntimePlan {
     /// Whether the machine needs a generated runtime at all.
     pub fn is_empty(&self) -> bool {
-        !self.queues && self.histories.is_empty() && self.epochs.is_empty() && !self.always
+        !self.queues
+            && self.histories.is_empty()
+            && self.epochs.is_empty()
+            && !self.completion
+            && self.always_states.is_empty()
     }
 }
 
 /// Derives the plan.
 pub fn runtime_plan(generation: &Generation<'_>) -> RuntimePlan {
     let tree = generation.tree;
-    let queues = generation
-        .model
-        .analysed_handlers
-        .iter()
-        .any(|handler| handler.uses.raise || handler.uses.defer);
+    let queues = generation.uses_queues();
     let histories = tree
         .nodes
         .iter()
@@ -61,7 +64,14 @@ pub fn runtime_plan(generation: &Generation<'_>) -> RuntimePlan {
         queues,
         histories,
         epochs,
-        always: generation.needs_always(),
+        completion: generation.needs_completion(),
+        always_states: generation
+            .model
+            .analysed_handlers
+            .iter()
+            .filter(|handler| handler.role == HandlerRole::Always)
+            .map(|handler| handler.state)
+            .collect(),
     }
 }
 
@@ -82,6 +92,14 @@ pub fn history_field(generation: &Generation<'_>, node: StateId) -> Ident {
 pub fn epoch_field(generation: &Generation<'_>, node: StateId) -> Ident {
     format_ident!(
         "{}_epoch",
+        snake_case_name(&generation.tree.node(node).name)
+    )
+}
+
+/// `awaiting_always_pending`: set while the `#[always]` of the state is due.
+pub fn always_field(generation: &Generation<'_>, node: StateId) -> Ident {
+    format_ident!(
+        "{}_always_pending",
         snake_case_name(&generation.tree.node(node).name)
     )
 }
@@ -156,14 +174,26 @@ pub fn runtime_items(generation: &Generation<'_>) -> TokenStream {
         fields.push(quote! { #[doc = #documentation] pub #field: u32 });
         initial.push(quote! { #field: 0 });
     }
-    if plan.always {
-        fields.push(quote! { #[doc = "A completion or `#[always]` evaluation is pending."] pub always_pending: bool });
-        initial.push(quote! { always_pending: false });
+    if plan.completion {
+        fields.push(quote! { #[doc = "A completion check (`#[on_done]`) is pending."] pub completion_pending: bool });
+        initial.push(quote! { completion_pending: false });
     }
-    let take_always = plan.always.then(|| {
+    let mut pending = Vec::new();
+    if plan.completion {
+        pending.push(quote! { self.completion_pending });
+    }
+    for &node in &plan.always_states {
+        let field = always_field(generation, node);
+        let documentation = format!("The `#[always]` of `{}` is due.", tree.node(node).name);
+        fields.push(quote! { #[doc = #documentation] pub #field: bool });
+        initial.push(quote! { #field: false });
+        pending.push(quote! { self.#field });
+    }
+    // The run clears the flag it serves; this only reports whether one is set.
+    let take_always = (!pending.is_empty()).then(|| {
         quote! {
             fn take_always_pending(&mut self) -> bool {
-                ::core::mem::take(&mut self.always_pending)
+                #(#pending)||*
             }
         }
     });

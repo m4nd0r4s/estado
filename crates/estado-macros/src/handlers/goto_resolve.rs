@@ -60,6 +60,13 @@ pub fn resolve_goto(
         ));
     }
     let (kind, lca) = geometry(tree, handler_state, target, &syntax)?;
+    super::parallel_geometry::check_parallel_geometry(
+        tree,
+        handler_state,
+        target,
+        lca,
+        macro_span,
+    )?;
 
     let payload = match syntax.extra {
         GotoExtra::Constructor(closure) => {
@@ -341,14 +348,22 @@ fn build_value(
     if entered.is_empty() {
         return parse_value(below.expect("a local transition to an ancestor enters its initial"));
     }
+    // The region a path goes into, with the value of its state.
+    let mut chosen_regions: Vec<(StateId, TokenStream)> = Vec::new();
     for &node in entered.iter().rev() {
+        if tree.node(node).kind == StateKind::Region {
+            let value = below.take().expect("a region holds the state below it");
+            chosen_regions.push((node, value));
+            continue;
+        }
         let data = supplied
             .iter()
             .position(|(id, _, _)| *id == node)
             .map(|index| supplied.remove(index).1)
             .unwrap_or(SuppliedData::None);
-        let value =
-            variant_value(tree, node, &data, below.take(), false).map_err(missing_to_error)?;
+        let value = variant_value(tree, node, &data, below.take(), &chosen_regions, false)
+            .map_err(missing_to_error)?;
+        chosen_regions.clear();
         below = Some(value);
     }
     parse_value(below.expect("at least one level"))

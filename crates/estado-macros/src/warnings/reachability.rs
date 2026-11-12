@@ -2,9 +2,7 @@
 //! tree and the edges between states.
 //!
 //! The edges come from the handler rewrite: one [`EdgeSource`] per handler,
-//! listing the targets of its `goto!` occurrences. Until the call site exists
-//! (bead 4.2 produces `HandlerModel::gotos`), only the unit tests use these
-//! functions.
+//! listing the targets of its `goto!` occurrences ([`edge_sources`]).
 
 use std::collections::HashSet;
 
@@ -20,6 +18,21 @@ pub struct EdgeSource {
     pub targets: Vec<StateId>,
     /// The handler uses `goto_dyn!`: the target is only known at run time.
     pub has_dynamic_target: bool,
+}
+
+/// One [`EdgeSource`] per analysed handler, from its `goto!` occurrences.
+/// Entries, exits and handlers without a `goto!` give an empty source, which
+/// is harmless. `goto_dyn!` is not supported yet, so none is dynamic.
+pub fn edge_sources(model: &MachineModel) -> Vec<EdgeSource> {
+    model
+        .analysed_handlers
+        .iter()
+        .map(|handler| EdgeSource {
+            from: handler.state,
+            targets: handler.gotos.iter().map(|goto| goto.target).collect(),
+            has_dynamic_target: false,
+        })
+        .collect()
 }
 
 /// The W0001 and W0002 warnings of a machine, given all its edges.
