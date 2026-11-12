@@ -5,7 +5,7 @@
 use proc_macro2::TokenTree;
 use quote::ToTokens;
 use syn::visit::{self, Visit};
-use syn::{Arm, Block, Expr, ExprMatch, Ident, Pat, UnOp};
+use syn::{Arm, Block, Expr, ExprMacro, ExprMatch, ExprReturn, Ident, Pat, StmtMacro, UnOp};
 
 use crate::model::EventCoverage;
 use crate::naming::facade_name;
@@ -25,8 +25,17 @@ pub fn event_coverage(body: &Block, event: Option<&Ident>) -> EventCoverage {
         scrutinee_uses: 0,
         any_event: false,
         matches_over_event: 0,
+        depth: 0,
+        transitions_in_arms: 0,
     };
     scan.visit_block(body);
+    // A transition outside the arms of those matches (`if cond { return
+    // goto!(..) }` before or after the match) reacts to every event.
+    let mut all = TransitionCount::default();
+    all.visit_block(body);
+    if all.count > scan.transitions_in_arms {
+        return EventCoverage::AnyEvent;
+    }
     let total_uses = count_identifier(body.to_token_stream(), event);
     // The event is used only as the scrutinee of the matches the scan read;
     // `if let`, `matches!`, a helper call or `event.kind()` leave it unknown.
@@ -46,6 +55,10 @@ struct MatchScan<'event> {
     scrutinee_uses: usize,
     any_event: bool,
     matches_over_event: usize,
+    /// Nesting of the matches read, to count the arms of the outermost only.
+    depth: usize,
+    /// Transitions and returns inside the arms of the outermost matches read.
+    transitions_in_arms: usize,
 }
 
 impl<'ast> Visit<'ast> for MatchScan<'_> {
@@ -55,7 +68,19 @@ impl<'ast> Visit<'ast> for MatchScan<'_> {
             self.scrutinee_uses += 1;
             for arm in &expression.arms {
                 self.read_arm(arm);
+                if self.depth == 0 {
+                    let mut inside = TransitionCount::default();
+                    inside.visit_expr(&arm.body);
+                    if let Some((_, guard)) = &arm.guard {
+                        inside.visit_expr(guard);
+                    }
+                    self.transitions_in_arms += inside.count;
+                }
             }
+            self.depth += 1;
+            visit::visit_expr_match(self, expression);
+            self.depth -= 1;
+            return;
         }
         visit::visit_expr_match(self, expression);
     }
@@ -107,6 +132,8 @@ fn arm_pattern(pattern: &Pat) -> ArmPattern {
         Pat::Paren(inner) => arm_pattern(&inner.pat),
         Pat::Ident(inner) => match &inner.subpat {
             Some((_, subpattern)) => arm_pattern(subpattern),
+            // `T` or `TIMEOUT` may be a constant or a renamed import: unknown.
+            None if is_all_uppercase(&inner.ident) => ArmPattern::Unknown,
             // `Timeout` after `use Ev::*` is a variant, `other` is a binding.
             None if starts_uppercase(&inner.ident) => {
                 ArmPattern::Variants(vec![inner.ident.to_string()])
@@ -132,6 +159,45 @@ fn variant_of(path: &syn::Path) -> ArmPattern {
     path.segments.last().map_or(ArmPattern::Unknown, |segment| {
         ArmPattern::Variants(vec![segment.ident.to_string()])
     })
+}
+
+fn is_all_uppercase(ident: &Ident) -> bool {
+    let name = ident.to_string();
+    name.chars().any(char::is_alphabetic) && !name.chars().any(char::is_lowercase)
+}
+
+/// Counts transition macros (`goto!`, `reenter!`, `stay!`, `defer!`) and
+/// `return` expressions.
+#[derive(Default)]
+struct TransitionCount {
+    count: usize,
+}
+
+impl TransitionCount {
+    fn macro_path(&mut self, path: &syn::Path) {
+        if facade_name(path).is_some_and(|name| {
+            name == "goto" || name == "reenter" || name == "stay" || name == "defer"
+        }) {
+            self.count += 1;
+        }
+    }
+}
+
+impl<'ast> Visit<'ast> for TransitionCount {
+    fn visit_expr_macro(&mut self, call: &'ast ExprMacro) {
+        self.macro_path(&call.mac.path);
+        visit::visit_expr_macro(self, call);
+    }
+
+    fn visit_stmt_macro(&mut self, call: &'ast StmtMacro) {
+        self.macro_path(&call.mac.path);
+        visit::visit_stmt_macro(self, call);
+    }
+
+    fn visit_expr_return(&mut self, expression: &'ast ExprReturn) {
+        self.count += 1;
+        visit::visit_expr_return(self, expression);
+    }
 }
 
 fn starts_uppercase(ident: &Ident) -> bool {
