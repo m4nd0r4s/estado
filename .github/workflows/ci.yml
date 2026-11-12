@@ -73,6 +73,8 @@ jobs:
     # BM-01 and BM-02 (spec 10.3): estado vs a hand-written parser / enum +
     # match. Quick mode only proves the benches compile and run; the 10%
     # regression gate against main is not wired yet.
+    # BM-05: `cargo check` of a generated 200-state, 600-edge machine; the
+    # spec target is 3 s on a standard CI machine.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -80,3 +82,12 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo bench -p estado-core --bench bm_02_ping_pong -- --quick
       - run: cargo bench -p estado-examples --bench bm_01_http_parser -- --quick
+      # BM-05 threshold. On an Apple M4 Pro the check takes about 1 s (median
+      # of 5, incremental off). A shared 4-vCPU runner runs this
+      # single-threaded work roughly 2 to 3 times slower, so about 2 to 3 s is
+      # expected here. The step fails above 6 s (twice the spec target), a
+      # margin for noisy neighbours and cold disks; the step takes the median
+      # of 3 runs. Between 3 s and 6 s it passes with a warning annotation
+      # (the spec target is missed on this runner); the measured time is in
+      # the job summary. Tighten to 3 s once CI history confirms the margin.
+      - run: scripts/bm05.sh --runs 3 --fail-above 6

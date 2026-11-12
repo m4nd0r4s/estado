@@ -1,0 +1,15 @@
+[package]
+name = "bm05-generator"
+description = "BM-05 (spec 10.3): generates a synthetic 200-state, 600-edge machine and times its expansion and checking"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+publish = false
+
+# Standalone on purpose: not a member of the estado workspace, so it never
+# takes part in `cargo build --workspace`, in the published crates or in
+# their lockfile.
+[workspace]
+
+[dependencies]
