@@ -22,3 +22,6 @@ tracing = ["estado-core/tracing"]
 inspect = ["estado-core/inspect"]
 invariants = ["estado-core/invariants"]
 serde = ["estado-core/serde"]
+
+[dev-dependencies]
+trybuild = "1"

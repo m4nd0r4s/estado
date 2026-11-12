@@ -151,6 +151,7 @@ version = "0.0.0"
 dependencies = [
  "estado-core",
  "estado-macros",
+ "trybuild",
 ]
 
 [[package]]

@@ -1,0 +1,23 @@
+error: estado::E0040: `goto!` is only valid inside a `#[handlers]` function of a `#[machine]` module
+ --> tests/ui/e0040_goto_outside_handlers.rs:4:13
+  |
+4 |     let _ = goto!(Playing);
+  |             ^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the macro `goto` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: estado::E0040: `stay!` is only valid inside a `#[handlers]` function of a `#[machine]` module
+ --> tests/ui/e0040_goto_outside_handlers.rs:8:13
+  |
+8 |     let _ = estado::stay!();
+  |             ^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the macro `estado::stay` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: estado::E0040: `edges!` is only valid inside a `#[handlers]` function of a `#[machine]` module
+  --> tests/ui/e0040_goto_outside_handlers.rs:11:27
+   |
+11 | fn not_a_type() -> Option<edges![A | B]> {
+   |                           ^^^^^^^^^^^^^
+   |
+   = note: this error originates in the macro `edges` (in Nightly builds, run with -Z macro-backtrace for more info)
