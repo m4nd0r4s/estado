@@ -23,6 +23,7 @@ pub struct Cx<'step, M: Spec, S> {
     runtime: &'step mut M::Runtime,
     sink: &'step mut S,
     active: Option<&'step StatePath>,
+    refreshed: Option<StatePath>,
     fault: Option<Fault>,
 }
 
@@ -41,6 +42,7 @@ impl<'step, M: Spec, S: Sink<M::Effect>> Cx<'step, M, S> {
             runtime,
             sink,
             active,
+            refreshed: None,
             fault: None,
         }
     }
@@ -74,11 +76,24 @@ impl<'step, M: Spec, S: Sink<M::Effect>> Cx<'step, M, S> {
 
     /// Whether `state` is active, including states of sibling regions.
     ///
-    /// Reflects the configuration at the start of the current microstep.
+    /// Reflects the configuration at the start of the current microstep,
+    /// updated after each region-internal transition of a parallel state
+    /// (see [`refresh_active`](Self::refresh_active)).
     /// Requires `Spec::TRACKS_ACTIVE`; without it, always `false`.
     #[inline]
     pub fn in_state(&self, state: StateId) -> bool {
-        self.active.is_some_and(|path| path.contains(state))
+        let path = self.refreshed.as_ref().or(self.active);
+        path.is_some_and(|path| path.contains(state))
+    }
+
+    /// Replaces the configuration read by [`in_state`](Self::in_state).
+    ///
+    /// Generated code calls it after a region-internal transition, so the
+    /// next region sees the new configuration (spec 5.6, item 2).
+    #[doc(hidden)]
+    #[inline]
+    pub fn refresh_active(&mut self, path: StatePath) {
+        self.refreshed = Some(path);
     }
 
     /// Pushes any effect (timers, invokes). Called by generated code.

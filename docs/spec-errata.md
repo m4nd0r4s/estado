@@ -26,3 +26,8 @@ Contradictions and errors in the spec. By rule 2 of section 0, section 5 wins. E
 
 - **Problem.** `#[history(deep, keep)]` stores the full substate value when the compound exits (3.4, 5.3 step 3), and a constructor receives the exit segment by value, substates included (`Exiting![Active]` is `Active` with `sub`, 6.3). Both cannot own the same value without `Clone`.
 - **Resolution** (ADR 0006). For a compound with `#[history(deep, keep)]`, the substate value moves into the history and `Exiting![X]` is a generated struct with the remaining fields only. Compounds without deep history keep the spec's shape.
+
+## 6. 4.3 and 5.6: `cx.in_state` snapshot taken at the start of the microstep is stale between regions
+
+- **Problem.** 4.3 suggests a snapshot of the active discriminants "updated at the start of each microstep". 5.6 item 2 applies a region-internal transition immediately, before the next region is evaluated, in the same microstep. A later region that asks `cx.in_state(..)` about an earlier region would see the configuration from before the transition, although the transition already ran (its exits and entries are in the log).
+- **Resolution** (ADR 0005). Section 5 wins: after every region-internal transition the generated code refreshes the snapshot with `Cx::refresh_active(M::path(..))` (`#[doc(hidden)]`, only needed when `TRACKS_ACTIVE`), so `in_state` always reflects the applied transitions of the current microstep. Test: `ac_02_a_region_internal_transition_is_applied_before_the_next_region_is_evaluated`.
