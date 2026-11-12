@@ -243,3 +243,16 @@ fn ac_10_a_machine_that_is_not_in_a_root_final_has_no_output() {
         })
     );
 }
+
+#[test]
+fn ac_10_the_output_is_taken_once_and_the_machine_stays_done() {
+    let mut machine = connected();
+    machine.send(Event::Close).unwrap();
+    assert!(machine.take_output().is_some());
+    assert_eq!(machine.take_output(), None);
+    assert!(machine.is_done());
+    assert!(machine.try_state().is_none());
+    let report = machine.send(Event::Poke).unwrap().report;
+    assert_eq!(report.ignored, Some(IgnoreReason::Unhandled));
+    assert!(!machine.is_poisoned());
+}

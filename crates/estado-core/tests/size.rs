@@ -62,7 +62,7 @@ fn assert_machine_is_the_plain_pair<M: Spec>() {
     assert_eq!(
         size_of::<Slot<M>>(),
         size_of::<M>(),
-        "precondition: the root enum has two spare niche values"
+        "precondition: the root enum has three spare niche values"
     );
     assert_eq!(size_of::<Machine<M>>(), size_of::<(M, M::Ctx)>());
 }

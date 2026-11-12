@@ -34,7 +34,7 @@ impl<M: Spec> Machine<M> {
     ) -> Result<Report, SendError<M::Event>> {
         let event = match &self.slot {
             Slot::Poisoned => return Err(SendError::Poisoned),
-            Slot::Unstarted => None,
+            Slot::Unstarted | Slot::Finished => None,
             Slot::Live(state) => state.timer_event(&self.runtime, key),
         };
         match event {
@@ -73,7 +73,7 @@ impl<M: Spec> Machine<M> {
     ) -> Result<Report, SendError<M::Event>> {
         let accepted = match &self.slot {
             Slot::Poisoned => return Err(SendError::Poisoned),
-            Slot::Unstarted => false,
+            Slot::Unstarted | Slot::Finished => false,
             Slot::Live(state) => state.accepts_invoke(&self.runtime, key),
         };
         if accepted {

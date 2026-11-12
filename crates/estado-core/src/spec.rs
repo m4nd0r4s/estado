@@ -96,9 +96,14 @@ pub trait Spec: Sized {
         false
     }
 
-    /// Moves the output out of the root `#[final]` state.
-    fn take_output(&mut self) -> Option<Self::Output> {
-        None
+    /// Moves the output out of the root `#[final]` state, or gives the
+    /// state back when it is not in one.
+    ///
+    /// # Errors
+    ///
+    /// `Err(self)` when the root is not in a `#[final]` state with output.
+    fn into_output(self) -> Result<Self::Output, Self> {
+        Err(self)
     }
 
     /// The event of the timer `key`, built from the current data of its

@@ -137,7 +137,7 @@ impl<M: Spec> Machine<M> {
     ) -> Result<Report, SendError<M::Event>> {
         match self.slot {
             Slot::Poisoned => return Err(SendError::Poisoned),
-            Slot::Live(_) => return Ok(Report::default()),
+            Slot::Live(_) | Slot::Finished => return Ok(Report::default()),
             Slot::Unstarted => {}
         }
         let guard = PoisonGuard {
@@ -183,10 +183,20 @@ impl<M: Spec> Machine<M> {
         event: M::Event,
         sink: &mut S,
     ) -> Result<Report, SendError<M::Event>> {
-        // One test on the hot path; poisoned and unstarted are handled out of line.
+        // One test on the hot path; the other slot states go out of line.
         if !matches!(self.slot, Slot::Live(_)) {
-            self.begin_send_when_not_live(sink)?;
+            return self.send_when_not_live(event, sink);
         }
+        self.send_live(event, sink)
+    }
+
+    /// `send_into` on a live slot.
+    #[inline(always)]
+    fn send_live<S: Sink<M::Effect>>(
+        &mut self,
+        event: M::Event,
+        sink: &mut S,
+    ) -> Result<Report, SendError<M::Event>> {
         let guard = PoisonGuard {
             slot: &mut self.slot,
         };
@@ -221,29 +231,36 @@ impl<M: Spec> Machine<M> {
         Ok(report)
     }
 
-    /// The slow start of `send_into`: refuses a poisoned machine and runs the
-    /// initial entries of an unstarted one (spec 4.5).
+    /// The slow path of `send_into`: refuses a poisoned machine, ignores
+    /// events after the output was taken (spec 5.10), and runs the initial
+    /// entries of an unstarted one before the event (spec 4.5).
     #[cold]
-    fn begin_send_when_not_live<S: Sink<M::Effect>>(
+    #[inline(never)]
+    fn send_when_not_live<S: Sink<M::Effect>>(
         &mut self,
+        event: M::Event,
         sink: &mut S,
-    ) -> Result<(), SendError<M::Event>> {
+    ) -> Result<Report, SendError<M::Event>> {
         match self.slot {
-            Slot::Live(_) => Ok(()),
-            Slot::Poisoned => Err(SendError::Poisoned),
+            Slot::Live(_) => {}
+            Slot::Poisoned => return Err(SendError::Poisoned),
+            Slot::Finished => {
+                return Ok(Report {
+                    ignored: Some(IgnoreReason::Unhandled),
+                    ..Report::default()
+                });
+            }
             Slot::Unstarted => {
                 let guard = PoisonGuard {
                     slot: &mut self.slot,
                 };
-                match start_in(guard.slot, &mut self.ctx, &mut self.runtime, sink) {
-                    Ok(()) => {
-                        guard.disarm();
-                        Ok(())
-                    }
-                    Err(error) => Err(settle_error(guard, error)),
+                if let Err(error) = start_in(guard.slot, &mut self.ctx, &mut self.runtime, sink) {
+                    return Err(settle_error(guard, error));
                 }
+                guard.disarm();
             }
         }
+        self.send_live(event, sink)
     }
 
     /// [`send_into`](Self::send_into) with a closure as the sink.
@@ -300,6 +317,10 @@ impl<M: Spec> Machine<M> {
                 "estado: machine `{}` is poisoned by an earlier panic or fatal error",
                 M::NAME
             ),
+            Slot::Finished => panic!(
+                "estado: machine `{}` finished and its output was taken",
+                M::NAME
+            ),
         }
     }
 
@@ -336,14 +357,29 @@ impl<M: Spec> Machine<M> {
 
     /// Whether the root reached a `#[final]` state.
     pub fn is_done(&self) -> bool {
-        self.slot.live().is_some_and(M::is_done)
+        match &self.slot {
+            Slot::Live(state) => state.is_done(),
+            Slot::Finished => true,
+            Slot::Unstarted | Slot::Poisoned => false,
+        }
     }
 
-    /// Moves the output out of the root `#[final]` state.
+    /// Moves the output out of the root `#[final]` state. The machine is
+    /// then finished: still done, its state no longer readable, and later
+    /// calls return `None`.
     pub fn take_output(&mut self) -> Option<M::Output> {
-        match &mut self.slot {
-            Slot::Live(state) => state.take_output(),
-            _ => None,
+        if !self.slot.live().is_some_and(M::is_done) {
+            return None;
+        }
+        match self.slot.take().into_output() {
+            Ok(output) => {
+                self.slot = Slot::Finished;
+                Some(output)
+            }
+            Err(state) => {
+                self.slot.put(state);
+                None
+            }
         }
     }
 

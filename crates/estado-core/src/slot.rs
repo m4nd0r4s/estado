@@ -30,6 +30,8 @@ pub enum Slot<State> {
     Unstarted,
     /// A panic or fatal error happened in the middle of a step.
     Poisoned,
+    /// The root reached a `#[final]` state and its output was taken.
+    Finished,
 }
 
 impl<State> Slot<State> {

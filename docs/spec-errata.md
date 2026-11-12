@@ -5,7 +5,7 @@ Contradictions and errors in the spec. By rule 2 of section 0, section 5 wins. E
 ## 1. AC-15 and 3.5: the size requirement ignores alignment and niches
 
 - **Problem.** `size_of::<Machine<M>>() == size_of::<M>() + size_of::<M::Ctx>()` cannot hold even for a plain `struct { M, Ctx }`: alignment padding breaks the sum (`Player` + `u8` is 49 by the formula, 56 in memory). And when `M` has no spare niche value, any poison or started marker costs extra bytes.
-- **Resolution** (ADR 0002). AC-15 becomes: `size_of::<Machine<M>>() == size_of::<(M, M::Ctx)>()` for a machine without optional features whose root enum has at least two niche values (checked as `size_of::<Slot<M>>() == size_of::<M>()`); otherwise the excess is at most `align_of::<M>()`.
+- **Resolution** (ADR 0002). AC-15 becomes: `size_of::<Machine<M>>() == size_of::<(M, M::Ctx)>()` for a machine without optional features whose root enum has at least three niche values (`Unstarted`, `Poisoned`, `Finished`; checked as `size_of::<Slot<M>>() == size_of::<M>()`); otherwise the excess is at most `align_of::<M>()`.
 
 ## 2. 3.5 and 4.5: no room for the "started" bit
 

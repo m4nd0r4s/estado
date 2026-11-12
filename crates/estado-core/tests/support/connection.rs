@@ -288,11 +288,10 @@ impl Spec for Conn {
         matches!(self, Self::Closed(_))
     }
 
-    /// Leaves the default receipt behind (ADR 0005): a second call yields it.
-    fn take_output(&mut self) -> Option<Receipt> {
+    fn into_output(self) -> Result<Receipt, Self> {
         match self {
-            Self::Closed(receipt) => Some(core::mem::take(receipt)),
-            _ => None,
+            Self::Closed(receipt) => Ok(receipt),
+            other => Err(other),
         }
     }
 }
