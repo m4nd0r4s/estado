@@ -1,0 +1,6 @@
+error: estado::E0090: `sender` is a region: it has no handlers of its own
+         = help: put the handler on a state of the region, or on the parallel state
+  --> tests/ui/e0090_handler_on_a_region.rs:39:12
+   |
+39 |         fn on_sender(_cx: &mut Cx<Self>, _event: &Ev) -> Next<Self> {
+   |            ^^^^^^^^^

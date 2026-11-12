@@ -32,7 +32,7 @@ pub enum Command {
     StopOutput,
 }
 
-#[machine(event = Event, effect = Command, max_microsteps = 32, allow(W0001))]
+#[machine(event = Event, effect = Command, max_microsteps = 32, allow(W0001, W0002))]
 /// The media player machine.
 pub mod player {
     use super::*;

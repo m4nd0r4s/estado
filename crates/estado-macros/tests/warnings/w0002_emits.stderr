@@ -1,0 +1,11 @@
+error: use of deprecated function `door::__estado_warnings::W0002_Jammed`: estado::W0002: state `Jammed` has no outgoing edges and is not `#[terminal]`; once entered the machine can never leave it (silence with `#[machine(allow(W0002))]`)
+  --> tests/warnings/w0002_emits.rs:19:9
+   |
+19 |         Jammed,
+   |         ^^^^^^
+   |
+note: the lint level is defined here
+  --> tests/warnings/w0002_emits.rs:3:9
+   |
+ 3 | #![deny(deprecated)]
+   |         ^^^^^^^^^^

@@ -1,0 +1,6 @@
+error: estado::E0090: the parallel state `Sending` is inside a region
+         = help: nested parallel states are not supported yet; flatten the regions
+  --> tests/ui/e0090_nested_parallel.rs:24:9
+   |
+24 |         Sending(Nested),
+   |         ^^^^^^^

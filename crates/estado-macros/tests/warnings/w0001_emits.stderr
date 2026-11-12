@@ -1,0 +1,11 @@
+error: use of deprecated function `player::__estado_warnings::W0001_Orphan`: estado::W0001: state `Orphan` is unreachable from the initial state (silence with `#[machine(allow(W0001))]`)
+  --> tests/warnings/w0001_emits.rs:19:9
+   |
+19 |         Orphan(Orphan),
+   |         ^^^^^^
+   |
+note: the lint level is defined here
+  --> tests/warnings/w0001_emits.rs:3:9
+   |
+ 3 | #![deny(deprecated)]
+   |         ^^^^^^^^^^

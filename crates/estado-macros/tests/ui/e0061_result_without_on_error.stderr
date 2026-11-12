@@ -1,0 +1,6 @@
+error: estado::E0061: a handler returns `Result` but there is no `#[on_error]`
+         = help: `#[on_error]` is not supported yet by this version of `estado`: return `Next<Self>` and turn the error into a transition in the body
+  --> tests/ui/e0061_result_without_on_error.rs:19:53
+   |
+19 |         fn on_idle(_cx: &mut Cx<Self>, _event: &Ev) -> Result<Next<Self>, String> {
+   |                                                     ^

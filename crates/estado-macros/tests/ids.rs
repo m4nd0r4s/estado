@@ -10,7 +10,7 @@ use estado_macros::machine;
 pub struct Ev;
 pub struct Cmd;
 
-#[machine(event = Ev, effect = Cmd, unhandled = error, version = 2)]
+#[machine(event = Ev, effect = Cmd, unhandled = error, version = 2, allow(W0001, W0002))]
 mod connection {
     use super::*;
 
@@ -46,7 +46,7 @@ mod connection {
         #[initial(with = KeepAlive::new_waiting)]
         WaitingForPing { missed: u8 },
         #[unhandled(panic)]
-        #[invoke(|state: &PingSent| Cmd)]
+        #[invoke(|_: &()| Cmd)]
         PingSent,
     }
 

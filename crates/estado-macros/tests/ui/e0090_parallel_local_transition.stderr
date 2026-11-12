@@ -1,0 +1,6 @@
+error: estado::E0090: a local transition between `Up` and its own regions is not supported yet
+         = help: use `goto!(.., external)` to leave and re-enter it, or transition inside one region
+  --> tests/ui/e0090_parallel_local_transition.rs:41:13
+   |
+41 |             goto!(Up)
+   |             ^^^^

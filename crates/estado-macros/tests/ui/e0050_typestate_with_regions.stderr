@@ -4,16 +4,3 @@ error: estado::E0050: regions are not supported in `typestate` mode
    |
 16 |         link: Link,
    |         ^^^^
-
-error: estado::E0020: `Connected` is entered through its `#[initial]` and needs data for `0`
-         = help: add `#[initial(with = constructor)]` to `Connected` so the macro can build it
-  --> tests/ui/e0050_typestate_with_regions.rs:10:9
-   |
-10 |         Connected(Connected),
-   |         ^^^^^^^^^
-
-error: estado::E0020: note: `Connected` is declared here
-  --> tests/ui/e0050_typestate_with_regions.rs:10:9
-   |
-10 |         Connected(Connected),
-   |         ^^^^^^^^^

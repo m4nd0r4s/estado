@@ -9,4 +9,5 @@ fn warnings_are_emitted_and_silenced() {
     cases.compile_fail("tests/warnings/*_counts_own_fields.rs");
     cases.pass("tests/warnings/*_silences.rs");
     cases.pass("tests/warnings/*_below_the_limit.rs");
+    cases.pass("tests/warnings/*_clean_machine.rs");
 }

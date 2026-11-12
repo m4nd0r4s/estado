@@ -1,0 +1,6 @@
+error: estado::E0021: `Sending` and `Muted` are in sibling regions of `Up`
+         = help: regions never transition each other: raise an event with `cx.raise(..)` that the other region handles
+  --> tests/ui/e0021_sibling_regions.rs:43:13
+   |
+43 |             goto!(Muted)
+   |             ^^^^
