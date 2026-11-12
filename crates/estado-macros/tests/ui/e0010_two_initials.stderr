@@ -1,0 +1,12 @@
+error: estado::E0010: `Player` has more than one `#[initial]` variant
+         = help: keep `#[initial]` on exactly one variant
+  --> tests/ui/e0010_two_initials.rs:12:9
+   |
+12 |         Busy,
+   |         ^^^^
+
+error: estado::E0010: note: `Idle` is the first `#[initial]`
+  --> tests/ui/e0010_two_initials.rs:10:9
+   |
+10 |         Idle,
+   |         ^^^^

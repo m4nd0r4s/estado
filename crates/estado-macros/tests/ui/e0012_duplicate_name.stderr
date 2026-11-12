@@ -1,0 +1,12 @@
+error: estado::E0012: duplicate state name `Idle`
+         = help: state names are unique in a machine so that `goto!(Name)` is unambiguous; rename one
+  --> tests/ui/e0012_duplicate_name.rs:24:9
+   |
+24 |         Idle,
+   |         ^^^^
+
+error: estado::E0012: note: `Idle` is first declared here
+  --> tests/ui/e0012_duplicate_name.rs:10:9
+   |
+10 |         Idle,
+   |         ^^^^

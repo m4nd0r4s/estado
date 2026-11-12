@@ -1,0 +1,12 @@
+error: estado::E0001: a machine has exactly one `#[root]` enum
+         = help: a module holds a single machine; move this enum to another `#[machine]` module
+  --> tests/ui/e0001_two_roots.rs:14:14
+   |
+14 |     pub enum Recorder {
+   |              ^^^^^^^^
+
+error: estado::E0001: note: the first `#[root]` enum
+ --> tests/ui/e0001_two_roots.rs:8:14
+  |
+8 |     pub enum Player {
+  |              ^^^^^^

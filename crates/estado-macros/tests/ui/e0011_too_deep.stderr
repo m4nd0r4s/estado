@@ -1,0 +1,6 @@
+error: estado::E0011: `L16` is nested 17 levels deep; the maximum is 16
+         = help: flatten the hierarchy, or move a branch into a child machine
+   --> tests/ui/e0011_too_deep.rs:202:9
+    |
+202 |         L16(S16),
+    |         ^^^

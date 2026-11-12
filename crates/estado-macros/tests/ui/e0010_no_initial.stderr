@@ -1,0 +1,6 @@
+error: estado::E0010: `ActiveSub` has no `#[initial]` variant
+         = help: mark the variant entered first with `#[initial]`
+  --> tests/ui/e0010_no_initial.rs:21:14
+   |
+21 |     pub enum ActiveSub {
+   |              ^^^^^^^^^

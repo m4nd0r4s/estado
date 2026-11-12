@@ -1,0 +1,6 @@
+error: estado::E0014: `Active` has a single `#[region]` field; a parallel state needs at least two
+         = help: use `#[substates]` for one level of substates, or add a second region
+  --> tests/ui/e0014_single_region.rs:16:9
+   |
+16 |         output: Output,
+   |         ^^^^^^

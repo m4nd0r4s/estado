@@ -1,0 +1,12 @@
+error: estado::E0012: state `link` clashes with `Link`: both generate the id constant `LINK`
+         = help: state names are unique in a machine so that `goto!(Name)` is unambiguous; rename one
+  --> tests/ui/e0012_region_name_clash.rs:17:9
+   |
+17 |         link: LinkRegion,
+   |         ^^^^
+
+error: estado::E0012: note: `Link` is first declared here
+  --> tests/ui/e0012_region_name_clash.rs:10:9
+   |
+10 |         Link,
+   |         ^^^^

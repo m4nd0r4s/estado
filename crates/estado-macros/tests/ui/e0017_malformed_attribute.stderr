@@ -1,0 +1,27 @@
+error: estado::E0017: invalid `#[after]`: expected `=>`
+         = help: write `#[after(duration => event)]`
+  --> tests/ui/e0017_malformed_attribute.rs:10:22
+   |
+10 |         #[after(1 + 1)]
+   |                      ^
+
+error: estado::E0017: `panik` is not an unhandled policy
+         = help: did you mean `panic`?
+  --> tests/ui/e0017_malformed_attribute.rs:12:21
+   |
+12 |         #[unhandled(panik)]
+   |                     ^^^^^
+
+error: estado::E0017: deep history needs both `deep` and `keep`
+         = help: write `#[history(deep, keep)]`
+  --> tests/ui/e0017_malformed_attribute.rs:18:7
+   |
+18 |     #[history(deep)]
+   |       ^^^^^^^
+
+error: estado::E0017: `#[history]` goes on the `#[state]` struct of the compound state
+         = help: move it to the struct that has the `#[substates]` field
+  --> tests/ui/e0017_malformed_attribute.rs:27:11
+   |
+27 |         #[history]
+   |           ^^^^^^^

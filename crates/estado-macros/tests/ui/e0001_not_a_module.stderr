@@ -1,0 +1,6 @@
+error: estado::E0001: `#[machine]` must be applied to an inline module
+         = help: wrap the machine in `mod name { .. }` and mark its enum with `#[root]`
+ --> tests/ui/e0001_not_a_module.rs:6:6
+  |
+6 | enum Player {
+  |      ^^^^^^

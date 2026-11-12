@@ -1,0 +1,12 @@
+error: estado::E0013: `Active` has both `#[substates]` and `#[region]` fields
+         = help: a state is compound or parallel, never both; wrap the regions in a substate
+  --> tests/ui/e0013_substates_and_region.rs:18:9
+   |
+18 |         extra: Extra,
+   |         ^^^^^
+
+error: estado::E0013: note: the `#[substates]` field
+  --> tests/ui/e0013_substates_and_region.rs:16:9
+   |
+16 |         sub: Sub,
+   |         ^^^

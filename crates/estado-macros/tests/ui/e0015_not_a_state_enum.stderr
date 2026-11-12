@@ -1,0 +1,13 @@
+error: estado::E0015: the type of `sub` must be a `#[state]` enum
+         = help: add `#[state]` to `enum ActiveSub`
+  --> tests/ui/e0015_not_a_state_enum.rs:17:14
+   |
+17 |         sub: ActiveSub,
+   |              ^^^^^^^^^
+
+error: estado::E0015: the type of `sub` must be a `#[state]` enum
+         = help: declare an enum of the substates in this module and mark it `#[state]`
+  --> tests/ui/e0015_not_a_state_enum.rs:28:14
+   |
+28 |         sub: u32,
+   |              ^^^

@@ -1,0 +1,20 @@
+error: estado::E0016: unknown option `defer_capp`
+         = help: did you mean `defer_cap`?
+ --> tests/ui/e0016_unknown_option.rs:5:23
+  |
+5 | #[machine(event = Ev, defer_capp = 4, unhandled = ignor, typestate = true)]
+  |                       ^^^^^^^^^^
+
+error: estado::E0016: `ignor` is not a valid value of `unhandled`
+         = help: did you mean `ignore`?
+ --> tests/ui/e0016_unknown_option.rs:5:51
+  |
+5 | #[machine(event = Ev, defer_capp = 4, unhandled = ignor, typestate = true)]
+  |                                                   ^^^^^
+
+error: estado::E0016: `typestate` is a flag and takes no value
+         = help: write just `typestate`
+ --> tests/ui/e0016_unknown_option.rs:5:58
+  |
+5 | #[machine(event = Ev, defer_capp = 4, unhandled = ignor, typestate = true)]
+  |                                                          ^^^^^^^^^

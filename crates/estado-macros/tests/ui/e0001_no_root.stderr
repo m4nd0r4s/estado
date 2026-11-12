@@ -1,0 +1,6 @@
+error: estado::E0001: machine module `player` has no `#[root]` enum
+         = help: mark the enum of the top-level states with `#[root]`
+ --> tests/ui/e0001_no_root.rs:6:5
+  |
+6 | mod player {
+  |     ^^^^^^

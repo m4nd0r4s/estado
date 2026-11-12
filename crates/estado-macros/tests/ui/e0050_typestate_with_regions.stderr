@@ -1,0 +1,6 @@
+error: estado::E0050: regions are not supported in `typestate` mode
+         = help: remove `typestate`, or split the regions into separate machines
+  --> tests/ui/e0050_typestate_with_regions.rs:16:9
+   |
+16 |         link: Link,
+   |         ^^^^
