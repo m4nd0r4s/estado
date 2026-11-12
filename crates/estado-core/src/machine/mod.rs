@@ -144,10 +144,13 @@ impl<M: Spec> Machine<M> {
             slot: &mut self.slot,
         };
         let mut report = Report::default();
-        // Same error handling as the implicit start in `send_into`: only
-        // `RaiseOverflow` and `Livelock` poison.
+        // A start that fails half-way (entries ran, `#[always]` or raised
+        // events still pending) leaves no consistent configuration to resume
+        // from, so every start error poisons (ADR 0013, amendment by the lead).
+        // Dropping the guard writes `Poisoned`.
         if let Err(error) = start_in(guard.slot, &mut self.ctx, &mut self.runtime, sink) {
-            return Err(settle_error(guard, error));
+            drop(guard);
+            return Err(error);
         }
         if let Err(error) = drain::<M, S>(
             guard.slot,
@@ -156,7 +159,8 @@ impl<M: Spec> Machine<M> {
             sink,
             &mut report,
         ) {
-            return Err(settle_error(guard, error));
+            drop(guard);
+            return Err(error);
         }
         guard.disarm();
         Ok(report)
@@ -198,10 +202,21 @@ impl<M: Spec> Machine<M> {
         event: M::Event,
         sink: &mut S,
     ) -> Result<Report, SendError<M::Event>> {
+        self.send_live_from(event, sink, Report::default())
+    }
+
+    /// `send_live` continuing the counters of `report`: after an implicit
+    /// start, the start and the event share one livelock budget.
+    #[inline(always)]
+    fn send_live_from<S: Sink<M::Effect>>(
+        &mut self,
+        event: M::Event,
+        sink: &mut S,
+        mut report: Report,
+    ) -> Result<Report, SendError<M::Event>> {
         let guard = PoisonGuard {
             slot: &mut self.slot,
         };
-        let mut report = Report::default();
         if guard.slot.live().is_some_and(M::is_done) {
             report.ignored = Some(IgnoreReason::Unhandled);
             guard.disarm();
@@ -253,15 +268,10 @@ impl<M: Spec> Machine<M> {
             }
             Slot::Unstarted => {
                 // The full start, `#[always]`, completions and raised events
-                // included, runs before the event (spec 4.5, ADR 0013 item 6).
+                // included, runs before the event (spec 4.5, ADR 0013 item 6),
+                // within one livelock budget.
                 let started = self.start_into(sink)?;
-                let mut report = self.send_live(event, sink)?;
-                report.microsteps = report.microsteps.saturating_add(started.microsteps);
-                report.transitions = report.transitions.saturating_add(started.transitions);
-                report.unhandled_internal = report
-                    .unhandled_internal
-                    .saturating_add(started.unhandled_internal);
-                return Ok(report);
+                return self.send_live_from(event, sink, started);
             }
         }
         self.send_live(event, sink)

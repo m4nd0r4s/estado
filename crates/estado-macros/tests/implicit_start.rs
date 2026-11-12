@@ -3,7 +3,7 @@
 //! being entered (spec 4.5, ADR 0013 items 6 and 7).
 #![allow(dead_code, missing_docs)]
 
-use estado_core::{Cx, Machine, Next, Sink};
+use estado_core::{Cx, Effect, Machine, Next, Overflow, SendError, Sink};
 use estado_macros::machine;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -122,4 +122,109 @@ fn initial_entries_see_the_configuration_being_entered() {
     let mut machine = Machine::<panel::Panel>::new(Vec::new());
     machine.start().unwrap();
     assert_eq!(*machine.ctx(), [true]);
+}
+
+/// Accepts one effect, then overflows.
+struct OneEffect(usize);
+
+impl<Command> Sink<Command> for OneEffect {
+    fn push(&mut self, _: Effect<Command>) -> Result<(), Overflow> {
+        self.0 += 1;
+        if self.0 > 1 { Err(Overflow) } else { Ok(()) }
+    }
+}
+
+#[derive(Debug)]
+pub enum Beep {
+    Short,
+}
+
+#[machine(event = Event, effect = Beep, allow(W0002))]
+mod noisy {
+    use super::*;
+
+    #[root]
+    #[derive(Debug, PartialEq, Eq)]
+    pub enum Noisy {
+        #[initial]
+        Loud,
+    }
+
+    #[handlers]
+    impl Noisy {
+        #[entry(Loud)]
+        fn entry_loud(cx: &mut Cx<Self>) {
+            cx.emit(Beep::Short);
+            cx.emit(Beep::Short);
+        }
+    }
+}
+
+#[test]
+fn a_fault_during_the_implicit_start_poisons_the_machine() {
+    let mut machine = Machine::<noisy::Noisy>::new(());
+    let error = machine.send_into(Event::Go, &mut OneEffect(0)).unwrap_err();
+    assert!(matches!(error, SendError::EffectOverflow));
+    assert!(machine.is_poisoned());
+    assert!(matches!(
+        machine.send(Event::Go).unwrap_err(),
+        SendError::Poisoned
+    ));
+}
+
+#[test]
+fn a_fault_during_an_explicit_start_poisons_the_machine() {
+    let mut machine = Machine::<noisy::Noisy>::new(());
+    assert!(matches!(
+        machine.start_into(&mut OneEffect(0)).unwrap_err(),
+        SendError::EffectOverflow
+    ));
+    assert!(machine.is_poisoned());
+}
+
+#[machine(event = Event, ctx = Vec<String>, raise_cap = 4, max_microsteps = 2, allow(W0002))]
+mod tight {
+    use super::*;
+
+    #[root]
+    #[derive(Debug, PartialEq, Eq)]
+    pub enum Tight {
+        #[initial]
+        Booting,
+        Ready,
+    }
+
+    #[handlers]
+    impl Tight {
+        #[entry(Booting)]
+        fn entry_booting(cx: &mut Cx<Self>) {
+            cx.raise(Event::Note(1));
+        }
+
+        #[always(Booting)]
+        fn always_booting() -> Next<Self> {
+            goto!(Ready)
+        }
+
+        #[on(Ready)]
+        fn on_ready() -> Next<Self> {
+            stay!()
+        }
+    }
+}
+
+#[test]
+fn the_implicit_start_and_the_event_share_one_livelock_budget() {
+    // Start: always + raised Note = 2 microsteps; the event is the third.
+    let mut explicit = Machine::<tight::Tight>::new(Vec::new());
+    explicit.start().unwrap();
+    assert!(explicit.send(Event::Go).is_ok());
+
+    let mut implicit = Machine::<tight::Tight>::new(Vec::new());
+    let error = implicit.send(Event::Go).unwrap_err();
+    assert!(
+        matches!(error, SendError::Livelock { microsteps: 3, .. }),
+        "{error:?}"
+    );
+    assert!(implicit.is_poisoned());
 }
