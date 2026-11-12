@@ -1,7 +1,7 @@
-//! Deferral of `Send` and the defer queue (spec 5.4, 5.5).
+// Deferral of `Send` and the defer queue (spec 5.4, 5.5).
 
 use estado_core::{DeferOverflowPolicy, IgnoreReason, SendError, Spec};
-use estado_examples::b_connection::{
+use super::scenario::{
     CONNECT_TIMEOUT, Conn, DEFER_CAP, DEFER_OVERFLOW_POLICY, Event, Frame,
 };
 use estado_test::{DurationExt, assert_state};

@@ -6,19 +6,25 @@
 //! is the machine of `a_http_parser`, fed with `send_batch`. The bytes come
 //! from `black_box`, so the optimizer cannot fold the parse away.
 //!
-//! Status (M2, Apple M-series, release): the target of 5% is not met. The
-//! hand-written parser takes about 1.0 ms per MB, estado about 1.6 ms with
-//! `send_into` per byte and 1.75 ms with `send_batch`. See the report of bead
-//! 3.9 for the breakdown; `estado_send_into` is kept to show what
-//! `send_batch` adds on top.
+//! Status (M2, Apple M-series, release): the target of 5% is not met by the
+//! hand-written machine of `a_http_parser`. The baseline takes about 1.0 ms
+//! per MB, that machine about 1.6 ms with `send_into` per byte and 1.75 ms
+//! with `send_batch`. See the report of bead 3.9 for the breakdown;
+//! `estado_send_into` is kept to show what `send_batch` adds on top.
+//!
+//! M3 adds the `estado_macro_*` functions: the same parser written with
+//! `#[machine]` (`a_http_parser_macro`), the machine ADR 0009 asks to
+//! re-measure. Its edges write in place below the root and `microstep` is
+//! `#[inline(always)]`.
 
 use core::hint::black_box;
 
 use criterion::{Criterion, Throughput, criterion_group, criterion_main};
-use estado_core::{Discard, Machine};
+use estado_core::{Cx, Discard, Machine, Runtime, Slot, Spec};
 use estado_examples::a_http_parser::baseline::BaselineParser;
 use estado_examples::a_http_parser::corpus::{Corpus, build_requests};
 use estado_examples::a_http_parser::{HttpParser, ParserCtx};
+use estado_examples::a_http_parser_macro::HttpParser as MacroParser;
 
 const CORPUS_BYTES: usize = 1_000_000;
 const SEED: u64 = 0x5eed;
@@ -45,12 +51,52 @@ fn run_estado_send_into(bytes: &[u8]) -> ParserCtx {
     black_box(*machine.ctx())
 }
 
+/// The machine written with `#[machine]`, fed with `send_batch`.
+fn run_macro(bytes: &[u8]) -> ParserCtx {
+    let mut machine = Machine::<MacroParser>::new(ParserCtx::default());
+    let _ = machine.send_batch(black_box(bytes).iter().copied(), &mut Discard);
+    black_box(*machine.ctx())
+}
+
+/// Same, one `send_into` per byte.
+fn run_macro_send_into(bytes: &[u8]) -> ParserCtx {
+    let mut machine = Machine::<MacroParser>::new(ParserCtx::default());
+    for &byte in black_box(bytes) {
+        let _ = machine.send_into(byte, &mut Discard);
+    }
+    black_box(*machine.ctx())
+}
+
+/// The generated `microstep` called directly, without `Machine`: no poison
+/// guard, no queues, no report. This is the generated code on its own, which
+/// is what ADR 0009 calls "the shape of generated code"; the rest of the
+/// ratio is the machine layer.
+fn run_microstep<M: Spec<Event = u8, Effect = (), Ctx = ParserCtx>>(bytes: &[u8]) -> ParserCtx {
+    let mut ctx = ParserCtx::default();
+    let mut runtime = <M::Runtime as Runtime>::NEW;
+    let mut slot = Slot::Live(M::initial());
+    let mut sink = Discard;
+    {
+        let mut cx = Cx::<M, Discard>::new(&mut ctx, &mut runtime, &mut sink, None);
+        M::enter_initial(slot.live_mut(), &mut cx);
+    }
+    for &byte in black_box(bytes) {
+        let mut cx = Cx::<M, Discard>::new(&mut ctx, &mut runtime, &mut sink, None);
+        let _ = M::microstep(&mut slot, &mut cx, &byte);
+    }
+    black_box(ctx)
+}
+
 /// Both sides must compute the same thing, or the comparison is void.
 fn assert_sides_agree(corpus: &Corpus) {
     let baseline = run_baseline(&corpus.bytes);
     let estado = run_estado(&corpus.bytes);
     assert_eq!(baseline, estado);
     assert_eq!(estado, run_estado_send_into(&corpus.bytes));
+    assert_eq!(estado, run_macro(&corpus.bytes));
+    assert_eq!(estado, run_macro_send_into(&corpus.bytes));
+    assert_eq!(estado, run_microstep::<HttpParser>(&corpus.bytes));
+    assert_eq!(estado, run_microstep::<MacroParser>(&corpus.bytes));
     assert_eq!(estado.requests, corpus.requests);
     assert_eq!(estado.error, None);
 }
@@ -68,6 +114,18 @@ fn bm_01_http_parser(criterion: &mut Criterion) {
     });
     group.bench_function("estado_send_into", |bencher| {
         bencher.iter(|| run_estado_send_into(&corpus.bytes))
+    });
+    group.bench_function("estado_macro_send_batch", |bencher| {
+        bencher.iter(|| run_macro(&corpus.bytes))
+    });
+    group.bench_function("estado_macro_send_into", |bencher| {
+        bencher.iter(|| run_macro_send_into(&corpus.bytes))
+    });
+    group.bench_function("estado_microstep_direct", |bencher| {
+        bencher.iter(|| run_microstep::<HttpParser>(&corpus.bytes))
+    });
+    group.bench_function("estado_macro_microstep_direct", |bencher| {
+        bencher.iter(|| run_microstep::<MacroParser>(&corpus.bytes))
     });
     group.finish();
 }

@@ -1,7 +1,7 @@
-//! The regions of `Connected`: keepalive, link, `cx.in_state` between them
-//! and the exit order when `Dead` leaves the parallel state (spec 5.3, 5.6).
+// The regions of `Connected`: keepalive, link, `cx.in_state` between them
+// and the exit order when `Dead` leaves the parallel state (spec 5.3, 5.6).
 
-use estado_examples::b_connection::{Command, Conn, Event, PING_INTERVAL, PONG_TIMEOUT, backoff};
+use super::scenario::{Command, Conn, Event, PING_INTERVAL, PONG_TIMEOUT, backoff};
 use estado_test::{DurationExt, assert_state};
 
 use super::support::{

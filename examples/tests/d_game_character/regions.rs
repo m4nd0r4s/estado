@@ -1,14 +1,14 @@
-//! The regions of `Alive`: evaluation order, `cx.in_state` between them and
-//! the pose of `anim` derived from the others (spec 5.3, 5.6, ADR 0005,
-//! ADR 0008).
+// The regions of `Alive`: evaluation order, `cx.in_state` between them and
+// the pose of `anim` derived from the others (spec 5.3, 5.6, ADR 0005,
+// ADR 0008).
 
-use estado_examples::d_game_character::{
+use super::scenario::{
     Anim, Command, Event, FIRE_COOLDOWN, JUMP_TIME, Movement, RELOAD_TIME, Weapon,
 };
 use estado_test::DurationExt;
 
 use super::support::{alive, fire_once, path, started, take_trace, timer_of};
-use estado_examples::d_game_character::Character;
+use super::scenario::Character;
 
 #[test]
 fn regions_are_evaluated_in_declaration_order_and_each_transition_is_applied_at_once() {

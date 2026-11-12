@@ -1,8 +1,8 @@
-//! Health: damage and healing are handled by `Alive` itself, after the
-//! regions declined the event.
+// Health: damage and healing are handled by `Alive` itself, after the
+// regions declined the event.
 
 use estado_core::IgnoreReason;
-use estado_examples::d_game_character::{Character, Event, MAX_HEALTH, RELOAD_TIME};
+use super::scenario::{Character, Event, MAX_HEALTH, RELOAD_TIME};
 use estado_test::assert_state;
 
 use super::support::{alive, fire_once, path, started, take_trace, timer_of};

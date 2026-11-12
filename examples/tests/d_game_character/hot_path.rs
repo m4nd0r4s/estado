@@ -1,69 +1,14 @@
-//! The machine is meant to be reused by BM-04 (10,000 machines times 60
-//! events): this checks what that needs, without measuring anything yet.
-//!
-//! A counting global allocator, per thread so parallel tests do not disturb
-//! it, proves that `send` allocates nothing once the machine is built.
-
-use std::alloc::{GlobalAlloc, Layout, System};
-use std::cell::Cell;
+// The machine is meant to be reused by BM-04 (10,000 machines times 60
+// events): this checks what that needs, without measuring anything yet.
+//
+// A counting global allocator, per thread so parallel tests do not disturb
+// it, proves that `send` allocates nothing once the machine is built.
 
 use estado_core::{Discard, Machine};
-use estado_examples::d_game_character::{Character, GameCtx};
+use super::scenario::{Character, GameCtx};
+use crate::counting_allocator::allocations;
 
 use super::support::{Lcg, random_event};
-
-thread_local! {
-    static ALLOCATIONS: Cell<u64> = const { Cell::new(0) };
-}
-
-fn allocations() -> u64 {
-    ALLOCATIONS.with(Cell::get)
-}
-
-struct CountingAllocator;
-
-fn count_one() {
-    // `try_with`: the thread-local may already be gone while a thread exits.
-    let _ = ALLOCATIONS.try_with(|count| count.set(count.get() + 1));
-}
-
-// SAFETY: every method forwards to `System` unchanged; the counting touches
-// only a thread-local `Cell` and never allocates.
-unsafe impl GlobalAlloc for CountingAllocator {
-    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        count_one();
-        // SAFETY: same contract as ours, forwarded.
-        unsafe { System.alloc(layout) }
-    }
-
-    unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
-        count_one();
-        // SAFETY: same contract as ours, forwarded.
-        unsafe { System.alloc_zeroed(layout) }
-    }
-
-    unsafe fn dealloc(&self, pointer: *mut u8, layout: Layout) {
-        // SAFETY: same contract as ours, forwarded.
-        unsafe { System.dealloc(pointer, layout) }
-    }
-
-    unsafe fn realloc(&self, pointer: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
-        count_one();
-        // SAFETY: same contract as ours, forwarded.
-        unsafe { System.realloc(pointer, layout, new_size) }
-    }
-}
-
-#[global_allocator]
-static ALLOCATOR: CountingAllocator = CountingAllocator;
-
-#[test]
-fn the_counting_allocator_counts() {
-    let before = allocations();
-    let boxed = Box::new(7_u64);
-    assert_eq!(allocations(), before + 1);
-    drop(boxed);
-}
 
 #[test]
 fn sending_events_never_allocates() {

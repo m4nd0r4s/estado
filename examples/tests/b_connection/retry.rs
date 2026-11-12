@@ -1,6 +1,6 @@
-//! Retries with exponential backoff, driven by the virtual clock.
+// Retries with exponential backoff, driven by the virtual clock.
 
-use estado_examples::b_connection::{
+use super::scenario::{
     BACKOFF_CAP, CONNECT_TIMEOUT, Command, Conn, Event, MAX_ATTEMPTS, backoff,
 };
 use estado_test::{DurationExt, assert_state};

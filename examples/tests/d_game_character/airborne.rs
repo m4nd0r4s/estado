@@ -1,8 +1,8 @@
-//! No reload while airborne: `weapon` asks `cx.in_state` about `movement` and
-//! defers the request, which lands again when the configuration changes
-//! (spec 5.5, 5.6).
+// No reload while airborne: `weapon` asks `cx.in_state` about `movement` and
+// defers the request, which lands again when the configuration changes
+// (spec 5.5, 5.6).
 
-use estado_examples::d_game_character::{
+use super::scenario::{
     Anim, Character, Command, DEFER_CAP, Event, FIRE_COOLDOWN, JUMP_TIME, MAGAZINE_SIZE, Movement,
     RELOAD_TIME, Sound, Weapon,
 };

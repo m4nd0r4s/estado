@@ -1,8 +1,7 @@
-//! Shared helpers of the scenario D tests.
-#![allow(dead_code)]
+// Shared helpers of the scenario D tests.
 
 use estado_core::{Machine, TimerKey};
-use estado_examples::d_game_character::{
+use super::scenario::{
     Alive, Character, Event, FIRE_COOLDOWN, GameCtx, MAGAZINE_SIZE,
 };
 use estado_test::Harness;

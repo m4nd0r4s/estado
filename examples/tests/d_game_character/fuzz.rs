@@ -1,12 +1,12 @@
-//! A long, deterministic pseudo-random run (a fixed LCG) with the invariants
-//! of the machine checked after every operation, and the determinism of spec
-//! 1.2: the same events give the same states and effects.
+// A long, deterministic pseudo-random run (a fixed LCG) with the invariants
+// of the machine checked after every operation, and the determinism of spec
+// 1.2: the same events give the same states and effects.
 
 use std::collections::BTreeSet;
 use std::time::Duration;
 
 use estado_core::StateId;
-use estado_examples::d_game_character::{
+use super::scenario::{
     Alive, Anim, Character, Command, MAGAZINE_SIZE, MAX_HEALTH, Movement, Sound, Weapon,
 };
 use estado_test::Harness;

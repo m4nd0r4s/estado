@@ -1,7 +1,7 @@
-//! Epochs: late timeouts and late invoke results are `Stale` (spec 7.1, 7.2).
+// Epochs: late timeouts and late invoke results are `Stale` (spec 7.1, 7.2).
 
 use estado_core::IgnoreReason;
-use estado_examples::b_connection::{CONNECT_TIMEOUT, Command, Conn, Event, PING_INTERVAL};
+use super::scenario::{CONNECT_TIMEOUT, Command, Conn, Event, PING_INTERVAL};
 use estado_test::{DurationExt, assert_state};
 
 use super::support::{

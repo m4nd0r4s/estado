@@ -1,8 +1,7 @@
-//! Shared helpers of the scenario B tests.
-#![allow(dead_code)]
+// Shared helpers of the scenario B tests.
 
 use estado_core::{InvokeKey, Machine, TimerKey};
-use estado_examples::b_connection::{Command, Conn, Connected, Event, Frame, Session};
+use super::scenario::{Command, Conn, Connected, Event, Frame, Session};
 use estado_test::Harness;
 
 pub const SESSION: Session = Session { id: 7 };

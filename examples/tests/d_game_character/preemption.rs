@@ -1,8 +1,8 @@
-//! A fatal `Damage` preempts everything: all regions exit in reverse
-//! declaration order and take their timers with them (spec 5.3, 7.1).
+// A fatal `Damage` preempts everything: all regions exit in reverse
+// declaration order and take their timers with them (spec 5.3, 7.1).
 
 use estado_core::{Effect, IgnoreReason};
-use estado_examples::d_game_character::{
+use super::scenario::{
     Anim, Character, Command, Event, MAGAZINE_SIZE, MAX_HEALTH, Sound,
 };
 use estado_test::{DurationExt, Harness, assert_state};
