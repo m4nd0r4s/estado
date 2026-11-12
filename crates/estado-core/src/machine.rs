@@ -398,13 +398,13 @@ fn microstep<M: Spec, S: Sink<M::Effect>>(
     source: Source,
     report: &mut Report,
 ) -> Result<(), SendError<M::Event>> {
-    let snapshot = if M::TRACKS_ACTIVE {
+    let mut snapshot = if M::TRACKS_ACTIVE {
         Some(slot.live_mut().path())
     } else {
         None
     };
     let outcome = {
-        let mut cx = Cx::<M, S>::new(ctx, runtime, sink, snapshot.as_ref());
+        let mut cx = Cx::<M, S>::new(ctx, runtime, sink, snapshot.as_mut());
         let outcome = M::microstep(slot, &mut cx, &event);
         check_fault(cx.fault())?;
         outcome

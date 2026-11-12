@@ -22,8 +22,7 @@ pub struct Cx<'step, M: Spec, S> {
     ctx: &'step mut M::Ctx,
     runtime: &'step mut M::Runtime,
     sink: &'step mut S,
-    active: Option<&'step StatePath>,
-    refreshed: Option<StatePath>,
+    active: Option<&'step mut StatePath>,
     fault: Option<Fault>,
 }
 
@@ -35,14 +34,13 @@ impl<'step, M: Spec, S: Sink<M::Effect>> Cx<'step, M, S> {
         ctx: &'step mut M::Ctx,
         runtime: &'step mut M::Runtime,
         sink: &'step mut S,
-        active: Option<&'step StatePath>,
+        active: Option<&'step mut StatePath>,
     ) -> Self {
         Self {
             ctx,
             runtime,
             sink,
             active,
-            refreshed: None,
             fault: None,
         }
     }
@@ -82,8 +80,9 @@ impl<'step, M: Spec, S: Sink<M::Effect>> Cx<'step, M, S> {
     /// Requires `Spec::TRACKS_ACTIVE`; without it, always `false`.
     #[inline]
     pub fn in_state(&self, state: StateId) -> bool {
-        let path = self.refreshed.as_ref().or(self.active);
-        path.is_some_and(|path| path.contains(state))
+        self.active
+            .as_deref()
+            .is_some_and(|path| path.contains(state))
     }
 
     /// Replaces the configuration read by [`in_state`](Self::in_state).
@@ -93,7 +92,9 @@ impl<'step, M: Spec, S: Sink<M::Effect>> Cx<'step, M, S> {
     #[doc(hidden)]
     #[inline]
     pub fn refresh_active(&mut self, path: StatePath) {
-        self.refreshed = Some(path);
+        if let Some(active) = self.active.as_deref_mut() {
+            *active = path;
+        }
     }
 
     /// Pushes any effect (timers, invokes). Called by generated code.
