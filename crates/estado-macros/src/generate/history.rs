@@ -54,7 +54,8 @@ pub fn discriminant_functions(generation: &Generation<'_>) -> TokenStream {
         let discriminant = discriminant_function(enum_name);
         let arms = node.children.iter().enumerate().map(|(index, &child)| {
             let pattern = variant_pattern(generation, child, Binding::Nothing);
-            let index = u8::try_from(index).unwrap_or(u8::MAX);
+            let index = u8::try_from(index)
+                .expect("guarded by E0090: at most 256 substates with shallow history");
             quote! { #pattern => #index, }
         });
         let documentation =
@@ -70,7 +71,8 @@ pub fn discriminant_functions(generation: &Generation<'_>) -> TokenStream {
             let arms = node.children.iter().enumerate().map(|(index, &child)| {
                 let state = tree.node(child);
                 let variant = &state.name;
-                let index = u8::try_from(index).unwrap_or(u8::MAX);
+                let index = u8::try_from(index)
+                    .expect("guarded by E0090: at most 256 substates with shallow history");
                 quote! { #index => #enum_name::#variant, }
             });
             let last = tree

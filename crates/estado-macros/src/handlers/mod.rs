@@ -6,13 +6,17 @@
 //! generators, and the rewritten impl blocks.
 
 mod body;
+mod body_names;
 mod captures;
+#[cfg(test)]
+mod captures_tests;
 mod checks;
 mod goto_resolve;
 mod goto_syntax;
 mod parallel_geometry;
 mod parameters;
 mod roles;
+mod scopes;
 mod signature;
 #[cfg(test)]
 mod tests;

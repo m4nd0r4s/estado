@@ -44,8 +44,8 @@ pub fn graph_items(generation: &Generation<'_>) -> TokenStream {
             HistoryKind::DeepKeep => Some(quote! { .with_history(__estado_core::HistoryKind::DeepKeep) }),
         };
         let tasks = (!node.timers.is_empty() || !node.invokes.is_empty()).then(|| {
-            let timers = u8::try_from(node.timers.len()).unwrap_or(u8::MAX);
-            let invokes = u8::try_from(node.invokes.len()).unwrap_or(u8::MAX);
+            let timers = u8::try_from(node.timers.len()).expect("guarded by E0090: at most 255 timers per state");
+            let invokes = u8::try_from(node.invokes.len()).expect("guarded by E0090: at most 255 invokes per state");
             quote! { .with_tasks(#timers, #invokes) }
         });
         quote! {

@@ -14,7 +14,7 @@ use crate::naming::snake_case_name;
 
 /// The states with an `#[always]` handler, deepest first: an inner state is
 /// evaluated before the compound state that holds it.
-fn always_states(generation: &Generation<'_>) -> Vec<StateId> {
+pub fn always_states(generation: &Generation<'_>) -> Vec<StateId> {
     let tree = generation.tree;
     let mut states: Vec<StateId> = generation
         .model

@@ -62,6 +62,18 @@ pub fn has_invokes(generation: &Generation<'_>) -> bool {
         .any(|node| !node.invokes.is_empty())
 }
 
+/// Whether some state strictly below `node` has a timer.
+pub fn has_timers_below(generation: &Generation<'_>, node: StateId) -> bool {
+    let tree = generation.tree;
+    tree.any_below(node, &|child| !tree.node(child).timers.is_empty())
+}
+
+/// Whether some state strictly below `node` has an invoke.
+pub fn has_invokes_below(generation: &Generation<'_>, node: StateId) -> bool {
+    let tree = generation.tree;
+    tree.any_below(node, &|child| !tree.node(child).invokes.is_empty())
+}
+
 /// The call that schedules what entered below `owner`; empty when nothing
 /// there has a lifecycle. `children` is the binding of the children enum.
 pub fn start_call(
@@ -140,7 +152,8 @@ fn start_statements(generation: &Generation<'_>, node: StateId) -> TokenStream {
             };
         });
         for (index, timer) in state.timers.iter().enumerate() {
-            let index = u8::try_from(index).unwrap_or(u8::MAX);
+            let index = u8::try_from(index)
+                .expect("guarded by E0090: at most 255 timers or invokes per state");
             let after = evaluate(&timer.duration, &data);
             statements.extend(quote! {
                 cx.effect(__estado_core::Effect::StartTimer {
@@ -150,7 +163,8 @@ fn start_statements(generation: &Generation<'_>, node: StateId) -> TokenStream {
             });
         }
         for (index, invoke) in state.invokes.iter().enumerate() {
-            let index = u8::try_from(index).unwrap_or(u8::MAX);
+            let index = u8::try_from(index)
+                .expect("guarded by E0090: at most 255 timers or invokes per state");
             let task = evaluate(&invoke.task, &data);
             statements.extend(quote! {
                 cx.effect(__estado_core::Effect::Invoke {
@@ -177,13 +191,15 @@ fn cancel_statements(generation: &Generation<'_>, node: StateId) -> TokenStream 
         let id = state_constant(generation, node);
         statements.extend(quote! { let #epoch = cx.runtime_mut().#field; });
         for index in 0..state.timers.len() {
-            let index = u8::try_from(index).unwrap_or(u8::MAX);
+            let index = u8::try_from(index)
+                .expect("guarded by E0090: at most 255 timers or invokes per state");
             statements.extend(quote! {
                 cx.effect(__estado_core::Effect::CancelTimer(timer_key(#id, #epoch, #index)));
             });
         }
         for index in 0..state.invokes.len() {
-            let index = u8::try_from(index).unwrap_or(u8::MAX);
+            let index = u8::try_from(index)
+                .expect("guarded by E0090: at most 255 timers or invokes per state");
             statements.extend(quote! {
                 cx.effect(__estado_core::Effect::Cancel(invoke_key(#id, #epoch, #index)));
             });

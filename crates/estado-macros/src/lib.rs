@@ -24,11 +24,26 @@ use proc_macro::TokenStream;
 ///
 /// The macro finds `cx.raise(..)`, `defer!()` and `cx.in_state(..)` by
 /// looking for them in the machine module, and generates the queues and the
-/// active-configuration snapshot only when it sees them. A helper function
-/// outside the module that calls `cx.raise` or `cx.in_state`, or a call
-/// written `Cx::raise(cx, ..)`, is invisible to that scan: switch the feature
-/// on by hand with `#[machine(tracks_active)]` (for `cx.in_state`) and with an
-/// explicit `raise_cap = N` or `defer_cap = N` (for the queues).
+/// active-configuration snapshot only when it sees them. It sees the method
+/// calls and the path forms (`Cx::raise(cx, ..)`, `Cx::<..>::in_state(..)`,
+/// `::estado::Cx::raise(..)`): an identifier `raise` or `in_state` that
+/// follows a `.` or a `::`. A helper function outside the module is invisible
+/// to that scan: switch the feature on by hand with
+/// `#[machine(tracks_active)]` (for `cx.in_state`) and with an explicit
+/// `raise_cap = N` or `defer_cap = N` (for the queues).
+///
+/// # Where the generated code finds `estado-core`
+///
+/// Through the `estado` facade when the crate depends on it (under whatever
+/// name), else through `estado-core` (under whatever name), else as
+/// `::estado_core`. Inside the `estado` package itself it is `::estado_core`.
+///
+/// Limitation: the macro cannot tell a normal dependency from a
+/// dev-dependency. A crate that has `estado-core` and `estado-macros` as
+/// normal dependencies and `estado` only as a dev-dependency resolves to the
+/// facade, which its library build does not have, and fails to compile. Give
+/// such a crate the facade as a normal dependency, or drop `estado` from its
+/// dev-dependencies.
 #[proc_macro_attribute]
 pub fn machine(attribute: TokenStream, item: TokenStream) -> TokenStream {
     expand::machine(attribute.into(), item.into()).into()

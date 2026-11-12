@@ -87,21 +87,15 @@ pub fn done_methods(generation: &Generation<'_>) -> TokenStream {
 /// Whether the state can complete: a compound state with a `#[terminal]`
 /// substate, or a parallel state with one in some region.
 fn can_complete(tree: &StateTree, node: StateId) -> bool {
-    let has_terminal = |owner: StateId| {
+    matches!(
+        tree.node(node).kind,
+        StateKind::Compound | StateKind::Parallel
+    ) && tree.children_owners(node).into_iter().any(|owner| {
         tree.node(owner)
             .children
             .iter()
             .any(|&child| tree.node(child).is_final)
-    };
-    match tree.node(node).kind {
-        StateKind::Compound => has_terminal(node),
-        StateKind::Parallel => tree
-            .node(node)
-            .children
-            .iter()
-            .any(|&region| has_terminal(region)),
-        _ => false,
-    }
+    })
 }
 
 /// The states with a pending flag, deepest first: an inner completion runs

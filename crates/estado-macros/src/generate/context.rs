@@ -147,26 +147,46 @@ impl<'model> Generation<'model> {
     }
 }
 
-/// Whether `tokens` contain `.name` followed by a parenthesis or a turbofish.
+/// Whether `tokens` call `name` as a method (`.name(..)`, `.name::<..>(..)`)
+/// or through a path (`Cx::name(cx, ..)`, `Cx::<..>::name(..)`,
+/// `::estado::Cx::name(..)`): the identifier follows a `.` or a `::`.
 fn calls_method(tokens: TokenStream, name: &str) -> bool {
-    let mut previous_is_dot = false;
+    let mut previous = Previous::Other;
     for tree in tokens {
         match tree {
-            TokenTree::Punct(punct) => previous_is_dot = punct.as_char() == '.',
+            TokenTree::Punct(punct) => {
+                previous = match (punct.as_char(), previous) {
+                    ('.', _) => Previous::Dot,
+                    (':', Previous::Colon) => Previous::PathSeparator,
+                    (':', _) => Previous::Colon,
+                    _ => Previous::Other,
+                };
+            }
             TokenTree::Ident(ident) => {
-                if previous_is_dot && ident == name {
+                if ident == name && matches!(previous, Previous::Dot | Previous::PathSeparator) {
                     return true;
                 }
-                previous_is_dot = false;
+                previous = Previous::Other;
             }
             TokenTree::Group(group) => {
                 if calls_method(group.stream(), name) {
                     return true;
                 }
-                previous_is_dot = false;
+                previous = Previous::Other;
             }
-            TokenTree::Literal(_) => previous_is_dot = false,
+            TokenTree::Literal(_) => previous = Previous::Other,
         }
     }
     false
+}
+
+/// What the scan saw just before the current token.
+#[derive(Clone, Copy)]
+enum Previous {
+    Dot,
+    /// One `:`, the start of a `::`.
+    Colon,
+    /// A complete `::`.
+    PathSeparator,
+    Other,
 }

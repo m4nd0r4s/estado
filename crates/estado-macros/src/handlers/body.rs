@@ -3,21 +3,24 @@
 //! variant of the handler's edge enum, whatever the nesting (closures,
 //! blocks, match arms).
 
-use std::collections::HashSet;
-
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::visit_mut::{self, VisitMut};
-use syn::{Arm, Block, Expr, ExprMacro, Ident, Macro, Pat, Stmt, parse_quote};
+use syn::{
+    Arm, Block, Expr, ExprClosure, ExprForLoop, ExprIf, ExprLet, ExprMacro, ExprWhile, Ident,
+    Local, Macro, Stmt, parse_quote,
+};
 
+use super::body_names::{pattern_hint, variant_name};
 use super::captures::captured_binding;
 use super::goto_resolve::{ResolvedPayload, resolve_goto};
 use super::goto_syntax::parse_goto;
+use super::scopes::Scopes;
 use crate::construct::exiting_type;
 use crate::model::{
     Diagnostic, Extent, GotoForm, GotoOccurrence, HandlerRole, HandlerUses, StateId, StateTree,
 };
-use crate::naming::{facade_name, plain_name};
+use crate::naming::facade_name;
 
 /// How the body is rewritten.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -65,6 +68,7 @@ pub fn rewrite_body(body: &mut Block, environment: &BodyEnvironment<'_>) -> Body
             diagnostics: Vec::new(),
         },
         hints: Vec::new(),
+        scopes: Scopes::new(),
     };
     rewriter.visit_block_mut(body);
     rewriter.report
@@ -98,6 +102,8 @@ struct BodyRewriter<'environment, 'model> {
     report: BodyReport,
     /// Event patterns of the enclosing `match` arms, innermost last.
     hints: Vec<Option<String>>,
+    /// Names the handler body binds again around the current expression.
+    scopes: Scopes,
 }
 
 impl BodyRewriter<'_, '_> {
@@ -186,7 +192,12 @@ impl BodyRewriter<'_, '_> {
         }
 
         if let ResolvedPayload::Constructor { closure, .. } = &resolved.payload {
-            if let Some(captured) = captured_binding(closure, environment.borrowed_names) {
+            let borrowed: Vec<&Ident> = environment
+                .borrowed_names
+                .iter()
+                .filter(|name| !self.scopes.shadows(name))
+                .collect();
+            if let Some(captured) = captured_binding(closure, &borrowed) {
                 let diagnostic = Diagnostic::new(
                     "E0046",
                     captured.span(),
@@ -226,7 +237,8 @@ impl BodyRewriter<'_, '_> {
             lca: resolved.lca,
             form,
             kind: resolved.kind,
-            compares_leaf: tree.is_ancestor_or_self(resolved.target, environment.state),
+            compares_leaf: tree.is_ancestor_or_self(resolved.target, environment.state)
+                || tree.is_ancestor_or_self(environment.state, resolved.target),
             event_hint: self.current_hint(),
         });
         parse_quote!(__estado_core::Next::Goto(__estado::#edges::#variant(#argument)))
@@ -293,54 +305,68 @@ impl VisitMut for BodyRewriter<'_, '_> {
 
     fn visit_arm_mut(&mut self, arm: &mut Arm) {
         self.hints.push(pattern_hint(&arm.pat));
+        self.scopes.push();
+        self.scopes.bind(&arm.pat);
         visit_mut::visit_arm_mut(self, arm);
+        self.scopes.pop();
         self.hints.pop();
     }
-}
 
-/// The edge variant of a `goto!` to `target` given the variants the handler
-/// already has: `ToFoo` for the first one, then `ToFoo2`, `ToFoo3`, ... A
-/// numbered name never equals the plain name another state would get
-/// (`ToFoo2` for a state called `Foo2`): that number is skipped (ADR 0013
-/// item 10).
-fn variant_name(tree: &StateTree, target: &Ident, used: &[String]) -> String {
-    let plain = format!("To{}", plain_name(target));
-    if !used.contains(&plain) {
-        return plain;
+    fn visit_block_mut(&mut self, block: &mut Block) {
+        self.scopes.push();
+        visit_mut::visit_block_mut(self, block);
+        self.scopes.pop();
     }
-    let state_variants: HashSet<String> = tree
-        .nodes
-        .iter()
-        .skip(1)
-        .map(|node| format!("To{}", plain_name(&node.name)))
-        .collect();
-    (2..)
-        .map(|occurrence| format!("{plain}{occurrence}"))
-        .find(|candidate| !state_variants.contains(candidate) && !used.contains(candidate))
-        .expect("an unused number exists")
-}
 
-fn path_text(path: &syn::Path) -> String {
-    path.segments
-        .iter()
-        .map(|segment| segment.ident.to_string())
-        .collect::<Vec<_>>()
-        .join("::")
-}
-
-/// The event a match arm is about, e.g. `Event::Play` for
-/// `Event::Play(track)` (spec 8.1, `event_hint`).
-fn pattern_hint(pattern: &Pat) -> Option<String> {
-    match pattern {
-        Pat::TupleStruct(inner) => Some(path_text(&inner.path)),
-        Pat::Struct(inner) => Some(path_text(&inner.path)),
-        Pat::Path(inner) => Some(path_text(&inner.path)),
-        Pat::Reference(inner) => pattern_hint(&inner.pat),
-        Pat::Paren(inner) => pattern_hint(&inner.pat),
-        Pat::Or(inner) => {
-            let parts: Option<Vec<String>> = inner.cases.iter().map(pattern_hint).collect();
-            parts.map(|parts| parts.join(" | "))
+    /// The initialiser sees the name as it was before the `let`.
+    fn visit_local_mut(&mut self, local: &mut Local) {
+        if let Some(initializer) = &mut local.init {
+            self.visit_expr_mut(&mut initializer.expr);
+            if let Some((_, diverging)) = &mut initializer.diverge {
+                self.visit_expr_mut(diverging);
+            }
         }
-        _ => None,
+        self.scopes.bind(&local.pat);
+    }
+
+    fn visit_expr_closure_mut(&mut self, closure: &mut ExprClosure) {
+        self.scopes.push();
+        for input in &closure.inputs {
+            self.scopes.bind(input);
+        }
+        self.visit_expr_mut(&mut closure.body);
+        self.scopes.pop();
+    }
+
+    fn visit_expr_if_mut(&mut self, expression: &mut ExprIf) {
+        self.scopes.push();
+        self.visit_expr_mut(&mut expression.cond);
+        self.visit_block_mut(&mut expression.then_branch);
+        self.scopes.pop();
+        if let Some((_, otherwise)) = &mut expression.else_branch {
+            self.visit_expr_mut(otherwise);
+        }
+    }
+
+    fn visit_expr_while_mut(&mut self, expression: &mut ExprWhile) {
+        self.scopes.push();
+        self.visit_expr_mut(&mut expression.cond);
+        self.visit_block_mut(&mut expression.body);
+        self.scopes.pop();
+    }
+
+    fn visit_expr_for_loop_mut(&mut self, expression: &mut ExprForLoop) {
+        self.visit_expr_mut(&mut expression.expr);
+        self.scopes.push();
+        self.scopes.bind(&expression.pat);
+        self.visit_block_mut(&mut expression.body);
+        self.scopes.pop();
+    }
+
+    /// `if let PATTERN = scrutinee`: the pattern binds for the rest of the
+    /// condition and the block (the scope the `if` opened).
+    fn visit_expr_let_mut(&mut self, expression: &mut ExprLet) {
+        self.visit_expr_mut(&mut expression.expr);
+        self.scopes.bind(&expression.pat);
     }
 }

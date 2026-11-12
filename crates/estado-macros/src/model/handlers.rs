@@ -77,9 +77,10 @@ pub struct GotoOccurrence {
     pub form: GotoForm,
     /// The flavour of the transition.
     pub kind: TransitionKind,
-    /// Whether the target is the handler's own state or one of its
-    /// ancestors: `Transitioned { changed }` then compares the active leaf
-    /// before and after (ADR 0006).
+    /// Whether the target is the handler's own state, one of its ancestors or
+    /// one of its descendants (which may already be active):
+    /// `Transitioned { changed }` then compares the active configuration
+    /// before and after (ADR 0006). A sibling or a cousin always changes it.
     pub compares_leaf: bool,
     /// Event pattern of the enclosing `match` arm, for the graph (spec 8.1).
     pub event_hint: Option<String>,

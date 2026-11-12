@@ -9,7 +9,9 @@ use quote::quote;
 use super::context::Generation;
 use super::naming::{children_function, hygienic_local, payload_binding, state_constant};
 use super::runtime::{epoch_field, runtime_name};
-use super::tasks::{data_reference, evaluate, has_invokes, has_timers};
+use super::tasks::{
+    data_reference, evaluate, has_invokes, has_invokes_below, has_timers, has_timers_below,
+};
 use super::walk::{Binding, variant_pattern};
 use crate::model::{StateId, StateKind};
 
@@ -30,16 +32,6 @@ pub fn lookup_functions(generation: &Generation<'_>) -> TokenStream {
         }
     }
     functions
-}
-
-fn has_timers_below(generation: &Generation<'_>, node: StateId) -> bool {
-    let tree = generation.tree;
-    tree.any_below(node, &|child| !tree.node(child).timers.is_empty())
-}
-
-fn has_invokes_below(generation: &Generation<'_>, node: StateId) -> bool {
-    let tree = generation.tree;
-    tree.any_below(node, &|child| !tree.node(child).invokes.is_empty())
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -99,7 +91,7 @@ fn lookup(generation: &Generation<'_>, owner: StateId, kind: Lookup) -> TokenStr
         let field = epoch_field(generation, child);
         let data = data_reference(generation, child);
         let checks = (0..own_count).map(|index| {
-            let number = u8::try_from(index).unwrap_or(u8::MAX);
+            let number = u8::try_from(index).expect("guarded by E0090: at most 255 timers or invokes per state");
             let key = quote! { #key_function(#id, #runtime_parameter.#field, #number) };
             match kind {
                 Lookup::Timer => {

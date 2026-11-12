@@ -16,7 +16,7 @@ use quote::{format_ident, quote};
 use syn::Ident;
 
 use super::context::Generation;
-use crate::model::{HandlerRole, HistoryKind, StateId};
+use crate::model::{HistoryKind, StateId};
 use crate::naming::snake_case_name;
 
 /// What the runtime holds, derived from the model.
@@ -65,13 +65,7 @@ pub fn runtime_plan(generation: &Generation<'_>) -> RuntimePlan {
         histories,
         epochs,
         completions: super::completion::completing_states(generation),
-        always_states: generation
-            .model
-            .analysed_handlers
-            .iter()
-            .filter(|handler| handler.role == HandlerRole::Always)
-            .map(|handler| handler.state)
-            .collect(),
+        always_states: super::always::always_states(generation),
     }
 }
 

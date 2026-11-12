@@ -3,62 +3,107 @@
 //! `*Fields` of its ancestors. Rust reports that as an opaque-type lifetime
 //! error (E0700) whose advice cannot be followed; estado reports it as E0046
 //! with the fix instead (ADR 0013 item 11).
+//!
+//! The check is syntactic but scope-aware: a name that a `let`, a closure
+//! parameter, a match arm or an `if let` binds again (in the closure, or in
+//! the handler before the `goto!`) is a different value (ADR 0013 amendment
+//! 15).
 
-use proc_macro2::{TokenStream, TokenTree};
+use proc_macro2::{Spacing, TokenStream, TokenTree};
 use syn::visit::{self, Visit};
-use syn::{ExprClosure, ExprPath, Ident, Macro, Pat};
+use syn::{
+    Arm, Block, ExprClosure, ExprForLoop, ExprIf, ExprLet, ExprPath, ExprWhile, Ident, Local, Macro,
+};
 
-/// The first identifier of `names` that `closure` uses, if any. Names the
-/// closure binds itself (parameters) are not the handler's.
-pub fn captured_binding(closure: &ExprClosure, names: &[Ident]) -> Option<Ident> {
-    let mut bound = Vec::new();
-    for input in &closure.inputs {
-        collect_bound(input, &mut bound);
-    }
+use super::scopes::Scopes;
+
+/// The first identifier of `names` that `closure` uses, if any. A name the
+/// closure binds itself (a parameter, a `let`, a match arm) is not the
+/// handler's; neither is one the caller already knows to be shadowed.
+pub fn captured_binding(closure: &ExprClosure, names: &[&Ident]) -> Option<Ident> {
     let mut finder = Finder {
-        names: names.iter().filter(|name| !bound.contains(name)).collect(),
+        names: names.to_vec(),
+        scopes: Scopes::new(),
         found: None,
     };
-    finder.visit_expr(&closure.body);
+    finder.visit_expr_closure(closure);
     finder.found
-}
-
-fn collect_bound(pattern: &Pat, bound: &mut Vec<Ident>) {
-    match pattern {
-        Pat::Ident(inner) => bound.push(inner.ident.clone()),
-        Pat::Type(inner) => collect_bound(&inner.pat, bound),
-        Pat::Reference(inner) => collect_bound(&inner.pat, bound),
-        Pat::Tuple(inner) => inner.elems.iter().for_each(|pat| collect_bound(pat, bound)),
-        Pat::TupleStruct(inner) => inner.elems.iter().for_each(|pat| collect_bound(pat, bound)),
-        Pat::Struct(inner) => inner
-            .fields
-            .iter()
-            .for_each(|field| collect_bound(&field.pat, bound)),
-        _ => {}
-    }
 }
 
 struct Finder<'names> {
     names: Vec<&'names Ident>,
+    scopes: Scopes,
     found: Option<Ident>,
 }
 
 impl Finder<'_> {
     fn note(&mut self, ident: &Ident) {
-        if self.found.is_none() && self.names.contains(&ident) {
+        if self.found.is_none() && self.names.contains(&ident) && !self.scopes.shadows(ident) {
             self.found = Some(ident.clone());
         }
     }
 
+    /// The tokens of a macro call: identifiers that follow a `.` (a field)
+    /// or precede a single `:` or `=` (a field initialiser, a named
+    /// argument) are not uses of a binding; a string literal may name one
+    /// inline (`"{name}"`) unless a named argument of the call takes the name.
     fn scan_tokens(&mut self, tokens: TokenStream) {
-        for tree in tokens {
+        let trees: Vec<TokenTree> = tokens.into_iter().collect();
+        let named: Vec<Ident> = trees
+            .windows(2)
+            .filter_map(|pair| match (&pair[0], &pair[1]) {
+                (TokenTree::Ident(ident), next) if is_single(next, '=') => Some(ident.clone()),
+                _ => None,
+            })
+            .collect();
+        let mut after_dot = false;
+        for (position, tree) in trees.iter().enumerate() {
+            let mut is_dot = false;
             match tree {
-                TokenTree::Ident(ident) => self.note(&ident),
+                TokenTree::Ident(ident) => {
+                    let next = trees.get(position + 1);
+                    let names_a_field = after_dot
+                        || next.is_some_and(|next| is_single(next, ':') || is_single(next, '='));
+                    if !names_a_field {
+                        self.note(ident);
+                    }
+                }
                 TokenTree::Group(group) => self.scan_tokens(group.stream()),
-                _ => {}
+                TokenTree::Literal(literal) => {
+                    self.scan_inline_arguments(&literal.to_string(), &named);
+                }
+                TokenTree::Punct(punct) => is_dot = punct.as_char() == '.',
+            }
+            after_dot = is_dot;
+        }
+    }
+
+    fn scan_inline_arguments(&mut self, literal: &str, named: &[Ident]) {
+        if !literal.starts_with('"') {
+            return;
+        }
+        let text = literal.replace("{{", "").replace("}}", "");
+        let candidates: Vec<Ident> = self
+            .names
+            .iter()
+            .filter(|name| !named.contains(name))
+            .map(|name| (*name).clone())
+            .collect();
+        for name in candidates {
+            let plain = format!("{{{name}}}");
+            let formatted = format!("{{{name}:");
+            if text.contains(&plain) || text.contains(&formatted) {
+                self.note(&name);
             }
         }
     }
+}
+
+/// Whether `tree` is the punctuation `symbol` on its own (not the start of
+/// `::`, `==`, `=>`, ...).
+fn is_single(tree: &TokenTree, symbol: char) -> bool {
+    matches!(tree, TokenTree::Punct(punct)
+        if punct.as_char() == symbol && punct.spacing() == Spacing::Alone)
 }
 
 impl<'ast> Visit<'ast> for Finder<'_> {
@@ -74,5 +119,73 @@ impl<'ast> Visit<'ast> for Finder<'_> {
     /// `format!("{}", state.x)` and friends: the arguments are tokens.
     fn visit_macro(&mut self, mac: &'ast Macro) {
         self.scan_tokens(mac.tokens.clone());
+    }
+
+    fn visit_block(&mut self, block: &'ast Block) {
+        self.scopes.push();
+        visit::visit_block(self, block);
+        self.scopes.pop();
+    }
+
+    /// The initialiser sees the name as it was before the `let`.
+    fn visit_local(&mut self, local: &'ast Local) {
+        if let Some(initializer) = &local.init {
+            self.visit_expr(&initializer.expr);
+            if let Some((_, diverging)) = &initializer.diverge {
+                self.visit_expr(diverging);
+            }
+        }
+        self.scopes.bind(&local.pat);
+    }
+
+    fn visit_expr_closure(&mut self, closure: &'ast ExprClosure) {
+        self.scopes.push();
+        for input in &closure.inputs {
+            self.scopes.bind(input);
+        }
+        self.visit_expr(&closure.body);
+        self.scopes.pop();
+    }
+
+    fn visit_arm(&mut self, arm: &'ast Arm) {
+        self.scopes.push();
+        self.scopes.bind(&arm.pat);
+        if let Some((_, guard)) = &arm.guard {
+            self.visit_expr(guard);
+        }
+        self.visit_expr(&arm.body);
+        self.scopes.pop();
+    }
+
+    fn visit_expr_if(&mut self, expression: &'ast ExprIf) {
+        self.scopes.push();
+        self.visit_expr(&expression.cond);
+        self.visit_block(&expression.then_branch);
+        self.scopes.pop();
+        if let Some((_, otherwise)) = &expression.else_branch {
+            self.visit_expr(otherwise);
+        }
+    }
+
+    fn visit_expr_while(&mut self, expression: &'ast ExprWhile) {
+        self.scopes.push();
+        self.visit_expr(&expression.cond);
+        self.visit_block(&expression.body);
+        self.scopes.pop();
+    }
+
+    fn visit_expr_for_loop(&mut self, expression: &'ast ExprForLoop) {
+        self.visit_expr(&expression.expr);
+        self.scopes.push();
+        self.scopes.bind(&expression.pat);
+        self.visit_block(&expression.body);
+        self.scopes.pop();
+    }
+
+    /// `if let PATTERN = scrutinee`: the pattern binds for the rest of the
+    /// condition and the block (the scope the `if` opened).
+    fn visit_expr_let(&mut self, expression: &'ast ExprLet) {
+        self.visit_expr(&expression.expr);
+        self.scopes.bind(&expression.pat);
     }
 }

@@ -162,6 +162,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "estado-core-rename-check"
+version = "0.0.0"
+dependencies = [
+ "estado-core",
+ "estado-macros",
+]
+
+[[package]]
 name = "estado-embassy"
 version = "0.0.0"
 dependencies = [
