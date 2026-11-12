@@ -178,6 +178,7 @@ impl<M: Spec> Machine<M> {
     /// # Errors
     ///
     /// See [`SendError`].
+    #[inline]
     pub fn send_into<S: Sink<M::Effect>>(
         &mut self,
         event: M::Event,
@@ -288,16 +289,23 @@ impl<M: Spec> Machine<M> {
         sink: &mut S,
     ) -> Result<Report, SendError<M::Event>> {
         let mut total = Report::default();
+        // Wide counters, clamped once: the same value as saturating at every
+        // event (all addends are non-negative), without the compare per event.
+        let mut transitions = 0_u64;
+        let mut microsteps = 0_u64;
+        let mut unhandled_internal = 0_u64;
         for event in events {
             let report = self.send_into(event, sink)?;
             total.handled = report.handled;
             total.ignored = report.ignored;
-            total.transitions = total.transitions.saturating_add(report.transitions);
-            total.microsteps = total.microsteps.saturating_add(report.microsteps);
-            total.unhandled_internal = total
-                .unhandled_internal
-                .saturating_add(report.unhandled_internal);
+            transitions += u64::from(report.transitions);
+            microsteps += u64::from(report.microsteps);
+            unhandled_internal += u64::from(report.unhandled_internal);
         }
+        let clamp = |count: u64| u16::try_from(count).unwrap_or(u16::MAX);
+        total.transitions = clamp(transitions);
+        total.microsteps = clamp(microsteps);
+        total.unhandled_internal = clamp(unhandled_internal);
         Ok(total)
     }
 
@@ -427,6 +435,7 @@ fn check_fault<Event>(fault: Option<Fault>) -> Result<(), SendError<Event>> {
 }
 
 /// One microstep of `event`, then the policy for its outcome (spec 5.4).
+#[inline(always)]
 fn microstep<M: Spec, S: Sink<M::Effect>>(
     slot: &mut Slot<M>,
     ctx: &mut M::Ctx,
@@ -472,6 +481,7 @@ fn microstep<M: Spec, S: Sink<M::Effect>>(
     Ok(())
 }
 
+#[inline(always)]
 fn count(report: &mut Report, outcome: Outcome, source: &Source) {
     report.microsteps += 1;
     if let Outcome::Transitioned { .. } = outcome {
@@ -497,6 +507,7 @@ fn defer<M: Spec>(runtime: &mut M::Runtime, event: M::Event) -> Result<(), SendE
 }
 
 /// Runs pending always > internal > requeued events until none is left.
+#[inline(always)]
 fn drain<M: Spec, S: Sink<M::Effect>>(
     slot: &mut Slot<M>,
     ctx: &mut M::Ctx,
