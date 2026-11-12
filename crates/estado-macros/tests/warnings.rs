@@ -10,4 +10,5 @@ fn warnings_are_emitted_and_silenced() {
     cases.pass("tests/warnings/*_silences.rs");
     cases.pass("tests/warnings/*_below_the_limit.rs");
     cases.pass("tests/warnings/*_clean_machine.rs");
+    cases.pass("tests/warnings/*_no_warning.rs");
 }

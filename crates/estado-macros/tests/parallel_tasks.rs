@@ -27,7 +27,9 @@ pub enum Command {
 
 const SECOND: Duration = Duration::from_secs(1);
 
-#[machine(event = Event, effect = Command, allow(W0002))]
+// W0005 is allowed on purpose: no handler matches `Event::Tick`, which only
+// the timer of the state fires; the tests look at the effects it produces.
+#[machine(event = Event, effect = Command, allow(W0002, W0005))]
 mod session {
     use super::*;
 

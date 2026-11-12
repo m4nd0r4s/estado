@@ -1,0 +1,11 @@
+error: use of deprecated function `uploader::__estado_warnings::W0003_Stuck_0`: estado::W0003: `defer!()` in `Stuck`, which has no outgoing edges: the configuration never changes, so the deferred event is never redelivered (silence with `#[machine(allow(W0003))]`)
+  --> tests/warnings/w0003_emits.rs:35:29
+   |
+35 |                 Ev::Data => defer!(),
+   |                             ^^^^^
+   |
+note: the lint level is defined here
+  --> tests/warnings/w0003_emits.rs:3:9
+   |
+ 3 | #![deny(deprecated)]
+   |         ^^^^^^^^^^

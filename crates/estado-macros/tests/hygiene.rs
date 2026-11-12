@@ -23,7 +23,9 @@ pub enum Command {
     Probe(u64),
 }
 
-#[machine(event = Event, effect = Command, allow(W0002))]
+// W0005 is allowed on purpose: `Armed` has no handler, and the test relies on
+// the event its timer builds being unhandled.
+#[machine(event = Event, effect = Command, allow(W0002, W0005))]
 mod clock {
     use super::*;
 

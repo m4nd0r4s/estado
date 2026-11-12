@@ -54,6 +54,8 @@ pub struct BodyReport {
     pub gotos: Vec<GotoOccurrence>,
     /// Features used.
     pub uses: HandlerUses,
+    /// The `defer` identifier of each `defer!()`, in source order.
+    pub defer_calls: Vec<proc_macro2::Span>,
     /// Problems.
     pub diagnostics: Vec<Diagnostic>,
 }
@@ -65,6 +67,7 @@ pub fn rewrite_body(body: &mut Block, environment: &BodyEnvironment<'_>) -> Body
         report: BodyReport {
             gotos: Vec::new(),
             uses: HandlerUses::default(),
+            defer_calls: Vec::new(),
             diagnostics: Vec::new(),
         },
         hints: Vec::new(),
@@ -152,6 +155,10 @@ impl BodyRewriter<'_, '_> {
             TransitionMacro::Unhandled => parse_quote!(__estado_core::Next::Unhandled),
             TransitionMacro::Defer => {
                 self.report.uses.defer = true;
+                let call_site = mac.path.segments.last().map(|segment| segment.ident.span());
+                self.report
+                    .defer_calls
+                    .push(call_site.unwrap_or_else(proc_macro2::Span::call_site));
                 parse_quote!(__estado_core::Next::Defer)
             }
             TransitionMacro::Reenter => {

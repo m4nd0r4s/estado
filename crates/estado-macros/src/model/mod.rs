@@ -12,8 +12,8 @@ mod tree;
 
 #[allow(unused_imports)] // consumed by the generators of beads 4.2 and 4.3
 pub use handlers::{
-    GotoForm, GotoOccurrence, HandlerModel, HandlerParameter, HandlerRole, HandlerUses,
-    TransitionKind,
+    EventCoverage, GotoForm, GotoOccurrence, HandlerModel, HandlerParameter, HandlerRole,
+    HandlerUses, TransitionKind,
 };
 pub use options::{DeferOverflow, MachineOptions, UnhandledPolicy};
 pub use tree::{

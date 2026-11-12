@@ -139,3 +139,41 @@ fn an_ancestor_handler_lets_every_descendant_leave() {
     let dead = names(&tree, dead_end_states(&tree, &edges));
     assert_eq!(dead, ["Idle", "Orphan"]);
 }
+
+fn in_play(tree: &StateTree, name: &str) -> Vec<String> {
+    let mut names: Vec<String> = super::scope::states_in_play(tree, id_of(tree, name))
+        .into_iter()
+        .filter(|&id| id != 0)
+        .map(|id| tree.node(id).name.to_string())
+        .collect();
+    names.sort();
+    names
+}
+
+#[test]
+fn a_state_in_play_sees_its_ancestors_and_everything_below() {
+    let tree = player();
+    assert_eq!(in_play(&tree, "Active"), ["Active", "Paused", "Playing"]);
+    assert_eq!(in_play(&tree, "Paused"), ["Active", "Paused"]);
+    assert_eq!(in_play(&tree, "Idle"), ["Idle"]);
+}
+
+#[test]
+fn inside_a_parallel_state_the_sibling_regions_are_in_play() {
+    let tree = tree_of(quote! {
+        mod machine {
+            #[root]
+            enum Root { #[initial] Both(Both), Elsewhere }
+            #[state]
+            struct Both { #[region] left: Left, #[region] right: Right }
+            #[state]
+            enum Left { #[initial] LeftA }
+            #[state]
+            enum Right { #[initial] RightA }
+        }
+    });
+    let seen = in_play(&tree, "LeftA");
+    assert!(seen.contains(&"RightA".to_owned()));
+    assert!(seen.contains(&"Both".to_owned()));
+    assert!(!seen.contains(&"Elsewhere".to_owned()));
+}

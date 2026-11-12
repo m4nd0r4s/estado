@@ -107,6 +107,25 @@ pub struct HandlerModel {
     /// Whether the body calls `cx.raise`, `defer!()`, `cx.in_state` or
     /// `reenter!()`.
     pub uses: HandlerUses,
+    /// Where each `defer!()` of the body is written (the `defer` identifier),
+    /// in source order. Used by W0003.
+    pub defer_calls: Vec<proc_macro2::Span>,
+    /// Which events the handler reacts to. Used by W0005.
+    pub event_coverage: EventCoverage,
+}
+
+/// The events an `#[on]` handler can react to, read from its `match` over the
+/// event parameter. Conservative: whenever the shape of the body is not
+/// understood the answer is [`EventCoverage::AnyEvent`].
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum EventCoverage {
+    /// May react to any event: no `match` over the event, a catch-all arm that
+    /// does more than `bubble!()` / `unhandled!()`, an arm pattern that is
+    /// not a variant, or any other use of the event.
+    AnyEvent,
+    /// Reacts only to the listed event variants (last path segment, e.g.
+    /// `Timeout` for `Ev::Timeout`); every other event bubbles or is unhandled.
+    Variants(Vec<String>),
 }
 
 /// Features a handler body uses, detected syntactically; they decide the

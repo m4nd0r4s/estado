@@ -30,7 +30,10 @@ pub enum Command {
 
 pub type Fx = Effect<Command>;
 
-#[machine(event = Event, effect = Command)]
+// W0005 is allowed on purpose: the timers of `Ticking` (`SlowTick`) and of
+// `Session` (`Expired`) fire events no handler matches, so the tests can
+// observe an unhandled timer event.
+#[machine(event = Event, effect = Command, allow(W0005))]
 mod net {
     use super::*;
 

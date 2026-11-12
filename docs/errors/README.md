@@ -42,8 +42,11 @@ Every diagnostic reads `estado::<code>: <message>`, with a `help:` line when the
 | --- | --- | --- | --- |
 | W0001 | State unreachable from the initial state | [W0001](W0001.md) | emitted |
 | W0002 | State with no outgoing edges that is not `#[terminal]` | [W0002](W0002.md) | emitted |
+| W0003 | `defer!()` in a state with no outgoing edges | [W0003](W0003.md) | emitted |
 | W0004 | Variant larger than `size_warn` bytes | [W0004](W0004.md) | emitted |
+| W0005 | `#[after]` event that no handler handles (best effort) | [W0005](W0005.md) | emitted |
+| W0010 | Typestate `match` arm not associated with an event variant | W0010 | M6 (needs typestate) |
 
 ## Not yet implemented
 
-Pages are added with each code: E0030, E0031, E0041, W0003, W0005, W0010.
+Pages are added with each code: E0030, E0031, E0041, W0010 (the last one belongs to milestone M6, typestate).

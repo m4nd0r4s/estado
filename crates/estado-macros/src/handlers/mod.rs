@@ -11,6 +11,9 @@ mod captures;
 #[cfg(test)]
 mod captures_tests;
 mod checks;
+mod event_coverage;
+#[cfg(test)]
+mod event_coverage_tests;
 mod goto_resolve;
 mod goto_syntax;
 mod parallel_geometry;
@@ -37,6 +40,7 @@ use checks::{
     check_history_nesting, check_impl_target, check_parallel_support, check_root_initial,
     reject_roles_outside_functions,
 };
+use event_coverage::event_coverage;
 use parameters::{ParameterEnvironment, ParameterList, classify_parameters};
 use roles::{FunctionRole, RoleAttribute, take_role};
 use signature::{EdgeType, rewrite_signature};
@@ -179,6 +183,7 @@ fn analyse_function(
     };
     let parameters = classify_parameters(&environment, degraded, diagnostics);
 
+    let coverage = event_coverage(&degraded.block, event_identifier(degraded, &parameters));
     let edges_enum = edges_enum_name(tree, state, attribute.role);
     let mut full = degraded.clone();
     let report = rewrite_body(
@@ -253,8 +258,24 @@ fn analyse_function(
         gotos: report.gotos,
         returns_result,
         uses: report.uses,
+        defer_calls: report.defer_calls,
+        event_coverage: coverage,
     };
     Some((handler_model, full))
+}
+
+/// The name the function binds its event parameter to, if it has one.
+fn event_identifier<'function>(
+    function: &'function ImplItemFn,
+    parameters: &ParameterList,
+) -> Option<&'function Ident> {
+    let FnArg::Typed(typed) = function.sig.inputs.iter().nth(parameters.event_index?)? else {
+        return None;
+    };
+    match &*typed.pat {
+        syn::Pat::Ident(binding) => Some(&binding.ident),
+        _ => None,
+    }
 }
 
 fn to_item_fn(function: &ImplItemFn) -> ItemFn {
