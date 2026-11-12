@@ -1,7 +1,6 @@
 //! Recognizing and stripping the machine's marker attributes. The emitted
 //! types must not carry them: they are not real attributes (ADR 0010).
 
-use syn::ext::IdentExt;
 use syn::{Attribute, Fields, ItemEnum, ItemImpl, ItemStruct};
 
 /// Marker attributes consumed by `#[machine]`.
@@ -10,7 +9,7 @@ const MARKERS: [&str; 11] = [
     "state",
     "handlers",
     "initial",
-    "final",
+    "terminal",
     "substates",
     "region",
     "history",
@@ -36,9 +35,7 @@ pub fn marker_name(attribute: &Attribute) -> Option<&'static str> {
         }
         _ => return None,
     };
-    // `final` is a reserved keyword, so it can only be written `#[r#final]`
-    // (spec errata 9); `unraw` makes both spellings match.
-    let written = segment.ident.unraw();
+    let written = &segment.ident;
     MARKERS.iter().copied().find(|marker| written == marker)
 }
 

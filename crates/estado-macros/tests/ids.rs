@@ -21,7 +21,7 @@ mod connection {
         #[after(Duration::from_secs(5) => Ev)]
         Connecting,
         Connected(Connected),
-        #[r#final]
+        #[terminal]
         Closed,
     }
 

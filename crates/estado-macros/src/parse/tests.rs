@@ -28,7 +28,7 @@ fn media_player() -> ItemMod {
             enum Player {
                 #[initial] Idle,
                 Active(Active),
-                #[r#final] Failed { reason: String },
+                #[terminal] Failed { reason: String },
             }
             #[state]
             #[history(deep, keep)]
@@ -120,7 +120,7 @@ fn types_are_emitted_without_machine_attributes() {
         "after",
         "invoke",
         "unhandled",
-        "final",
+        "terminal",
     ] {
         assert!(
             !text.contains(&format!("# [{marker}")),

@@ -84,7 +84,7 @@ pub fn parse_node_attributes(
         };
         let span = attribute.path().span();
         match (marker, site) {
-            ("initial" | "final", AttributeSite::CompositeStruct) => diagnostics.push(
+            ("initial" | "terminal", AttributeSite::CompositeStruct) => diagnostics.push(
                 malformed(
                     span,
                     format!(
@@ -102,9 +102,9 @@ pub fn parse_node_attributes(
                 .with_help("move it to the struct that has the `#[substates]` field"),
             ),
             ("initial", _) => parse_initial(attribute, &mut parsed, diagnostics),
-            ("final", _) => match attribute.meta {
+            ("terminal", _) => match attribute.meta {
                 Meta::Path(_) => parsed.is_final = true,
-                _ => diagnostics.push(malformed(span, "`#[r#final]` takes no arguments")),
+                _ => diagnostics.push(malformed(span, "`#[terminal]` takes no arguments")),
             },
             ("history", _) => parse_history(attribute, &mut parsed, diagnostics),
             ("after", _) => match attribute.parse_args_with(parse_after) {
@@ -128,13 +128,9 @@ pub fn parse_node_attributes(
     parsed
 }
 
-/// How a marker is written; `final` needs the raw identifier form.
+/// How a marker is written.
 fn marker_text(marker: &str) -> String {
-    if marker == "final" {
-        "#[r#final]".to_owned()
-    } else {
-        format!("#[{marker}]")
-    }
+    format!("#[{marker}]")
 }
 
 fn parse_after(input: ParseStream<'_>) -> syn::Result<AfterSpec> {

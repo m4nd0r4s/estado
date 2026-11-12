@@ -52,4 +52,4 @@ Contradictions and errors in the spec. By rule 2 of section 0, section 5 wins. E
 ## 9. 3.2 and 6.1: `#[final]` is not valid Rust syntax
 
 - **Problem.** `final` is a reserved keyword. rustc rejects `#[final]` while parsing the module ("expected identifier, found reserved keyword `final`"), before any macro runs, so the attribute cannot be written as the spec shows.
-- **Resolution** (bead 4.1). The attribute is written with the raw identifier: `#[r#final]`. The parser accepts it (a plain `final` never reaches the macro). Documentation and examples use `#[r#final]`; a different name (for example `#[terminal]`) would need an ADR.
+- **Resolution** (user decision, bead 4.1). The attribute is named `#[terminal]`. Documentation keeps the term "final state"; `StateKind::Final`, `is_done`, `on_done` and the graph are unchanged.
