@@ -1,0 +1,20 @@
+[package]
+name = "estado-core"
+description = "Sans-IO core of estado hierarchical statecharts: Spec, Machine and the step algorithm"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = ["std"]
+std = ["alloc"]
+alloc = []
+tracing = []
+inspect = []
+invariants = []
+serde = []

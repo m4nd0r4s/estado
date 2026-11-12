@@ -1,0 +1,24 @@
+[package]
+name = "estado"
+description = "Hierarchical statecharts for Rust with typed edges, an exact static graph and optional typestate"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+estado-core.workspace = true
+estado-macros.workspace = true
+
+[features]
+default = ["std"]
+std = ["estado-core/std"]
+alloc = ["estado-core/alloc"]
+tracing = ["estado-core/tracing"]
+inspect = ["estado-core/inspect"]
+invariants = ["estado-core/invariants"]
+serde = ["estado-core/serde"]

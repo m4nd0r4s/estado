@@ -1,0 +1,14 @@
+[package]
+name = "estado-tokio"
+description = "Tokio runtime (actor, timers, invokes) for estado machines"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+estado-core.workspace = true
