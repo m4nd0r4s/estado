@@ -68,3 +68,14 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
         with: { components: miri }
       - run: cargo miri test -p estado-core
+
+  bench:
+    # BM-02 (spec 10.3): estado vs a hand-written enum + match. Quick mode only
+    # proves the bench compiles and runs; the 10% regression gate against main
+    # is not wired yet.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo bench -p estado-core --bench bm_02_ping_pong -- --quick

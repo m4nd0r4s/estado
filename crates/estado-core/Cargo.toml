@@ -18,3 +18,11 @@ tracing = []
 inspect = []
 invariants = []
 serde = []
+
+[dev-dependencies]
+# Dev-only: never part of the library build, so no_std builds are unaffected.
+criterion = { version = "0.5", default-features = false, features = ["cargo_bench_support"] }
+
+[[bench]]
+name = "bm_02_ping_pong"
+harness = false
