@@ -14,6 +14,66 @@ use crate::spec::{DeferOverflowPolicy, Spec, UnhandledPolicy};
 ///
 /// Holds exactly the root state, the context and the runtime; the runtime
 /// is zero-sized when no optional feature is used (spec 3.5, errata 1).
+///
+/// A flat on/off machine written by hand against [`Spec`], driven through
+/// `send`. The first `send` starts the machine implicitly.
+///
+/// ```
+/// use estado_core::{
+///     Cx, Discard, Graph, Machine, NoRuntime, Outcome, Sink, Slot, Spec, StateId, StatePath,
+/// };
+///
+/// #[derive(Debug, Clone, Copy, PartialEq)]
+/// enum Switch {
+///     Off,
+///     On,
+/// }
+///
+/// impl Spec for Switch {
+///     type Event = ();
+///     type Effect = ();
+///     type Ctx = u32; // counts the flips
+///     type Output = ();
+///     type Runtime = NoRuntime<()>;
+///     type Effects = Discard;
+///
+///     const NAME: &'static str = "Switch";
+///     const GRAPH: &'static Graph = &Graph { machine: "Switch", states: &[], edges: &[] };
+///
+///     fn initial() -> Self {
+///         Self::Off
+///     }
+///     fn state_id(&self) -> StateId {
+///         StateId::new(*self as u16)
+///     }
+///     fn path(&self) -> StatePath {
+///         StatePath::new(Self::GRAPH)
+///     }
+///     fn enter_initial<S: Sink<()>>(&mut self, _cx: &mut Cx<'_, Self, S>) {}
+///
+///     fn microstep<S: Sink<()>>(
+///         slot: &mut Slot<Self>,
+///         cx: &mut Cx<'_, Self, S>,
+///         _event: &(),
+///     ) -> Outcome {
+///         *cx.ctx_mut() += 1;
+///         let next = match slot.take() {
+///             Self::Off => Self::On,
+///             Self::On => Self::Off,
+///         };
+///         slot.put(next);
+///         Outcome::Transitioned { changed: true }
+///     }
+/// }
+///
+/// let mut machine = Machine::<Switch>::new(0);
+/// assert!(machine.try_state().is_none()); // not started yet
+///
+/// let step = machine.send(()).unwrap();
+/// assert!(step.report.handled);
+/// assert_eq!(machine.state(), &Switch::On);
+/// assert_eq!(*machine.ctx(), 1);
+/// ```
 pub struct Machine<M: Spec> {
     slot: Slot<M>,
     ctx: M::Ctx,
@@ -82,14 +142,20 @@ impl<M: Spec> Machine<M> {
             slot: &mut self.slot,
         };
         let mut report = Report::default();
-        start_in(guard.slot, &mut self.ctx, &mut self.runtime, sink)?;
-        drain::<M, S>(
+        // Same error handling as the implicit start in `send_into`: only
+        // `RaiseOverflow` and `Livelock` poison.
+        if let Err(error) = start_in(guard.slot, &mut self.ctx, &mut self.runtime, sink) {
+            return Err(settle_error(guard, error));
+        }
+        if let Err(error) = drain::<M, S>(
             guard.slot,
             &mut self.ctx,
             &mut self.runtime,
             sink,
             &mut report,
-        )?;
+        ) {
+            return Err(settle_error(guard, error));
+        }
         guard.disarm();
         Ok(report)
     }
@@ -115,17 +181,13 @@ impl<M: Spec> Machine<M> {
         event: M::Event,
         sink: &mut S,
     ) -> Result<Report, SendError<M::Event>> {
-        if self.slot.is_poisoned() {
-            return Err(SendError::Poisoned);
+        // One test on the hot path; poisoned and unstarted are handled out of line.
+        if !matches!(self.slot, Slot::Live(_)) {
+            self.begin_send_when_not_live(sink)?;
         }
         let guard = PoisonGuard {
             slot: &mut self.slot,
         };
-        if matches!(guard.slot, Slot::Unstarted) {
-            if let Err(error) = start_in(guard.slot, &mut self.ctx, &mut self.runtime, sink) {
-                return finish_error(guard, error);
-            }
-        }
         let mut report = Report::default();
         if guard.slot.live().is_some_and(M::is_done) {
             report.ignored = Some(IgnoreReason::Unhandled);
@@ -142,7 +204,7 @@ impl<M: Spec> Machine<M> {
             &mut report,
         );
         if let Err(error) = first {
-            return finish_error(guard, error);
+            return Err(settle_error(guard, error));
         }
         if let Err(error) = drain::<M, S>(
             guard.slot,
@@ -151,10 +213,35 @@ impl<M: Spec> Machine<M> {
             sink,
             &mut report,
         ) {
-            return finish_error(guard, error);
+            return Err(settle_error(guard, error));
         }
         guard.disarm();
         Ok(report)
+    }
+
+    /// The slow start of `send_into`: refuses a poisoned machine and runs the
+    /// initial entries of an unstarted one (spec 4.5).
+    #[cold]
+    fn begin_send_when_not_live<S: Sink<M::Effect>>(
+        &mut self,
+        sink: &mut S,
+    ) -> Result<(), SendError<M::Event>> {
+        match self.slot {
+            Slot::Live(_) => Ok(()),
+            Slot::Poisoned => Err(SendError::Poisoned),
+            Slot::Unstarted => {
+                let guard = PoisonGuard {
+                    slot: &mut self.slot,
+                };
+                match start_in(guard.slot, &mut self.ctx, &mut self.runtime, sink) {
+                    Ok(()) => {
+                        guard.disarm();
+                        Ok(())
+                    }
+                    Err(error) => Err(settle_error(guard, error)),
+                }
+            }
+        }
     }
 
     /// [`send_into`](Self::send_into) with a closure as the sink.
@@ -270,17 +357,15 @@ impl<M: Spec> Machine<M> {
     }
 }
 
-fn finish_error<M, Event>(
-    guard: PoisonGuard<'_, M>,
-    error: SendError<Event>,
-) -> Result<Report, SendError<Event>> {
+/// Ends a failed step: poisons for a fatal error, otherwise leaves the state.
+fn settle_error<M, Event>(guard: PoisonGuard<'_, M>, error: SendError<Event>) -> SendError<Event> {
     let poisons = matches!(error, SendError::RaiseOverflow | SendError::Livelock { .. });
     if poisons {
         drop(guard);
     } else {
         guard.disarm();
     }
-    Err(error)
+    error
 }
 
 fn start_in<M: Spec, S: Sink<M::Effect>>(

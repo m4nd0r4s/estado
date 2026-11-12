@@ -15,12 +15,19 @@
 /// slot.put(taken);
 /// assert_eq!(slot.live().map(String::as_str), Some("Idle"));
 /// ```
+///
+/// `Live` is declared first on purpose: with the data-carrying variant before
+/// the marker variants, the niche values of the root enum are consecutive and
+/// the optimizer can prove, after one tag test, that a slot is live. Declared
+/// the other way round, an unreachable gap in the tag range keeps a panic
+/// branch alive in the hot path of `send`, and with it a frame and an unwind
+/// landing pad (measured by BM-02).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Slot<State> {
-    /// `Machine::new` ran, `start` did not.
-    Unstarted,
     /// Running.
     Live(State),
+    /// `Machine::new` ran, `start` did not.
+    Unstarted,
     /// A panic or fatal error happened in the middle of a step.
     Poisoned,
 }
