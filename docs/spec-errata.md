@@ -36,3 +36,20 @@ Contradictions and errors in the spec. By rule 2 of section 0, section 5 wins. E
 
 - **Problem.** The spec applies `#[machine]` to the root enum and `#[state]`/`#[handlers]` to separate items, but an attribute proc-macro sees only its own item, and generating typed edges, linear exit/entry code and the graph needs the whole machine.
 - **Resolution** (ADR 0010). `#[machine(..)]` goes on an inline `mod` containing every item of the machine; the root enum is marked `#[root]`. All other attributes keep their names and meaning. E0001 now means "`#[machine]` not on an inline module with exactly one `#[root]` enum".
+
+## 8. 3.1, 3.3 and 6.7: new error codes for structural rules the spec states without a code
+
+- **Problem.** The spec states structural rules in 3.1/3.3 (a compound has exactly one `#[substates]`, a parallel state has two or more `#[region]`s, `#[substates]` and `#[region]` never mix, the field type is a state enum) and the options and attributes of 6.1 have a fixed syntax, but the table in 6.7 gives none of these a code.
+- **Resolution** (bead 4.1). Added to the table, each with a page in `docs/errors/` and a `trybuild` snapshot:
+  - `E0013`: a `#[state]` struct combines `#[substates]` and `#[region]` fields, or has more than one `#[substates]` field.
+  - `E0014`: a `#[state]` struct has exactly one `#[region]` field (a parallel state needs at least two).
+  - `E0015`: the type of a `#[substates]` or `#[region]` field is not a `#[state]` enum of the same module.
+  - `E0016`: invalid `#[machine(..)]` option: unknown name (with a "did you mean" help), repeated, bad value, or a flag given a value.
+  - `E0017`: malformed state attribute (`#[initial(..)]`, `#[after(..)]`, `#[invoke(..)]`, `#[history(..)]`, `#[unhandled(..)]`), or a marker on the wrong item (`#[history]` on a variant, `#[initial]` on a struct, `#[state]` on a function).
+- E0010 is also reported when a level has more than one `#[initial]` variant ("exactly one", 3.2). Until the edges are resolved (4.2), a level without `#[initial]` is always E0010, although 3.2 allows omitting it when no `goto!` needs it.
+- A region counts as a level for the depth limit of E0011 (it is a node of the graph), and a region name clashes (E0012) with a state whose `StateId` constant is the same (`link` and `Link` both give `LINK`).
+
+## 9. 3.2 and 6.1: `#[final]` is not valid Rust syntax
+
+- **Problem.** `final` is a reserved keyword. rustc rejects `#[final]` while parsing the module ("expected identifier, found reserved keyword `final`"), before any macro runs, so the attribute cannot be written as the spec shows.
+- **Resolution** (bead 4.1). The attribute is written with the raw identifier: `#[r#final]`. The parser accepts it (a plain `final` never reaches the macro). Documentation and examples use `#[r#final]`; a different name (for example `#[terminal]`) would need an ADR.
