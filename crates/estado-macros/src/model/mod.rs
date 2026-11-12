@@ -6,9 +6,13 @@
 
 #![allow(dead_code)] // the IR is read in full only once the generators of 4.2/4.3 land
 
+mod handlers;
 mod options;
 mod tree;
 
+pub use handlers::{
+    GotoForm, GotoOccurrence, HandlerModel, HandlerParameter, HandlerRole, HandlerUses,
+};
 pub use options::{DeferOverflow, MachineOptions, UnhandledPolicy};
 pub use tree::{
     AfterSpec, HistoryKind, InvokeSpec, Payload, StateId, StateKind, StateNode, StateTree, TypeDecl,
@@ -29,8 +33,10 @@ pub struct MachineModel {
     pub module_name: Ident,
     /// Every state, root first, in declaration order (pre-order).
     pub tree: StateTree,
-    /// The `#[handlers]` impl blocks, untouched.
+    /// The `#[handlers]` impl blocks, untouched (parsing output).
     pub handlers: Vec<ItemImpl>,
+    /// The analysed handlers (bead 4.2), consumed by the generators (4.3).
+    pub analysed_handlers: Vec<HandlerModel>,
     /// Items of the module that are not part of the machine; emitted as is.
     pub passthrough: Vec<Item>,
 }
