@@ -1,5 +1,7 @@
 //! `Machine<M>` and the run-to-completion `send` algorithm (spec 4.5, 5.4).
 
+mod tasks;
+
 use crate::context::{Cx, Fault};
 use crate::effect::Effect;
 use crate::error::SendError;

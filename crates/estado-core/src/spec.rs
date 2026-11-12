@@ -1,6 +1,7 @@
 //! The `Spec` trait, implemented by `#[machine]` or by hand (spec 4.1).
 
 use crate::context::Cx;
+use crate::effect::{InvokeKey, TimerKey};
 use crate::graph::Graph;
 use crate::ids::{StateId, StatePath};
 use crate::report::Outcome;
@@ -98,5 +99,20 @@ pub trait Spec: Sized {
     /// Moves the output out of the root `#[final]` state.
     fn take_output(&mut self) -> Option<Self::Output> {
         None
+    }
+
+    /// The event of the timer `key`, built from the current data of its
+    /// state (spec 7.1), or `None` when `key` belongs to a state instance
+    /// that is no longer active (stale: wrong state or epoch).
+    fn timer_event(&self, runtime: &Self::Runtime, key: TimerKey) -> Option<Self::Event> {
+        let _ = (runtime, key);
+        None
+    }
+
+    /// Whether the invoke `key` belongs to the active state instance
+    /// (spec 7.2); a result for any other key is stale.
+    fn accepts_invoke(&self, runtime: &Self::Runtime, key: InvokeKey) -> bool {
+        let _ = (runtime, key);
+        false
     }
 }

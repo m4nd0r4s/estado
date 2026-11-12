@@ -15,6 +15,7 @@ extern crate alloc;
 extern crate std;
 
 mod context;
+mod driver;
 mod effect;
 mod error;
 mod graph;
@@ -29,6 +30,7 @@ mod slot;
 mod spec;
 
 pub use context::{Cx, Fault};
+pub use driver::{Driver, DriverSink, drive};
 pub use effect::{ChildPath, Effect, InvokeKey, TimerKey};
 pub use error::SendError;
 pub use graph::{EdgeInfo, EdgeKind, EdgeTarget, Graph, HistoryKind, StateInfo, StateKind};
