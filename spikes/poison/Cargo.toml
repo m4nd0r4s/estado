@@ -1,0 +1,10 @@
+[package]
+name = "estado-spike-poison"
+version = "0.0.0"
+edition = "2024"
+publish = false
+description = "Throwaway spike for spec 13.1: how a machine hides its poisoned state."
+
+[dependencies]
+
+[workspace]
