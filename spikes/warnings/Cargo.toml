@@ -1,0 +1,10 @@
+# Throwaway spike: warnings from a stable proc-macro via `#[deprecated]` items.
+[workspace]
+resolver = "3"
+members = ["machine-macros", "machine-demo"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.85"
+publish = false
