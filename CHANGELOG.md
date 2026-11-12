@@ -1,5 +1,12 @@
 # Changelog
 
+## M3 — the macro (in progress)
+
+- `#[machine]` generates the code M2 wrote by hand: hierarchy, constructors and views, history, `#[terminal]` with `#[on_done]`, `#[after]` and `#[invoke]` (epochs, `timer_event`, `accepts_invoke`), `cx.raise` and `defer!()` with the queue options, parallel regions (ADR 0005 and 0008) and `#[always]` (ADR 0012).
+- Scenarios B and D run on the macro (`b_connection_macro`, `d_game_character_macro`) with the same test cases as the hand-written versions, as scenario I does; scenario A runs on it too and BM-01 has `estado_macro_*` groups (spec errata 13).
+- W0001 and W0002 are emitted; E0021, E0061 and E0090 have pages in `docs/errors/`.
+- ADR 0012; spec errata 10-13.
+
 ## M2 — hand-written core
 
 - `estado-core`: `Spec`, `Machine` with the run-to-completion algorithm (queues, defer, policies, livelock, poisoning through `Slot`), `Cx`, effects and sinks, `fire`/`complete` with epochs and stale keys, `Driver`/`drive`. `no_std` without alloc, no dependencies.
