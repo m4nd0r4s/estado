@@ -1,11 +1,14 @@
 # Changelog
 
-## M3 — the macro (in progress)
+## M3 — the macro (in progress: BM-01 open)
 
-- `#[machine]` generates the code M2 wrote by hand: hierarchy, constructors and views, history, `#[terminal]` with `#[on_done]`, `#[after]` and `#[invoke]` (epochs, `timer_event`, `accepts_invoke`), `cx.raise` and `defer!()` with the queue options, parallel regions (ADR 0005 and 0008) and `#[always]` (ADR 0012).
-- Scenarios B and D run on the macro (`b_connection_macro`, `d_game_character_macro`) with the same test cases as the hand-written versions, as scenario I does; scenario A runs on it too and BM-01 has `estado_macro_*` groups (spec errata 13).
-- W0001 and W0002 are emitted; E0021, E0061 and E0090 have pages in `docs/errors/`.
-- ADR 0012; spec errata 10-13.
+- `#[machine]` on an inline module (ADR 0010) generates the code M2 wrote by hand (ADR 0011, 0012): hierarchy, constructors and views, history, `#[terminal]` with `#[on_done]`, `#[after]` and `#[invoke]`, `cx.raise` and `defer!()`, parallel regions, `#[always]`, `#[unhandled]` overrides.
+- Scenarios A, B, D and I run on the macro with the same test cases as the hand-written versions.
+- The `estado` facade works on its own (`proc-macro-crate` path resolution); the README quick start is a doctest.
+- Diagnostics: 30 error codes and warnings W0001-W0005, each with a page in `docs/errors/` and a trybuild snapshot (AC-17).
+- Core fixes from the reviews: `in_state` in `#[always]` and initial entries, implicit start drains, any start fault poisons, one livelock budget per send.
+- BM-05: about 0.9 s for a 200-state, 600-edge machine (target 3 s). BM-01 still above target (CI: macro `send_into` 1.17x, `send_batch` 1.48x), tracked in bead estado-99i.3.16.
+- Four review rounds; decisions in ADR 0013 (with amendments 1-20); errata 7-15.
 
 ## M2 — hand-written core
 
