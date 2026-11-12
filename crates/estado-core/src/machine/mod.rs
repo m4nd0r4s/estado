@@ -252,13 +252,16 @@ impl<M: Spec> Machine<M> {
                 });
             }
             Slot::Unstarted => {
-                let guard = PoisonGuard {
-                    slot: &mut self.slot,
-                };
-                if let Err(error) = start_in(guard.slot, &mut self.ctx, &mut self.runtime, sink) {
-                    return Err(settle_error(guard, error));
-                }
-                guard.disarm();
+                // The full start, `#[always]`, completions and raised events
+                // included, runs before the event (spec 4.5, ADR 0013 item 6).
+                let started = self.start_into(sink)?;
+                let mut report = self.send_live(event, sink)?;
+                report.microsteps = report.microsteps.saturating_add(started.microsteps);
+                report.transitions = report.transitions.saturating_add(started.transitions);
+                report.unhandled_internal = report
+                    .unhandled_internal
+                    .saturating_add(started.unhandled_internal);
+                return Ok(report);
             }
         }
         self.send_live(event, sink)
@@ -421,7 +424,13 @@ fn start_in<M: Spec, S: Sink<M::Effect>>(
     sink: &mut S,
 ) -> Result<(), SendError<M::Event>> {
     slot.put(M::initial());
-    let mut cx = Cx::<M, S>::new(ctx, runtime, sink, None);
+    // Initial entries see the configuration being entered (ADR 0013 item 7).
+    let mut snapshot = if M::TRACKS_ACTIVE {
+        Some(slot.live_mut().path())
+    } else {
+        None
+    };
+    let mut cx = Cx::<M, S>::new(ctx, runtime, sink, snapshot.as_mut());
     slot.live_mut().enter_initial(&mut cx);
     check_fault(cx.fault())
 }
