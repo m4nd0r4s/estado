@@ -16,45 +16,42 @@ pub fn stub_spec(model: &MachineModel) -> TokenStream {
     let root = &model.tree.root().name;
     let options = &model.options;
     let event = &options.event;
-    let effect = options
-        .effect
-        .clone()
-        .unwrap_or_else(|| syn::parse_quote!(()));
-    let ctx = options.ctx.clone().unwrap_or_else(|| syn::parse_quote!(()));
+    let effect = options.effect_type();
+    let ctx = options.ctx_type();
     let name = root.to_string();
     quote! {
         #[doc(hidden)]
         #[allow(missing_docs, unreachable_code, unused_variables)]
         const _: () = {
-            impl ::estado_core::Spec for #root {
+            impl __estado_core::Spec for #root {
                 type Event = #event;
                 type Effect = #effect;
                 type Ctx = #ctx;
                 type Output = ();
-                type Runtime = ::estado_core::NoRuntime<#event>;
-                type Effects = ::estado_core::InlineEffects<#effect, 1>;
+                type Runtime = __estado_core::NoRuntime<#event>;
+                type Effects = __estado_core::InlineEffects<#effect, 1>;
 
                 const NAME: &'static str = #name;
-                const GRAPH: &'static ::estado_core::Graph = &::estado_core::Graph {
+                const GRAPH: &'static __estado_core::Graph = &__estado_core::Graph {
                     machine: #name,
                     states: &[],
                     edges: &[],
                 };
 
                 fn initial() -> Self { ::core::unreachable!() }
-                fn state_id(&self) -> ::estado_core::StateId { ::core::unreachable!() }
-                fn path(&self) -> ::estado_core::StatePath { ::core::unreachable!() }
-                fn enter_initial<EffectSink: ::estado_core::Sink<#effect>>(
+                fn state_id(&self) -> __estado_core::StateId { ::core::unreachable!() }
+                fn path(&self) -> __estado_core::StatePath { ::core::unreachable!() }
+                fn enter_initial<EffectSink: __estado_core::Sink<#effect>>(
                     &mut self,
-                    cx: &mut ::estado_core::Cx<'_, Self, EffectSink>,
+                    cx: &mut __estado_core::Cx<'_, Self, EffectSink>,
                 ) {
                     ::core::unreachable!()
                 }
-                fn microstep<EffectSink: ::estado_core::Sink<#effect>>(
-                    slot: &mut ::estado_core::Slot<Self>,
-                    cx: &mut ::estado_core::Cx<'_, Self, EffectSink>,
+                fn microstep<EffectSink: __estado_core::Sink<#effect>>(
+                    slot: &mut __estado_core::Slot<Self>,
+                    cx: &mut __estado_core::Cx<'_, Self, EffectSink>,
                     event: &#event,
-                ) -> ::estado_core::Outcome {
+                ) -> __estado_core::Outcome {
                     ::core::unreachable!()
                 }
             }

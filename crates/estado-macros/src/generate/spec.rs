@@ -16,7 +16,7 @@ pub fn spec_impl(generation: &Generation<'_>) -> TokenStream {
     let options = &generation.model.options;
     let event = &options.event;
     let effect = &generation.effect;
-    let ctx = options.ctx.clone().unwrap_or_else(|| syn::parse_quote!(()));
+    let ctx = options.ctx_type();
     let root_name = root.to_string();
     let fx_inline = options.fx_inline;
     let max_microsteps = options.max_microsteps;
@@ -49,28 +49,28 @@ pub fn spec_impl(generation: &Generation<'_>) -> TokenStream {
     let run_always = super::always::has_run_always(generation).then(|| {
         quote! {
             fn run_always<#sink_parameter>(
-                slot: &mut ::estado_core::Slot<Self>,
+                slot: &mut __estado_core::Slot<Self>,
                 cx: &mut #cx_type,
-            ) -> ::estado_core::Outcome {
+            ) -> __estado_core::Outcome {
                 run_always(slot, cx)
             }
         }
     });
 
     quote! {
-        impl ::estado_core::Spec for #root {
+        impl __estado_core::Spec for #root {
             type Event = #event;
             type Effect = #effect;
             type Ctx = #ctx;
             type Output = #output;
             type Runtime = #runtime;
-            type Effects = ::estado_core::InlineEffects<#effect, #fx_inline>;
+            type Effects = __estado_core::InlineEffects<#effect, #fx_inline>;
 
             const NAME: &'static str = #root_name;
-            const GRAPH: &'static ::estado_core::Graph = &GRAPH;
-            const UNHANDLED: ::estado_core::UnhandledPolicy = ::estado_core::UnhandledPolicy::#unhandled;
-            const DEFER_OVERFLOW: ::estado_core::DeferOverflowPolicy =
-                ::estado_core::DeferOverflowPolicy::#defer_overflow;
+            const GRAPH: &'static __estado_core::Graph = &GRAPH;
+            const UNHANDLED: __estado_core::UnhandledPolicy = __estado_core::UnhandledPolicy::#unhandled;
+            const DEFER_OVERFLOW: __estado_core::DeferOverflowPolicy =
+                __estado_core::DeferOverflowPolicy::#defer_overflow;
             const MAX_MICROSTEPS: u16 = #max_microsteps;
             const TRACKS_ACTIVE: bool = #tracks_active;
 
@@ -78,11 +78,11 @@ pub fn spec_impl(generation: &Generation<'_>) -> TokenStream {
                 #initial
             }
 
-            fn state_id(&self) -> ::estado_core::StateId {
+            fn state_id(&self) -> __estado_core::StateId {
                 #state_id
             }
 
-            fn path(&self) -> ::estado_core::StatePath {
+            fn path(&self) -> __estado_core::StatePath {
                 #path
             }
 
@@ -93,10 +93,10 @@ pub fn spec_impl(generation: &Generation<'_>) -> TokenStream {
 
             #[inline(always)]
             fn microstep<#sink_parameter>(
-                slot: &mut ::estado_core::Slot<Self>,
+                slot: &mut __estado_core::Slot<Self>,
                 cx: &mut #cx_type,
                 event: &#event,
-            ) -> ::estado_core::Outcome {
+            ) -> __estado_core::Outcome {
                 microstep(slot, cx, event)
             }
 

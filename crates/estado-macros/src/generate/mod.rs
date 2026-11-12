@@ -4,15 +4,23 @@
 //!
 //! | File | Generates |
 //! | --- | --- |
-//! | `views` | `*Fields`, `*Mut`, `*Exiting` (machine module) |
-//! | `edges` | one edge enum per handler with `Edge::apply` |
+//! | `context` | `Generation`: the model, the handlers by role and state, feature detection |
+//! | `naming` | names of generated bindings, functions and types |
+//! | `walk` | patterns, handler calls, the borrowed and owned walks down the tree |
+//! | `views` | `*Fields`, `*Mut`, `*Ref`, `*Exiting` (machine module) |
+//! | `runtime` | the `Runtime` struct: queues, epochs, histories, pending flags |
+//! | `history` | discriminants, `retire_*`, deep-history recording |
+//! | `edges` | one edge enum per handler with `Edge::apply`; the `changed` probe |
 //! | `entries` | `exit_*` / `enter_*` per children enum |
+//! | `tasks` | timers, invokes, epochs: `start_*` / `cancel_*` |
+//! | `lookups` | `timer_event_*`, `accepts_invoke_*` |
 //! | `dispatch`, `bubble` | the nested `match`, bubbling, `reenter!()` |
 //! | `regions` | parallel states: the tally, region edges, `dispatch_<parallel>` |
-//! | `tasks` | timers, invokes, epochs; `timer_event`, `accepts_invoke` |
 //! | `completion`, `always` | `on_done`, `is_done`, `run_always` |
 //! | `graph` | `GRAPH`, `path()`, `state_id()` |
+//! | `state_ids` | the `StateId` constants of the root type |
 //! | `spec` | the `Spec` impl |
+//! | `stub` | the placeholder `Spec` impl of a machine with errors |
 
 mod always;
 mod bubble;
@@ -45,9 +53,11 @@ use context::Generation;
 /// so the user's own code keeps resolving them.
 pub fn generated_items(model: &MachineModel, valid: bool) -> TokenStream {
     let state_ids = state_ids::state_id_constants(model);
+    let core_alias = crate::core_crate::core_alias_item();
     if !valid {
         let stub = stub::stub_spec(model);
         return quote! {
+            #core_alias
             #state_ids
             #stub
 
@@ -62,8 +72,7 @@ pub fn generated_items(model: &MachineModel, valid: bool) -> TokenStream {
     let dispatch = dispatch::dispatch_items(&generation);
     let graph = graph::graph_items(&generation);
     let spec = spec::spec_impl(&generation);
-    let completion = completion::has_completion(&generation)
-        .then(|| completion::completion_function(&generation));
+    let completion = completion::completion_functions(&generation);
     let always = always::always_items(&generation);
     let task_helpers = tasks::helper_items(&generation);
     let lifecycle = tasks::lifecycle_functions(&generation);
@@ -72,8 +81,10 @@ pub fn generated_items(model: &MachineModel, valid: bool) -> TokenStream {
     let history_functions = history::discriminant_functions(&generation);
     let retire_functions = history::retire_functions(&generation);
     quote! {
+        #core_alias
         #state_ids
         #views
+        #runtime
 
         #[doc(hidden)]
         #[allow(
@@ -82,14 +93,14 @@ pub fn generated_items(model: &MachineModel, valid: bool) -> TokenStream {
             unused_mut,
             unreachable_code,
             private_interfaces,
+            private_bounds,
             clippy::too_many_arguments,
             clippy::large_enum_variant
         )]
         pub mod __estado {
             use super::*;
-            use ::estado_core::Edge as _;
+            use super::__estado_core::Edge as _;
 
-            #runtime
             #task_helpers
             #history_functions
             #retire_functions

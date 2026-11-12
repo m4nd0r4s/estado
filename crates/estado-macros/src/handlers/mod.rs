@@ -6,6 +6,8 @@
 //! generators, and the rewritten impl blocks.
 
 mod body;
+mod captures;
+mod checks;
 mod goto_resolve;
 mod goto_syntax;
 mod parallel_geometry;
@@ -21,11 +23,16 @@ use proc_macro2::Span;
 use syn::spanned::Spanned;
 use syn::{FnArg, Ident, ImplItem, ImplItemFn, ItemFn, Type};
 
-use crate::construct::initial_value;
-use crate::model::{Diagnostic, HandlerModel, HandlerRole, MachineModel, StateId, StateTree};
+use crate::model::{
+    Diagnostic, Extent, HandlerModel, HandlerRole, MachineModel, StateId, StateTree,
+};
+use crate::naming::plain_name;
 use crate::suggest::did_you_mean;
 use body::{BodyEnvironment, BodyMode, rewrite_body};
-use goto_resolve::missing_data_error;
+use checks::{
+    check_history_nesting, check_impl_target, check_parallel_support, check_root_initial,
+    reject_roles_outside_functions,
+};
 use parameters::{ParameterEnvironment, ParameterList, classify_parameters};
 use roles::{FunctionRole, RoleAttribute, take_role};
 use signature::{EdgeType, rewrite_signature};
@@ -42,8 +49,21 @@ pub fn analyse(model: &mut MachineModel) -> Vec<Diagnostic> {
 
     let impls = std::mem::take(&mut model.handlers);
     for mut degraded_impl in impls {
+        if !check_impl_target(model, &degraded_impl, &mut diagnostics) {
+            // Its functions are not the machine's: keep none of them, so
+            // rustc has nothing to add to the error.
+            degraded_impl.items.clear();
+            degraded_impls.push(degraded_impl.clone());
+            full_impls.push(degraded_impl);
+            continue;
+        }
         let mut full_impl = degraded_impl.clone();
         for (degraded_item, full_item) in degraded_impl.items.iter_mut().zip(&mut full_impl.items) {
+            if !matches!(degraded_item, ImplItem::Fn(_)) {
+                reject_roles_outside_functions(degraded_item, &mut diagnostics);
+                reject_roles_outside_functions(full_item, &mut Vec::new());
+                continue;
+            }
             let (ImplItem::Fn(degraded), ImplItem::Fn(full)) = (degraded_item, full_item) else {
                 continue;
             };
@@ -82,92 +102,6 @@ pub fn analyse(model: &mut MachineModel) -> Vec<Diagnostic> {
     diagnostics
 }
 
-/// `Spec::initial` builds the `#[initial]` chain of the root: every level on
-/// it must be buildable without data, or carry `#[initial(with = ..)]` (E0020).
-fn check_root_initial(model: &MachineModel, diagnostics: &mut Vec<Diagnostic>) {
-    let tree = &model.tree;
-    if let Err(missing) = initial_value(tree, 0) {
-        let node = tree.node(missing.node);
-        diagnostics.push(missing_data_error(
-            tree,
-            &missing,
-            &node.name,
-            node.name.span(),
-        ));
-    }
-}
-
-/// A deep history stores the whole substate value, so a second deep history
-/// inside it would need the same value twice (errata 5 covers one level).
-fn check_history_nesting(model: &MachineModel, diagnostics: &mut Vec<Diagnostic>) {
-    use crate::model::HistoryKind;
-    let tree = &model.tree;
-    for node in tree.nodes.iter().skip(1) {
-        if node.history != HistoryKind::DeepKeep {
-            continue;
-        }
-        let outer = node.id;
-        let nested = tree.nodes.iter().skip(1).find(|candidate| {
-            candidate.id != outer
-                && candidate.history == HistoryKind::DeepKeep
-                && tree.is_ancestor_or_self(outer, candidate.id)
-        });
-        if let Some(inner) = nested {
-            diagnostics.push(
-                Diagnostic::new(
-                    "E0090",
-                    inner.name.span(),
-                    format!(
-                        "`{}` keeps deep history inside `{}`, which keeps deep history too",
-                        inner.name, node.name
-                    ),
-                )
-                .with_help("nested deep histories are not supported yet; use `#[history]` (shallow) for the inner one"),
-            );
-        }
-    }
-}
-
-/// What parallel states do not support yet: a parallel state inside a region
-/// of another one (the short-circuit of spec 5.6 item 3 is tracked for one
-/// level), and a handler or `#[after]`-style attribute on a region itself.
-fn check_parallel_support(
-    model: &MachineModel,
-    analysed: &[HandlerModel],
-    diagnostics: &mut Vec<Diagnostic>,
-) {
-    use crate::model::StateKind;
-    let tree = &model.tree;
-    for node in tree.nodes.iter().skip(1) {
-        if node.kind == StateKind::Parallel && tree.region_of(node.id).is_some() {
-            diagnostics.push(
-                Diagnostic::new(
-                    "E0090",
-                    node.name.span(),
-                    format!("the parallel state `{}` is inside a region", node.name),
-                )
-                .with_help("nested parallel states are not supported yet; flatten the regions"),
-            );
-        }
-    }
-    for handler in analysed {
-        let state = tree.node(handler.state);
-        if state.kind == StateKind::Region {
-            diagnostics.push(
-                Diagnostic::new(
-                    "E0090",
-                    handler.function.sig.ident.span(),
-                    format!(
-                        "`{}` is a region: it has no handlers of its own",
-                        state.name
-                    ),
-                )
-                .with_help("put the handler on a state of the region, or on the parallel state"),
-            );
-        }
-    }
-}
-
 /// The edge enum name of a handler: `PlayingEdges`, `PlayingAlwaysEdges`.
 fn edges_enum_name(tree: &StateTree, state: StateId, role: HandlerRole) -> Ident {
     let name = &tree.node(state).name;
@@ -176,7 +110,7 @@ fn edges_enum_name(tree: &StateTree, state: StateId, role: HandlerRole) -> Ident
         HandlerRole::OnDone => "DoneEdges",
         _ => "Edges",
     };
-    Ident::new(&format!("{name}{suffix}"), name.span())
+    Ident::new(&format!("{}{suffix}", plain_name(name)), name.span())
 }
 
 /// Analyses one handler. Returns its model and the rewritten function, or
@@ -232,11 +166,7 @@ fn analyse_function(
         );
     }
 
-    let effect: Type = model
-        .options
-        .effect
-        .clone()
-        .unwrap_or_else(|| syn::parse_quote!(()));
+    let effect: Type = model.options.effect_type();
     let environment = ParameterEnvironment {
         tree,
         state,
@@ -255,6 +185,7 @@ fn analyse_function(
             role: attribute.role,
             edges_enum: &edges_enum,
             mode: BodyMode::Full,
+            borrowed_names: &parameters.borrowed_names,
         },
     );
     diagnostics.extend(report.diagnostics);
@@ -266,6 +197,7 @@ fn analyse_function(
             role: attribute.role,
             edges_enum: &edges_enum,
             mode: BodyMode::Degraded,
+            borrowed_names: &parameters.borrowed_names,
         },
     );
 
@@ -284,6 +216,10 @@ fn analyse_function(
     };
     rewrite_signature(&mut full, &parameters, &effect, &edge_type);
     rewrite_signature(degraded, &parameters, &effect, &EdgeType::None);
+    // Every `goto!` of the degraded copy is `unreachable!()`.
+    degraded
+        .attrs
+        .push(syn::parse_quote!(#[allow(unreachable_code)]));
 
     let returns_result = matches!(
         &full.sig.output,
@@ -295,7 +231,7 @@ fn analyse_function(
         diagnostics.push(
             Diagnostic::new(
                 "E0061",
-                full.sig.output.span(),
+                Extent::of(&full.sig.output),
                 "a handler returns `Result` but there is no `#[on_error]`",
             )
             .with_help(
@@ -349,11 +285,7 @@ fn unknown_state(tree: &StateTree, name: &Ident) -> Diagnostic {
 /// complete `Cx<Self>` and neutralise the transition macros, so rust-analyzer
 /// keeps working and errors do not cascade.
 fn neutralise(model: &MachineModel, function: &mut ImplItemFn) {
-    let effect: Type = model
-        .options
-        .effect
-        .clone()
-        .unwrap_or_else(|| syn::parse_quote!(()));
+    let effect: Type = model.options.effect_type();
     let dummy = Ident::new("Neutralised", Span::call_site());
     let tree = &model.tree;
     rewrite_body(
@@ -364,6 +296,7 @@ fn neutralise(model: &MachineModel, function: &mut ImplItemFn) {
             role: HandlerRole::On,
             edges_enum: &dummy,
             mode: BodyMode::Degraded,
+            borrowed_names: &[],
         },
     );
     let context_index = function
@@ -380,6 +313,10 @@ fn neutralise(model: &MachineModel, function: &mut ImplItemFn) {
         parameters: Vec::new(),
         context_index,
         event_index: None,
+        borrowed_names: Vec::new(),
     };
     rewrite_signature(function, &parameters, &effect, &EdgeType::None);
+    function
+        .attrs
+        .push(syn::parse_quote!(#[allow(unreachable_code)]));
 }

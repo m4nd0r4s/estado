@@ -6,11 +6,11 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 
+use super::completion::{completed_by, completing_states};
 use super::context::Generation;
-use super::naming::{
-    children_binding, enter_function, exit_function, fields_binding, fields_type, payload_binding,
-};
-use super::walk::{Binding, handler_arguments, variant_pattern};
+use super::naming::{children_binding, enter_function, exit_function, fields_binding, fields_type};
+use super::runtime::done_field;
+use super::walk::{Binding, FieldsAccess, handler_arguments, split_payload, variant_pattern};
 use crate::model::{HandlerRole, StateId, StateKind};
 
 /// Every `exit_*` and `enter_*` function of the machine.
@@ -63,7 +63,7 @@ fn sequence_function(
         .node(owner)
         .children
         .iter()
-        .map(|&child| arm(generation, child, role, direction, &ancestors, owner))
+        .map(|&child| arm(generation, child, role, direction, &ancestors))
         .collect();
     quote! {
         #[doc = #documentation]
@@ -86,7 +86,6 @@ fn arm(
     role: HandlerRole,
     direction: Direction,
     ancestors: &[StateId],
-    owner: StateId,
 ) -> TokenStream {
     let tree = generation.tree;
     let state = tree.node(child);
@@ -98,18 +97,19 @@ fn arm(
         let function = &handler.function.sig.ident;
         let sink = generation.sink();
         // Every `*Fields` argument is a reborrow of a binding in scope.
-        let fields = |node: StateId| {
-            let binding = fields_binding(tree, node);
-            quote! { #binding.reborrow() }
-        };
-        let arguments = handler_arguments(generation, handler, &fields, None);
+        let arguments = handler_arguments(generation, handler, FieldsAccess::Reborrow, None);
         quote! { #root::#function::<#sink>(#(#arguments),*); }
     });
 
     // Entering a final state below the root schedules the completion
-    // microstep of its parent (ADR 0005).
-    let completion = (direction == Direction::Enter && state.is_final && owner != 0)
-        .then(|| quote! { cx.runtime_mut().completion_pending = true; });
+    // microstep of the state it completes (ADR 0005, ADR 0013 item 4).
+    let completion = (direction == Direction::Enter && state.is_final)
+        .then(|| completed_by(tree, child))
+        .flatten()
+        .map(|completed| {
+            let flag = done_field(generation, completed);
+            quote! { cx.runtime_mut().#flag = true; }
+        });
     if !is_composite {
         let binding = if own_call.is_some() {
             Binding::Everything
@@ -121,8 +121,15 @@ fn arm(
     }
 
     let pattern = variant_pattern(generation, child, Binding::Everything);
-    let payload = payload_binding(tree, child);
     let own_fields = fields_binding(tree, child);
+    let split = split_payload(generation, child);
+    // A completion that was not served yet dies with its state.
+    let clear_completion = (direction == Direction::Exit
+        && completing_states(generation).contains(&child))
+    .then(|| {
+        let flag = done_field(generation, child);
+        quote! { cx.runtime_mut().#flag = false; }
+    });
     let inherited: Vec<_> = ancestors
         .iter()
         .map(|&ancestor| fields_binding(tree, ancestor))
@@ -141,32 +148,26 @@ fn arm(
             regions.reverse();
         }
         let recurse: Vec<TokenStream> = regions.iter().map(|&region| recursion(region)).collect();
-        let bindings: Vec<_> = state
-            .children
-            .iter()
-            .map(|&region| children_binding(tree, region))
-            .collect();
         let body = match direction {
-            Direction::Exit => quote! { #(#recurse)* #own_call },
+            Direction::Exit => quote! { #(#recurse)* #own_call #clear_completion },
             Direction::Enter => quote! { #own_call #(#recurse)* },
         };
         return quote! {
             #pattern => {
-                let (mut #own_fields, #(#bindings),*) = #payload.split();
+                #split
                 #body
             }
         };
     }
-    let substates = children_binding(tree, child);
     let recurse = recursion(child);
     let record = super::history::record_shallow(generation, child);
     let body = match direction {
-        Direction::Exit => quote! { #recurse #own_call #record },
+        Direction::Exit => quote! { #recurse #own_call #record #clear_completion },
         Direction::Enter => quote! { #own_call #recurse },
     };
     quote! {
         #pattern => {
-            let (mut #own_fields, #substates) = #payload.split();
+            #split
             #body
         }
     }

@@ -9,6 +9,7 @@ use quote::quote;
 use syn::{Expr, FieldValue};
 
 use crate::model::{HistoryKind, Payload, StateId, StateKind, StateTree};
+use crate::naming::exiting_name;
 
 /// Data the user wrote for one level of a `goto!` path.
 pub enum SuppliedData {
@@ -198,12 +199,12 @@ pub fn exiting_type(tree: &StateTree, node: StateId) -> TokenStream {
         // (errata 5).
         Payload::Newtype(_) if state.history == HistoryKind::DeepKeep => {
             let struct_name = state.composite_struct.as_ref().expect("a compound");
-            let name = quote::format_ident!("{}Exiting", struct_name);
+            let name = exiting_name(struct_name);
             quote! { #name }
         }
         Payload::Newtype(payload_type) => quote! { #payload_type },
         Payload::Struct(_) | Payload::Tuple(_) => {
-            let name = quote::format_ident!("{}Exiting", variant);
+            let name = exiting_name(variant);
             quote! { #name }
         }
         Payload::Unit | Payload::None => quote! { () },

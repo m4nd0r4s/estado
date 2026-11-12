@@ -5,19 +5,17 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use super::context::Generation;
-use super::naming::{
-    bubble_function, enter_function, exit_function, fields_binding, reenter_function,
-};
-use super::walk::{borrowed_walk, call_handler, fields_references};
+use super::naming::{bubble_function, enter_function, exit_function, reenter_function};
+use super::walk::{FieldsAccess, borrowed_walk, call_handler, fields_references};
 use crate::construct::initial_value;
 use crate::model::{HandlerRole, StateId, StateKind, UnhandledPolicy};
 
-/// `::estado_core::UnhandledPolicy::Error` and its siblings.
+/// `__estado_core::UnhandledPolicy::Error` and its siblings.
 fn policy_expression(policy: UnhandledPolicy) -> TokenStream {
     match policy {
-        UnhandledPolicy::Ignore => quote! { ::estado_core::UnhandledPolicy::Ignore },
-        UnhandledPolicy::Error => quote! { ::estado_core::UnhandledPolicy::Error },
-        UnhandledPolicy::Panic => quote! { ::estado_core::UnhandledPolicy::Panic },
+        UnhandledPolicy::Ignore => quote! { __estado_core::UnhandledPolicy::Ignore },
+        UnhandledPolicy::Error => quote! { __estado_core::UnhandledPolicy::Error },
+        UnhandledPolicy::Panic => quote! { __estado_core::UnhandledPolicy::Panic },
     }
 }
 
@@ -29,13 +27,29 @@ pub fn unhandled_outcome(
     let root = generation.root;
     match policy {
         None => {
-            quote! { ::estado_core::Outcome::Unhandled(<#root as ::estado_core::Spec>::UNHANDLED) }
+            quote! { __estado_core::Outcome::Unhandled(<#root as __estado_core::Spec>::UNHANDLED) }
         }
         Some(policy) => {
             let policy = policy_expression(policy);
-            quote! { ::estado_core::Outcome::Unhandled(#policy) }
+            quote! { __estado_core::Outcome::Unhandled(#policy) }
         }
     }
+}
+
+/// The `#[unhandled(p)]` override that applies to an event that `node` leaves
+/// unhandled: its own, else the nearest ancestor's (ADR 0013 item 2). The
+/// search stops at the top of a region: the parallel state decides after
+/// every region looked (spec 5.6).
+fn nearest_override(generation: &Generation<'_>, node: StateId) -> Option<UnhandledPolicy> {
+    let tree = generation.tree;
+    let mut current = node;
+    while current != 0 && tree.node(current).kind != StateKind::Region {
+        if let Some(policy) = tree.node(current).unhandled {
+            return Some(policy);
+        }
+        current = tree.node(current).parent.unwrap_or(0);
+    }
+    None
 }
 
 /// The event left `node` unhandled: apply its policy override, or go on to
@@ -76,7 +90,8 @@ pub fn bubble_out_of(generation: &Generation<'_>, node: StateId) -> TokenStream 
 pub fn handle_at(generation: &Generation<'_>, node: StateId, call: TokenStream) -> TokenStream {
     let tree = generation.tree;
     let in_region = tree.region_of(node).is_some();
-    let override_policy = tree.node(node).unhandled;
+    // `unhandled!()` reaches the same override `bubble!()` would.
+    let override_policy = nearest_override(generation, node);
     let handler = generation
         .handler(HandlerRole::On, node)
         .expect("handle_at is called for a state with a handler");
@@ -87,7 +102,7 @@ pub fn handle_at(generation: &Generation<'_>, node: StateId, call: TokenStream) 
         } else {
             unhandled_outcome(generation, Some(policy))
         };
-        quote! { Resolution::Done(::estado_core::Outcome::Unhandled(_)) => #outcome, }
+        quote! { Resolution::Done(__estado_core::Outcome::Unhandled(_)) => #outcome, }
     });
     let bubble = bubble_out_of(generation, node);
     let reenter = if !generation.uses_reenter() {
@@ -144,11 +159,7 @@ pub fn bubble_functions(generation: &Generation<'_>) -> TokenStream {
         });
         let walk = borrowed_walk(generation, node.id);
         let prelude = needs_data.then_some(&walk.prelude);
-        let fields = |ancestor: StateId| {
-            let binding = fields_binding(tree, ancestor);
-            quote! { #binding }
-        };
-        let call = call_handler(generation, handler, &fields, None);
+        let call = call_handler(generation, handler, FieldsAccess::Binding, None);
         let body = handle_at(generation, node.id, call);
         let documentation = format!(
             "Runs the handler of `{}` after its substates bubbled.",
@@ -162,11 +173,11 @@ pub fn bubble_functions(generation: &Generation<'_>) -> TokenStream {
             #[doc = #documentation]
             #[inline(always)]
             pub fn #name<#sink_parameter>(
-                slot: &mut ::estado_core::Slot<#root>,
+                slot: &mut __estado_core::Slot<#root>,
                 cx: &mut #cx_type,
                 event: &#event
                 #tally
-            ) -> ::estado_core::Outcome {
+            ) -> __estado_core::Outcome {
                 #prelude
                 #body
             }
@@ -196,6 +207,7 @@ pub fn reenter_functions(generation: &Generation<'_>) -> TokenStream {
         let children = &walk.children;
         let ancestors = fields_references(generation, &walk.chain);
         let reset = reset_statements(generation, node, children);
+        let configuration = super::edges::configuration_probe(generation, node, parent);
         let cancel = super::tasks::cancel_call(generation, parent, children);
         let start = super::tasks::start_call(generation, parent, children);
         let documentation = format!(
@@ -205,10 +217,10 @@ pub fn reenter_functions(generation: &Generation<'_>) -> TokenStream {
         functions.extend(quote! {
             #[doc = #documentation]
             pub fn #name<#sink_parameter>(
-                slot: &mut ::estado_core::Slot<#root>,
+                slot: &mut __estado_core::Slot<#root>,
                 cx: &mut #cx_type,
-            ) -> ::estado_core::Outcome {
-                let leaf_before = <#root as ::estado_core::Spec>::state_id(slot.live_mut());
+            ) -> __estado_core::Outcome {
+                let configuration_before = #configuration;
                 {
                     #prelude
                     #exit(#children, #(#ancestors,)* cx);
@@ -217,8 +229,8 @@ pub fn reenter_functions(generation: &Generation<'_>) -> TokenStream {
                     #enter(#children, #(#ancestors,)* cx);
                     #start
                 }
-                ::estado_core::Outcome::Transitioned {
-                    changed: <#root as ::estado_core::Spec>::state_id(slot.live_mut()) != leaf_before,
+                __estado_core::Outcome::Transitioned {
+                    changed: #configuration != configuration_before,
                 }
             }
         });
@@ -242,12 +254,7 @@ fn reset_statements(
     let variant = super::walk::variant_pattern(generation, node, super::walk::Binding::Everything);
     let payload = super::naming::payload_binding(tree, node);
     let message = format!("`{}` is active", state.name);
-    let owners: Vec<StateId> = if state.kind == StateKind::Parallel {
-        state.children.clone()
-    } else {
-        vec![node]
-    };
-    let replacements = owners.iter().map(|&owner| {
+    let replacements = tree.children_owners(node).into_iter().map(|owner| {
         let owner_state = tree.node(owner);
         let field = owner_state.children_field.as_ref().expect("children field");
         let initial =
@@ -260,11 +267,14 @@ fn reset_statements(
                 super::history::retire_function(owner_state.children_enum.as_ref().expect("enum"));
             quote! { #retire(old_substates, cx); }
         } else {
-            quote! { drop(old_substates); }
+            TokenStream::new()
         };
+        // The old value is dropped (or recorded) here, before the entries.
         quote! {
-            let old_substates = ::core::mem::replace(&mut #payload.#field, #initial);
-            #retired
+            {
+                let old_substates = ::core::mem::replace(&mut #payload.#field, #initial);
+                #retired
+            }
         }
     });
     quote! {

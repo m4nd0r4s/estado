@@ -18,5 +18,6 @@ pub fn validate(model: &MachineModel) -> Vec<Diagnostic> {
     names::check_unique_names(&model.tree, &mut diagnostics);
     levels::check_depth(&model.tree, &mut diagnostics);
     levels::check_initials(&model.tree, &mut diagnostics);
+    levels::check_counts(&model.tree, &mut diagnostics);
     diagnostics
 }

@@ -20,10 +20,18 @@ pub struct MachineOptions {
     pub unhandled: UnhandledPolicy,
     /// `defer_cap = N`, default 8.
     pub defer_cap: usize,
+    /// Whether `defer_cap` was written: the queues are then generated even
+    /// when no handler is seen using them (ADR 0013 item 8).
+    pub defer_cap_given: bool,
     /// `defer_overflow = error | drop_oldest`.
     pub defer_overflow: DeferOverflow,
     /// `raise_cap = N`, default 8.
     pub raise_cap: usize,
+    /// Whether `raise_cap` was written (see [`Self::defer_cap_given`]).
+    pub raise_cap_given: bool,
+    /// `tracks_active`: `cx.in_state` is available even when no code of the
+    /// module calls it syntactically (ADR 0013 item 8).
+    pub tracks_active: bool,
     /// `fx_inline = N`, default 4.
     pub fx_inline: usize,
     /// `max_microsteps = N`, default 64.
@@ -61,6 +69,16 @@ pub enum DeferOverflow {
 }
 
 impl MachineOptions {
+    /// The effect type of the machine, `()` when not declared.
+    pub fn effect_type(&self) -> Type {
+        self.effect.clone().unwrap_or_else(|| parse_quote!(()))
+    }
+
+    /// The context type of the machine, `()` when not declared.
+    pub fn ctx_type(&self) -> Type {
+        self.ctx.clone().unwrap_or_else(|| parse_quote!(()))
+    }
+
     /// Options with every default of spec 6.1 and no `event` yet.
     pub fn new(span: Span) -> Self {
         Self {
@@ -71,8 +89,11 @@ impl MachineOptions {
             ctx: None,
             unhandled: UnhandledPolicy::Ignore,
             defer_cap: 8,
+            defer_cap_given: false,
             defer_overflow: DeferOverflow::Error,
             raise_cap: 8,
+            raise_cap_given: false,
+            tracks_active: false,
             fx_inline: 4,
             max_microsteps: 64,
             size_warn: 128,

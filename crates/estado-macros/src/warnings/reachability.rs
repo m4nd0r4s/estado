@@ -46,7 +46,7 @@ pub fn graph_warnings(model: &MachineModel, edges: &[EdgeSource]) -> Vec<Warning
         Warning {
             code: WarningCode::UnreachableState,
             span: name.span(),
-            subject: name.to_string(),
+            subject: crate::naming::plain_name(name),
             message: format!("state `{name}` is unreachable from the initial state"),
             condition: None,
         }
@@ -56,7 +56,7 @@ pub fn graph_warnings(model: &MachineModel, edges: &[EdgeSource]) -> Vec<Warning
         Warning {
             code: WarningCode::DeadEnd,
             span: name.span(),
-            subject: name.to_string(),
+            subject: crate::naming::plain_name(name),
             message: format!(
                 "state `{name}` has no outgoing edges and is not `#[terminal]`; \
                  once entered the machine can never leave it"

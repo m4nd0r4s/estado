@@ -1,7 +1,36 @@
 //! Name conversions shared by analysis and the generators.
 
-use syn::Ident;
 use syn::ext::IdentExt;
+use syn::{Ident, Path};
+
+/// Facade crates a marker attribute or a transition macro may be qualified
+/// with (`#[estado::state]`, `estado::goto!`).
+pub const FACADE_CRATES: [&str; 2] = ["estado", "estado_macros"];
+
+/// Name of the generic effect sink parameter of generated functions and
+/// rewritten handlers.
+pub const SINK_PARAMETER: &str = "EffectSink";
+
+/// The name a marker or macro path stands for: `initial` for `initial` and
+/// for `estado::initial`; `None` for any other path.
+pub fn facade_name(path: &Path) -> Option<&Ident> {
+    let segments = &path.segments;
+    match segments.len() {
+        1 => Some(&segments[0].ident),
+        2 if FACADE_CRATES
+            .iter()
+            .any(|facade| segments[0].ident == facade) =>
+        {
+            Some(&segments[1].ident)
+        }
+        _ => None,
+    }
+}
+
+/// `PlayingExiting`: the owned value a constructor receives (`Exiting![X]`).
+pub fn exiting_name(base: &Ident) -> Ident {
+    Ident::new(&format!("{}Exiting", plain_name(base)), base.span())
+}
 
 /// `PlayingFast` -> `PLAYING_FAST`, `keep_alive` -> `KEEP_ALIVE`,
 /// `HTTPServer` -> `HTTP_SERVER`. Used for the `StateId` constants (spec 6.5).
@@ -30,6 +59,12 @@ pub fn screaming_snake_case(name: &str) -> String {
         result.extend(character.to_uppercase());
     }
     result
+}
+
+/// The name of an identifier as text, without the `r#` of a raw identifier:
+/// the base of every generated name (`r#type` gives `typeMut`, not `r#typeMut`).
+pub fn plain_name(name: &Ident) -> String {
+    name.unraw().to_string()
 }
 
 /// The `StateId` constant name of a state or region.

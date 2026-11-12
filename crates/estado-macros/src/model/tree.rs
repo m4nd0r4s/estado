@@ -220,6 +220,31 @@ impl StateTree {
             .collect()
     }
 
+    /// Whether `predicate` holds for some state strictly below `id`.
+    pub fn any_below(&self, id: StateId, predicate: &dyn Fn(StateId) -> bool) -> bool {
+        self.node(id)
+            .children
+            .iter()
+            .any(|&child| predicate(child) || self.any_below(child, predicate))
+    }
+
+    /// Whether the machine has a parallel state anywhere.
+    pub fn has_parallel(&self) -> bool {
+        self.nodes
+            .iter()
+            .any(|node| node.kind == StateKind::Parallel)
+    }
+
+    /// The nodes that own the children enums below `id`: the regions of a
+    /// parallel state, else the state itself.
+    pub fn children_owners(&self, id: StateId) -> Vec<StateId> {
+        if self.node(id).kind == StateKind::Parallel {
+            self.node(id).children.clone()
+        } else {
+            vec![id]
+        }
+    }
+
     /// Whether the node holds an enum of children it matches on: the root, a
     /// compound state or a region.
     pub fn owns_children(&self, id: StateId) -> bool {

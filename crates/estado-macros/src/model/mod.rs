@@ -47,12 +47,48 @@ pub struct MachineModel {
     pub passthrough: Vec<Item>,
 }
 
+/// The stretch of source a diagnostic underlines: from the first to the last
+/// token of a node, so rustc draws a caret under all of it and not under its
+/// first token only (stable proc-macros cannot join spans, but an error
+/// built from two spans covers the range between them).
+#[derive(Clone, Copy)]
+pub struct Extent {
+    /// Where it starts.
+    pub start: proc_macro2::Span,
+    /// Where it ends.
+    pub end: proc_macro2::Span,
+}
+
+impl Extent {
+    /// From the first to the last token of `node`.
+    pub fn of(node: &impl quote::ToTokens) -> Self {
+        let mut tokens = node.to_token_stream().into_iter();
+        let Some(first) = tokens.next() else {
+            return proc_macro2::Span::call_site().into();
+        };
+        let last = tokens.last().unwrap_or_else(|| first.clone());
+        Self {
+            start: first.span(),
+            end: last.span(),
+        }
+    }
+}
+
+impl From<proc_macro2::Span> for Extent {
+    fn from(span: proc_macro2::Span) -> Self {
+        Self {
+            start: span,
+            end: span,
+        }
+    }
+}
+
 /// One diagnostic with a stable code (spec 6.7).
 pub struct Diagnostic {
     /// `E0001`, `W0004`, ...
     pub code: &'static str,
     /// Where it points.
-    pub span: proc_macro2::Span,
+    pub extent: Extent,
     /// Short message.
     pub message: String,
     /// Optional `help:` line, e.g. a "did you mean" suggestion.
@@ -60,15 +96,15 @@ pub struct Diagnostic {
     /// Secondary locations, e.g. "first declared here". Stable proc-macros
     /// cannot attach labels, so each one becomes its own `compile_error!`
     /// whose message starts with `note:`. Added in 4.1.
-    pub notes: Vec<(proc_macro2::Span, String)>,
+    pub notes: Vec<(Extent, String)>,
 }
 
 impl Diagnostic {
     /// An error without help.
-    pub fn new(code: &'static str, span: proc_macro2::Span, message: impl Into<String>) -> Self {
+    pub fn new(code: &'static str, span: impl Into<Extent>, message: impl Into<String>) -> Self {
         Self {
             code,
-            span,
+            extent: span.into(),
             message: message.into(),
             help: None,
             notes: Vec::new(),
@@ -82,8 +118,8 @@ impl Diagnostic {
     }
 
     /// Adds a secondary location, rendered as an extra `note:` error.
-    pub fn with_note(mut self, span: proc_macro2::Span, message: impl Into<String>) -> Self {
-        self.notes.push((span, message.into()));
+    pub fn with_note(mut self, span: impl Into<Extent>, message: impl Into<String>) -> Self {
+        self.notes.push((span.into(), message.into()));
         self
     }
 
@@ -95,11 +131,24 @@ impl Diagnostic {
             text.push_str("\n  = help: ");
             text.push_str(help);
         }
-        let mut tokens = syn::Error::new(self.span, text).to_compile_error();
-        for (span, note) in &self.notes {
+        let mut tokens = error_over(self.extent, text).to_compile_error();
+        for (extent, note) in &self.notes {
             let note_text = format!("estado::{}: note: {note}", self.code);
-            tokens.extend(syn::Error::new(*span, note_text).to_compile_error());
+            tokens.extend(error_over(*extent, note_text).to_compile_error());
         }
         tokens
     }
+}
+
+/// A `syn::Error` that underlines `extent`: it is spanned by two tokens, one
+/// at each end.
+fn error_over(extent: Extent, message: String) -> syn::Error {
+    use proc_macro2::{Ident, TokenStream, TokenTree};
+    let tokens: TokenStream = [
+        TokenTree::Ident(Ident::new("estado", extent.start)),
+        TokenTree::Ident(Ident::new("estado", extent.end)),
+    ]
+    .into_iter()
+    .collect();
+    syn::Error::new_spanned(tokens, message)
 }

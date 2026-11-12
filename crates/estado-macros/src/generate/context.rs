@@ -8,9 +8,7 @@ use quote::{ToTokens, quote};
 use syn::{Ident, Type};
 
 use crate::model::{HandlerModel, HandlerRole, MachineModel, StateId, StateTree};
-
-/// Name of the generic sink parameter of generated functions.
-pub const SINK: &str = "EffectSink";
+use crate::naming::SINK_PARAMETER;
 
 /// Read-only context shared by the generators.
 pub struct Generation<'model> {
@@ -37,13 +35,19 @@ impl<'model> Generation<'model> {
             model,
             tree: &model.tree,
             root: &model.tree.root().name,
-            effect: model
-                .options
-                .effect
-                .clone()
-                .unwrap_or_else(|| syn::parse_quote!(())),
+            effect: model.options.effect_type(),
             handlers,
         }
+    }
+
+    /// The visibility of the root enum, which the generated types of the
+    /// machine module copy (ADR 0013 item 9).
+    pub fn root_visibility(&self) -> syn::Visibility {
+        self.tree
+            .enum_declaration(self.root)
+            .map_or(syn::Visibility::Inherited, |declaration| {
+                declaration.vis.clone()
+            })
     }
 
     /// The handler of `role` for `state`, if the user wrote one.
@@ -53,27 +57,26 @@ impl<'model> Generation<'model> {
 
     /// The generic sink parameter name.
     pub fn sink(&self) -> Ident {
-        Ident::new(SINK, proc_macro2::Span::call_site())
+        Ident::new(SINK_PARAMETER, proc_macro2::Span::call_site())
     }
 
-    /// `::estado_core::Cx<'_, Root, EffectSink>`.
+    /// `__estado_core::Cx<'_, Root, EffectSink>`.
     pub fn cx_type(&self) -> TokenStream {
         let root = self.root;
         let sink = self.sink();
-        quote! { ::estado_core::Cx<'_, #root, #sink> }
+        quote! { __estado_core::Cx<'_, #root, #sink> }
     }
 
-    /// `EffectSink: ::estado_core::Sink<Effect>`, for generic parameter lists.
+    /// `EffectSink: __estado_core::Sink<Effect>`, for generic parameter lists.
     pub fn sink_parameter(&self) -> TokenStream {
         let sink = self.sink();
         let effect = &self.effect;
-        quote! { #sink: ::estado_core::Sink<#effect> }
+        quote! { #sink: __estado_core::Sink<#effect> }
     }
 
-    /// Whether the runtime needs the completion flag: the machine has a
-    /// final state below the root, or an `#[on_done]` handler.
+    /// Whether some state can complete (has a pending flag).
     pub fn needs_completion(&self) -> bool {
-        super::completion::has_completion(self)
+        !super::completion::completing_states(self).is_empty()
     }
 
     /// Whether some state has an `#[always]` handler.
@@ -102,23 +105,31 @@ impl<'model> Generation<'model> {
             .any(|handler| handler.role == HandlerRole::On && handler.uses.reenter)
     }
 
-    /// Whether any code of the module calls `cx.in_state`: a handler, or a
-    /// helper function a handler calls with its `cx`.
+    /// Whether `cx.in_state` is available: forced with
+    /// `#[machine(tracks_active)]`, else some code of the module calls it
+    /// (a handler, or a helper function inside the module).
     pub fn tracks_active(&self) -> bool {
-        self.model
-            .analysed_handlers
-            .iter()
-            .any(|handler| handler.uses.in_state)
+        self.model.options.tracks_active
+            || self
+                .model
+                .analysed_handlers
+                .iter()
+                .any(|handler| handler.uses.in_state)
             || self.module_calls("in_state")
     }
 
     /// Whether the machine needs the raise and defer queues: `defer!()` in a
-    /// handler, or `cx.raise` anywhere in the module.
+    /// handler, `cx.raise` anywhere in the module, or an explicit
+    /// `raise_cap` / `defer_cap` (for helpers outside the module).
     pub fn uses_queues(&self) -> bool {
-        self.model
-            .analysed_handlers
-            .iter()
-            .any(|handler| handler.uses.raise || handler.uses.defer)
+        let options = &self.model.options;
+        options.raise_cap_given
+            || options.defer_cap_given
+            || self
+                .model
+                .analysed_handlers
+                .iter()
+                .any(|handler| handler.uses.raise || handler.uses.defer)
             || self.module_calls("raise")
     }
 

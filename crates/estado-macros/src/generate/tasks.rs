@@ -18,15 +18,16 @@
 //! variant, `&()` for a unit variant.
 
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote};
+use quote::quote;
 use syn::Expr;
 
 use super::context::Generation;
-use super::naming::{payload_binding, ref_view_type};
+use super::naming::{
+    children_function, hygienic_local, payload_binding, ref_view_type, state_constant,
+};
 use super::runtime::{always_field, epoch_field};
-use super::walk::{Binding, variant_pattern};
+use super::walk::{Binding, struct_field_pairs, tuple_field_bindings, variant_pattern};
 use crate::model::{HandlerRole, Payload, StateId, StateKind};
-use crate::naming::{snake_case_name, state_constant_name};
 
 /// Whether the state itself has timers, invokes or an `#[always]` handler.
 pub fn has_lifecycle(generation: &Generation<'_>, node: StateId) -> bool {
@@ -40,10 +41,7 @@ pub fn has_lifecycle(generation: &Generation<'_>, node: StateId) -> bool {
 pub fn has_lifecycle_below(generation: &Generation<'_>, node: StateId) -> bool {
     generation
         .tree
-        .node(node)
-        .children
-        .iter()
-        .any(|&child| has_lifecycle(generation, child) || has_lifecycle_below(generation, child))
+        .any_below(node, &|child| has_lifecycle(generation, child))
 }
 
 /// Whether the machine has any timer.
@@ -64,20 +62,6 @@ pub fn has_invokes(generation: &Generation<'_>) -> bool {
         .any(|node| !node.invokes.is_empty())
 }
 
-pub fn function_name(
-    prefix: &str,
-    generation: &Generation<'_>,
-    owner: StateId,
-) -> proc_macro2::Ident {
-    let enum_name = generation
-        .tree
-        .node(owner)
-        .children_enum
-        .as_ref()
-        .expect("a children owner");
-    format_ident!("{}_{}", prefix, snake_case_name(enum_name))
-}
-
 /// The call that schedules what entered below `owner`; empty when nothing
 /// there has a lifecycle. `children` is the binding of the children enum.
 pub fn start_call(
@@ -88,7 +72,7 @@ pub fn start_call(
     if !has_lifecycle_below(generation, owner) {
         return TokenStream::new();
     }
-    let function = function_name("start", generation, owner);
+    let function = children_function("start", generation.tree, owner);
     quote! { #function(&*#children, cx); }
 }
 
@@ -102,7 +86,7 @@ pub fn cancel_call(
     if !has_lifecycle_below(generation, owner) {
         return TokenStream::new();
     }
-    let function = function_name("cancel", generation, owner);
+    let function = children_function("cancel", generation.tree, owner);
     quote! { #function(&*#children, cx); }
 }
 
@@ -115,21 +99,14 @@ pub fn data_reference(generation: &Generation<'_>, node: StateId) -> TokenStream
             let payload = payload_binding(tree, node);
             quote! { #payload }
         }
-        Payload::Struct(fields) => {
+        Payload::Struct(_) => {
             let view = ref_view_type(tree, node);
-            let pairs = fields
-                .iter()
-                .filter_map(|field| field.ident.as_ref())
-                .map(|name| {
-                    let binding = super::naming::field_binding(tree, node, &name.to_string());
-                    quote! { #name: #binding }
-                });
+            let pairs = struct_field_pairs(generation, node);
             quote! { &#view { #(#pairs),* } }
         }
-        Payload::Tuple(fields) => {
+        Payload::Tuple(_) => {
             let view = ref_view_type(tree, node);
-            let names = (0..fields.len())
-                .map(|index| super::naming::field_binding(tree, node, &index.to_string()));
+            let names = tuple_field_bindings(generation, node);
             quote! { &#view(#(#names),*) }
         }
         Payload::Unit | Payload::None => quote! { &() },
@@ -146,22 +123,17 @@ pub fn evaluate(expression: &Expr, data: &TokenStream) -> TokenStream {
     }
 }
 
-pub fn state_constant(generation: &Generation<'_>, node: StateId) -> TokenStream {
-    let root = generation.root;
-    let constant = format_ident!("{}", state_constant_name(&generation.tree.node(node).name));
-    quote! { #root::#constant }
-}
-
 /// The statements of step 8 and 9 (and 10) for one state that entered.
 fn start_statements(generation: &Generation<'_>, node: StateId) -> TokenStream {
     let state = generation.tree.node(node);
+    let epoch = hygienic_local("epoch");
     let mut statements = TokenStream::new();
     if !state.timers.is_empty() || !state.invokes.is_empty() {
         let field = epoch_field(generation, node);
         let id = state_constant(generation, node);
         let data = data_reference(generation, node);
         statements.extend(quote! {
-            let epoch = {
+            let #epoch = {
                 let counter = &mut cx.runtime_mut().#field;
                 *counter = counter.wrapping_add(1);
                 *counter
@@ -171,8 +143,8 @@ fn start_statements(generation: &Generation<'_>, node: StateId) -> TokenStream {
             let index = u8::try_from(index).unwrap_or(u8::MAX);
             let after = evaluate(&timer.duration, &data);
             statements.extend(quote! {
-                cx.effect(::estado_core::Effect::StartTimer {
-                    key: timer_key(#id, epoch, #index),
+                cx.effect(__estado_core::Effect::StartTimer {
+                    key: timer_key(#id, #epoch, #index),
                     after: #after,
                 });
             });
@@ -181,8 +153,8 @@ fn start_statements(generation: &Generation<'_>, node: StateId) -> TokenStream {
             let index = u8::try_from(index).unwrap_or(u8::MAX);
             let task = evaluate(&invoke.task, &data);
             statements.extend(quote! {
-                cx.effect(::estado_core::Effect::Invoke {
-                    key: invoke_key(#id, epoch, #index),
+                cx.effect(__estado_core::Effect::Invoke {
+                    key: invoke_key(#id, #epoch, #index),
                     task: #task,
                 });
             });
@@ -198,21 +170,22 @@ fn start_statements(generation: &Generation<'_>, node: StateId) -> TokenStream {
 /// The statements of step 2 for one state that exited.
 fn cancel_statements(generation: &Generation<'_>, node: StateId) -> TokenStream {
     let state = generation.tree.node(node);
+    let epoch = hygienic_local("epoch");
     let mut statements = TokenStream::new();
     if !state.timers.is_empty() || !state.invokes.is_empty() {
         let field = epoch_field(generation, node);
         let id = state_constant(generation, node);
-        statements.extend(quote! { let epoch = cx.runtime_mut().#field; });
+        statements.extend(quote! { let #epoch = cx.runtime_mut().#field; });
         for index in 0..state.timers.len() {
             let index = u8::try_from(index).unwrap_or(u8::MAX);
             statements.extend(quote! {
-                cx.effect(::estado_core::Effect::CancelTimer(timer_key(#id, epoch, #index)));
+                cx.effect(__estado_core::Effect::CancelTimer(timer_key(#id, #epoch, #index)));
             });
         }
         for index in 0..state.invokes.len() {
             let index = u8::try_from(index).unwrap_or(u8::MAX);
             statements.extend(quote! {
-                cx.effect(::estado_core::Effect::Cancel(invoke_key(#id, epoch, #index)));
+                cx.effect(__estado_core::Effect::Cancel(invoke_key(#id, #epoch, #index)));
             });
         }
     }
@@ -249,12 +222,13 @@ fn sequence(generation: &Generation<'_>, owner: StateId, phase: Phase) -> TokenS
         Phase::Start => ("start", "Schedules the timers and invokes of"),
         Phase::Cancel => ("cancel", "Cancels the timers and invokes of"),
     };
-    let name = function_name(prefix, generation, owner);
+    let name = children_function(prefix, generation.tree, owner);
     let enum_name = tree.node(owner).children_enum.as_ref().expect("owner");
     let documentation =
         format!("{verb} the active child of `{enum_name}` and everything below it.");
     let sink_parameter = generation.sink_parameter();
     let cx_type = generation.cx_type();
+    let children = hygienic_local("children");
     let arms = tree.node(owner).children.iter().filter_map(|&child| {
         let composite = matches!(
             tree.node(child).kind,
@@ -280,8 +254,8 @@ fn sequence(generation: &Generation<'_>, owner: StateId, phase: Phase) -> TokenS
     quote! {
         #[doc = #documentation]
         #[allow(unreachable_patterns)]
-        pub fn #name<#sink_parameter>(children: &#enum_name, cx: &mut #cx_type) {
-            match children {
+        pub fn #name<#sink_parameter>(#children: &#enum_name, cx: &mut #cx_type) {
+            match #children {
                 #(#arms)*
                 _ => {}
             }
@@ -293,13 +267,8 @@ fn sequence(generation: &Generation<'_>, owner: StateId, phase: Phase) -> TokenS
 /// parallel one: regions in declaration order to start, reversed to cancel.
 fn nested_calls(generation: &Generation<'_>, node: StateId, phase: Phase) -> TokenStream {
     let tree = generation.tree;
-    let state = tree.node(node);
     let payload = payload_binding(tree, node);
-    let mut owners: Vec<StateId> = if state.kind == StateKind::Parallel {
-        state.children.clone()
-    } else {
-        vec![node]
-    };
+    let mut owners = tree.children_owners(node);
     if phase == Phase::Cancel {
         owners.reverse();
     }
@@ -312,7 +281,7 @@ fn nested_calls(generation: &Generation<'_>, node: StateId, phase: Phase) -> Tok
         if !has_lifecycle_below(generation, owner) {
             return None;
         }
-        let function = function_name(prefix, generation, owner);
+        let function = children_function(prefix, generation.tree, owner);
         let field = tree
             .node(owner)
             .children_field
@@ -328,16 +297,16 @@ pub fn helper_items(generation: &Generation<'_>) -> TokenStream {
     let timers = has_timers(generation).then(|| {
         quote! {
             /// The key of the timer `index` of the state instance with `epoch`.
-            pub const fn timer_key(state: ::estado_core::StateId, epoch: u32, index: u8) -> ::estado_core::TimerKey {
-                ::estado_core::TimerKey { state, epoch, index, child: ::estado_core::ChildPath::ROOT }
+            pub const fn timer_key(state: __estado_core::StateId, epoch: u32, index: u8) -> __estado_core::TimerKey {
+                __estado_core::TimerKey { state, epoch, index, child: __estado_core::ChildPath::ROOT }
             }
         }
     });
     let invokes = has_invokes(generation).then(|| {
         quote! {
             /// The key of the invoke `index` of the state instance with `epoch`.
-            pub const fn invoke_key(state: ::estado_core::StateId, epoch: u32, index: u8) -> ::estado_core::InvokeKey {
-                ::estado_core::InvokeKey { state, epoch, index, child: ::estado_core::ChildPath::ROOT }
+            pub const fn invoke_key(state: __estado_core::StateId, epoch: u32, index: u8) -> __estado_core::InvokeKey {
+                __estado_core::InvokeKey { state, epoch, index, child: __estado_core::ChildPath::ROOT }
             }
         }
     });

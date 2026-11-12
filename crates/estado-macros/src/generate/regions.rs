@@ -17,8 +17,7 @@ use quote::{format_ident, quote};
 use super::bubble::{bubble_out_of, handle_at};
 use super::context::Generation;
 use super::dispatch::children_arms;
-use super::naming::fields_binding;
-use super::walk::{borrowed_walk, call_handler};
+use super::walk::{FieldsAccess, borrowed_walk, call_handler};
 use crate::model::{HandlerRole, StateId, StateKind};
 use crate::naming::snake_case_name;
 
@@ -95,18 +94,18 @@ fn support_items(generation: &Generation<'_>) -> TokenStream {
             /// A transition left the parallel state.
             pub left: bool,
             /// A state with `#[unhandled]` inside a region stopped the event.
-            pub stopped: ::core::option::Option<::estado_core::UnhandledPolicy>,
+            pub stopped: ::core::option::Option<__estado_core::UnhandledPolicy>,
         }
 
         impl RegionTally {
             /// Folds the outcome of one region into the tally.
             #[inline(always)]
-            pub fn absorb(&mut self, outcome: ::estado_core::Outcome) {
+            pub fn absorb(&mut self, outcome: __estado_core::Outcome) {
                 match outcome {
-                    ::estado_core::Outcome::Stayed => self.consumed = true,
-                    ::estado_core::Outcome::Deferred => self.deferred = true,
-                    ::estado_core::Outcome::Unhandled(_) => {}
-                    ::estado_core::Outcome::Transitioned { changed } => {
+                    __estado_core::Outcome::Stayed => self.consumed = true,
+                    __estado_core::Outcome::Deferred => self.deferred = true,
+                    __estado_core::Outcome::Unhandled(_) => {}
+                    __estado_core::Outcome::Transitioned { changed } => {
                         self.consumed = true;
                         self.transitioned = true;
                         self.changed |= changed;
@@ -118,21 +117,21 @@ fn support_items(generation: &Generation<'_>) -> TokenStream {
             /// policy applies there, the parallel state's own handler does
             /// not see the event (spec 5.1 item 4).
             #[inline(always)]
-            pub fn stop(&mut self, policy: ::estado_core::UnhandledPolicy) -> ::estado_core::Outcome {
+            pub fn stop(&mut self, policy: __estado_core::UnhandledPolicy) -> __estado_core::Outcome {
                 self.stopped = ::core::option::Option::Some(policy);
-                ::estado_core::Outcome::Unhandled(policy)
+                __estado_core::Outcome::Unhandled(policy)
             }
         }
 
         /// An edge of a handler inside a region: it knows whether it leaves
         /// the parallel state, which stops the evaluation of the regions
         /// that are left (spec 5.6 item 3).
-        pub trait RegionEdge: ::estado_core::Edge<#root> {
+        pub trait RegionEdge: __estado_core::Edge<#root> {
             /// Whether applying this edge exits the parallel state.
             fn leaves_parallel(&self) -> bool;
         }
 
-        impl RegionEdge for ::estado_core::NoEdge {
+        impl RegionEdge for __estado_core::NoEdge {
             fn leaves_parallel(&self) -> bool {
                 match *self {}
             }
@@ -141,19 +140,19 @@ fn support_items(generation: &Generation<'_>) -> TokenStream {
         /// Like `resolve`, for the handler of a state inside a region.
         #[inline(always)]
         pub fn resolve_region<Edges: RegionEdge, #sink_parameter>(
-            next: ::estado_core::Next<#root, Edges>,
-            slot: &mut ::estado_core::Slot<#root>,
+            next: __estado_core::Next<#root, Edges>,
+            slot: &mut __estado_core::Slot<#root>,
             cx: &mut #cx_type,
             tally: &mut RegionTally,
         ) -> Resolution {
             match next {
-                ::estado_core::Next::Goto(edge) => {
+                __estado_core::Next::Goto(edge) => {
                     let leaves_parallel = edge.leaves_parallel();
-                    let changed = ::estado_core::Edge::apply(edge, slot, cx);
+                    let changed = __estado_core::Edge::apply(edge, slot, cx);
                     if leaves_parallel {
                         tally.left = true;
                     }
-                    Resolution::Done(::estado_core::Outcome::Transitioned { changed })
+                    Resolution::Done(__estado_core::Outcome::Transitioned { changed })
                 }
                 other => resolve(other, slot, cx),
             }
@@ -172,7 +171,7 @@ fn region_leaf(generation: &Generation<'_>, region: StateId) -> TokenStream {
     let arms = super::graph::leaf_arms(generation, region);
     quote! {
         /// Id of the active leaf of the region.
-        pub fn #name(slot: &mut ::estado_core::Slot<#root>) -> ::estado_core::StateId {
+        pub fn #name(slot: &mut __estado_core::Slot<#root>) -> __estado_core::StateId {
             #prelude
             match &*#children {
                 #arms
@@ -200,11 +199,11 @@ fn evaluate_region(generation: &Generation<'_>, region: StateId) -> TokenStream 
         #[doc = #documentation]
         #[inline]
         pub fn #name<#sink_parameter>(
-            slot: &mut ::estado_core::Slot<#root>,
+            slot: &mut __estado_core::Slot<#root>,
             cx: &mut #cx_type,
             event: &#event,
             tally: &mut RegionTally,
-        ) -> ::estado_core::Outcome {
+        ) -> __estado_core::Outcome {
             #prelude
             match #children {
                 #arms
@@ -229,8 +228,8 @@ fn dispatch_parallel(generation: &Generation<'_>, parallel: StateId) -> TokenStr
         // The last region has nobody left to tell (ADR 0008).
         let refresh = (tracks_active && !is_last).then(|| {
             quote! {
-                if ::core::matches!(outcome, ::estado_core::Outcome::Transitioned { .. }) {
-                    cx.refresh_active(::estado_core::Spec::path(slot.live_mut()));
+                if ::core::matches!(outcome, __estado_core::Outcome::Transitioned { .. }) {
+                    cx.refresh_active(__estado_core::Spec::path(slot.live_mut()));
                 }
             }
         });
@@ -238,7 +237,7 @@ fn dispatch_parallel(generation: &Generation<'_>, parallel: StateId) -> TokenStr
             let outcome = #evaluate(slot, cx, event, &mut tally);
             tally.absorb(outcome);
             if tally.left {
-                return ::estado_core::Outcome::Transitioned { changed: tally.changed };
+                return __estado_core::Outcome::Transitioned { changed: tally.changed };
             }
             #refresh
         }
@@ -248,14 +247,10 @@ fn dispatch_parallel(generation: &Generation<'_>, parallel: StateId) -> TokenStr
         |handler| {
             let walk = borrowed_walk(generation, parallel);
             let prelude = &walk.prelude;
-            let fields = |ancestor: StateId| {
-                let binding = fields_binding(tree, ancestor);
-                quote! { #binding }
-            };
             let body = handle_at(
                 generation,
                 parallel,
-                call_handler(generation, handler, &fields, None),
+                call_handler(generation, handler, FieldsAccess::Binding, None),
             );
             quote! { { #prelude #body } }
         },
@@ -268,24 +263,24 @@ fn dispatch_parallel(generation: &Generation<'_>, parallel: StateId) -> TokenStr
         #[doc = #documentation]
         #[inline(always)]
         pub fn #name<#sink_parameter>(
-            slot: &mut ::estado_core::Slot<#root>,
+            slot: &mut __estado_core::Slot<#root>,
             cx: &mut #cx_type,
             event: &#event,
-        ) -> ::estado_core::Outcome {
+        ) -> __estado_core::Outcome {
             let mut tally = RegionTally::default();
             #(#steps)*
             if tally.consumed {
                 return if tally.transitioned {
-                    ::estado_core::Outcome::Transitioned { changed: tally.changed }
+                    __estado_core::Outcome::Transitioned { changed: tally.changed }
                 } else {
-                    ::estado_core::Outcome::Stayed
+                    __estado_core::Outcome::Stayed
                 };
             }
             if tally.deferred {
-                return ::estado_core::Outcome::Deferred;
+                return __estado_core::Outcome::Deferred;
             }
             if let ::core::option::Option::Some(policy) = tally.stopped {
-                return ::estado_core::Outcome::Unhandled(policy);
+                return __estado_core::Outcome::Unhandled(policy);
             }
             #own
         }

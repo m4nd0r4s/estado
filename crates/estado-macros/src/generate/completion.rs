@@ -1,14 +1,22 @@
-//! Final states (spec 5.10, ADR 0005): the completion microstep that runs
-//! `#[on_done]`, and `is_done` / `into_output` for a `#[terminal]` root state.
+//! Final states (spec 5.10, ADR 0005, ADR 0013 item 4): the completion
+//! microstep that runs `#[on_done]`, and `is_done` / `into_output` for a
+//! `#[terminal]` root state.
+//!
+//! Every state that can complete has its own pending flag in the runtime:
+//! set by the entry of a `#[terminal]` that completes it, cleared when
+//! `run_always` serves it or when the state exits. A completion therefore
+//! fires exactly once per entry into a final configuration, and a sibling
+//! region or a nested compound completing does not run it again.
 
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Type;
 
 use super::context::Generation;
-use super::naming::{children_binding, fields_binding, payload_binding};
-use super::walk::{Binding, call_handler, variant_pattern};
-use crate::model::{HandlerRole, Payload, StateId, StateKind};
+use super::naming::{children_binding, payload_binding};
+use super::runtime::done_field;
+use super::walk::{Binding, FieldsAccess, call_handler, state_function, variant_pattern};
+use crate::model::{HandlerRole, Payload, StateId, StateKind, StateTree};
 
 /// The `Output` of the machine: the payload type shared by the root
 /// `#[terminal]` variants, or `()`.
@@ -76,221 +84,188 @@ pub fn done_methods(generation: &Generation<'_>) -> TokenStream {
     }
 }
 
-/// Whether the machine has a completion microstep at all: some final state
-/// below the root, or an `#[on_done]` handler.
-pub fn has_completion(generation: &Generation<'_>) -> bool {
-    generation
-        .tree
+/// Whether the state can complete: a compound state with a `#[terminal]`
+/// substate, or a parallel state with one in some region.
+fn can_complete(tree: &StateTree, node: StateId) -> bool {
+    let has_terminal = |owner: StateId| {
+        tree.node(owner)
+            .children
+            .iter()
+            .any(|&child| tree.node(child).is_final)
+    };
+    match tree.node(node).kind {
+        StateKind::Compound => has_terminal(node),
+        StateKind::Parallel => tree
+            .node(node)
+            .children
+            .iter()
+            .any(|&region| has_terminal(region)),
+        _ => false,
+    }
+}
+
+/// The states with a pending flag, deepest first: an inner completion runs
+/// before the one of the state around it.
+pub fn completing_states(generation: &Generation<'_>) -> Vec<StateId> {
+    let tree = generation.tree;
+    let mut states: Vec<StateId> = tree
         .nodes
         .iter()
         .skip(1)
-        .any(|node| node.is_final && node.parent.unwrap_or(0) != 0)
-        || generation
-            .model
-            .analysed_handlers
-            .iter()
-            .any(|handler| handler.role == HandlerRole::OnDone)
+        .map(|node| node.id)
+        .filter(|&node| can_complete(tree, node))
+        .collect();
+    states.sort_by_key(|&node| std::cmp::Reverse((tree.node(node).depth, node)));
+    states
 }
 
-/// `complete`: finds the compound whose active substate is a final one, or
-/// the parallel state whose regions are all final, and runs its `#[on_done]`
-/// (spec 5.10, ADR 0005).
-pub fn completion_function(generation: &Generation<'_>) -> TokenStream {
-    let root = generation.root;
-    let sink_parameter = generation.sink_parameter();
-    let cx_type = generation.cx_type();
-    let arms = completion_arms(generation, 0, Mode::Direct);
-    quote! {
-        /// The synthetic completion microstep of spec 5.10: runs `#[on_done]`
-        /// of the compound whose active substate is final, or of the parallel
-        /// state whose regions are all final.
-        pub fn complete<#sink_parameter>(
-            slot: &mut ::estado_core::Slot<#root>,
-            cx: &mut #cx_type,
-        ) -> ::estado_core::Outcome {
-            match slot.live_mut() {
-                #arms
-                _ => ::estado_core::Outcome::Stayed,
-            }
-        }
+/// The state whose pending flag entering `terminal` sets: its parent
+/// compound, or the parallel state of its region. `None` for a root
+/// `#[terminal]`, which only makes `is_done()` true.
+pub fn completed_by(tree: &StateTree, terminal: StateId) -> Option<StateId> {
+    let parent = tree.node(terminal).parent.filter(|&parent| parent != 0)?;
+    match tree.node(parent).kind {
+        StateKind::Region => tree.node(parent).parent,
+        _ => Some(parent),
     }
 }
 
-/// Where the arms are used: at the top (`Outcome`, `Stayed` when nothing is
-/// complete) or inside a region (`Option<Outcome>`, so the parallel state
-/// can tell that a completion inside a region ran).
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Mode {
-    Direct,
-    InRegion,
-}
-
-impl Mode {
-    fn found(self, outcome: TokenStream) -> TokenStream {
-        match self {
-            Self::Direct => outcome,
-            Self::InRegion => quote! { ::core::option::Option::Some(#outcome) },
-        }
-    }
-
-    fn nothing(self) -> TokenStream {
-        match self {
-            Self::Direct => quote! { ::estado_core::Outcome::Stayed },
-            Self::InRegion => quote! { ::core::option::Option::None },
-        }
-    }
-}
-
-/// Whether a compound state below `owner` has an `#[on_done]` handler.
-fn has_completion_below(generation: &Generation<'_>, owner: StateId) -> bool {
-    let tree = generation.tree;
-    tree.node(owner).children.iter().any(|&child| {
-        (generation.handler(HandlerRole::OnDone, child).is_some()
-            && matches!(
-                tree.node(child).kind,
-                StateKind::Compound | StateKind::Parallel
+/// `complete_<state>` for every completing state that has an `#[on_done]`.
+pub fn completion_functions(generation: &Generation<'_>) -> TokenStream {
+    completing_states(generation)
+        .into_iter()
+        .filter_map(|node| {
+            let handler = generation.handler(HandlerRole::OnDone, node)?;
+            let body = if generation.tree.node(node).kind == StateKind::Parallel {
+                parallel_body(generation, node, handler)
+            } else {
+                compound_body(generation, node, handler)
+            };
+            let name = complete_function(generation, node);
+            let documentation = format!(
+                "The completion microstep of `{}`.",
+                generation.tree.node(node).name
+            );
+            Some(state_function(
+                generation,
+                node,
+                &name,
+                &documentation,
+                body,
             ))
-            || has_completion_below(generation, child)
-    })
+        })
+        .collect()
 }
 
-fn completion_arms(generation: &Generation<'_>, owner: StateId, mode: Mode) -> TokenStream {
-    let tree = generation.tree;
+/// `complete_upload`.
+pub fn complete_function(generation: &Generation<'_>, node: StateId) -> proc_macro2::Ident {
+    quote::format_ident!(
+        "complete_{}",
+        crate::naming::snake_case_name(&generation.tree.node(node).name)
+    )
+}
+
+/// The statements of `run_always` that serve the pending completions.
+pub fn serve_completions(generation: &Generation<'_>) -> TokenStream {
+    completing_states(generation)
+        .into_iter()
+        .map(|node| {
+            let flag = done_field(generation, node);
+            let served = if generation.handler(HandlerRole::OnDone, node).is_some() {
+                let function = complete_function(generation, node);
+                quote! { return #function(slot, cx); }
+            } else {
+                // No `#[on_done]`: the check runs as a microstep and finds
+                // nothing to do (ADR 0005).
+                quote! { return __estado_core::Outcome::Stayed; }
+            };
+            quote! {
+                if ::core::mem::take(&mut cx.runtime_mut().#flag) {
+                    #served
+                }
+            }
+        })
+        .collect()
+}
+
+/// What a completion does with the `Next` of its handler. Only `stay!()` and
+/// `goto!` are allowed there (E0045), so nothing else bubbles.
+fn run_handler(generation: &Generation<'_>, call: &TokenStream) -> TokenStream {
     let bubble_pattern = generation.bubble_pattern();
-    let arms = tree.node(owner).children.iter().filter_map(|&child| {
-        let state = tree.node(child);
-        match state.kind {
-            StateKind::Compound => {
-                if !has_completion_below(generation, child)
-                    && generation.handler(HandlerRole::OnDone, child).is_none()
-                {
-                    return None;
-                }
-                let pattern = variant_pattern(generation, child, Binding::Everything);
-                let payload = payload_binding(tree, child);
-                let fields = fields_binding(tree, child);
-                let substates = children_binding(tree, child);
-                let inner = completion_arms(generation, child, mode);
-                let nothing = mode.nothing();
-                Some(quote! {
-                    #pattern => {
-                        let (#fields, #substates) = #payload.split();
-                        match #substates {
-                            #inner
-                            _ => #nothing,
-                        }
-                    }
-                })
-            }
-            StateKind::Parallel => Some(parallel_arm(generation, child)),
-            _ => {
-                let handler = generation.handler(HandlerRole::OnDone, owner)?;
-                if !state.is_final {
-                    return None;
-                }
-                let pattern = variant_pattern(generation, child, Binding::Everything);
-                let payload = payload_binding(tree, child);
-                let output =
-                    matches!(state.payload, Payload::Newtype(_)).then(|| quote! { #payload });
-                let fields = |ancestor: StateId| {
-                    let binding = fields_binding(tree, ancestor);
-                    quote! { #binding }
-                };
-                let call = call_handler(generation, handler, &fields, output.as_ref());
-                let found = mode.found(quote! { outcome });
-                let found_stayed = mode.found(quote! { ::estado_core::Outcome::Stayed });
-                Some(quote! {
-                    #pattern => {
-                        let next = #call;
-                        match resolve(next, slot, cx) {
-                            Resolution::Done(outcome) => #found,
-                            #bubble_pattern => {
-                                #found_stayed
-                            }
-                        }
-                    }
-                })
-            }
+    quote! {
+        let next = #call;
+        match resolve(next, slot, cx) {
+            Resolution::Done(outcome) => outcome,
+            #bubble_pattern => __estado_core::Outcome::Stayed,
         }
-    });
-    quote! { #(#arms)* }
+    }
 }
 
-/// A parallel state: completions inside its regions first (one per
-/// microstep), then its own `#[on_done]` when every region is final.
-fn parallel_arm(generation: &Generation<'_>, parallel: StateId) -> TokenStream {
+/// A compound state: it completed when its active substate is a `#[terminal]`.
+fn compound_body(
+    generation: &Generation<'_>,
+    node: StateId,
+    handler: &crate::model::HandlerModel,
+) -> TokenStream {
     let tree = generation.tree;
-    let state = tree.node(parallel);
-    let pattern = variant_pattern(generation, parallel, Binding::Everything);
-    let payload = payload_binding(tree, parallel);
-    let fields = fields_binding(tree, parallel);
-    let bindings: Vec<_> = state
+    let substates = children_binding(tree, node);
+    let arms = tree
+        .node(node)
         .children
         .iter()
-        .map(|&region| children_binding(tree, region))
-        .collect();
-    let own_handler = generation.handler(HandlerRole::OnDone, parallel);
-    let bubble_pattern = generation.bubble_pattern();
-
-    let nested = state.children.iter().filter_map(|&region| {
-        if !has_completion_below(generation, region) {
-            return None;
-        }
-        let arms = completion_arms(generation, region, Mode::InRegion);
-        let binding = children_binding(tree, region);
-        // The parallel state may complete right after: look again next time.
-        let again = own_handler
-            .is_some()
-            .then(|| quote! { cx.runtime_mut().completion_pending = true; });
-        Some(quote! {
-            if let ::core::option::Option::Some(outcome) = match &mut *#binding {
-                #arms
-                _ => ::core::option::Option::None,
-            } {
-                #again
-                return outcome;
-            }
-        })
-    });
-
-    let own = own_handler.and_then(|handler| {
-        let conditions: Option<Vec<TokenStream>> = state
-            .children
-            .iter()
-            .map(|&region| {
-                let finals: Vec<TokenStream> = tree
-                    .node(region)
-                    .children
-                    .iter()
-                    .filter(|&&child| tree.node(child).is_final)
-                    .map(|&child| variant_pattern(generation, child, Binding::Nothing))
-                    .collect();
-                let binding = children_binding(tree, region);
-                (!finals.is_empty()).then(|| quote! { ::core::matches!(&*#binding, #(#finals)|*) })
-            })
-            .collect();
-        let conditions = conditions?;
-        let fields_argument = |ancestor: StateId| {
-            let binding = fields_binding(tree, ancestor);
-            quote! { #binding }
-        };
-        let call = call_handler(generation, handler, &fields_argument, None);
-        Some(quote! {
-            if #(#conditions)&&* {
-                let next = #call;
-                return match resolve(next, slot, cx) {
-                    Resolution::Done(outcome) => outcome,
-                    #bubble_pattern => ::estado_core::Outcome::Stayed,
-                };
-            }
-        })
-    });
+        .filter(|&&child| tree.node(child).is_final)
+        .map(|&child| {
+            let state = tree.node(child);
+            let pattern = variant_pattern(generation, child, Binding::Everything);
+            let payload = payload_binding(tree, child);
+            let output = matches!(state.payload, Payload::Newtype(_)).then(|| quote! { #payload });
+            let call = call_handler(generation, handler, FieldsAccess::Binding, output.as_ref());
+            let run = run_handler(generation, &call);
+            quote! { #pattern => { #run } }
+        });
     quote! {
-        #pattern => {
-            let (mut #fields, #(#bindings),*) = #payload.split();
-            #(#nested)*
-            #own
-            ::estado_core::Outcome::Stayed
+        match #substates {
+            #(#arms)*
+            #[allow(unreachable_patterns)]
+            _ => __estado_core::Outcome::Stayed,
+        }
+    }
+}
+
+/// A parallel state: it completed when every region is in a `#[terminal]`;
+/// a region without one never completes.
+fn parallel_body(
+    generation: &Generation<'_>,
+    node: StateId,
+    handler: &crate::model::HandlerModel,
+) -> TokenStream {
+    let tree = generation.tree;
+    let conditions: Option<Vec<TokenStream>> = tree
+        .node(node)
+        .children
+        .iter()
+        .map(|&region| {
+            let finals: Vec<TokenStream> = tree
+                .node(region)
+                .children
+                .iter()
+                .filter(|&&child| tree.node(child).is_final)
+                .map(|&child| variant_pattern(generation, child, Binding::Nothing))
+                .collect();
+            let binding = children_binding(tree, region);
+            (!finals.is_empty()).then(|| quote! { ::core::matches!(&*#binding, #(#finals)|*) })
+        })
+        .collect();
+    let Some(conditions) = conditions else {
+        return quote! { __estado_core::Outcome::Stayed };
+    };
+    let call = call_handler(generation, handler, FieldsAccess::Binding, None);
+    let run = run_handler(generation, &call);
+    quote! {
+        if #(#conditions)&&* {
+            #run
+        } else {
+            __estado_core::Outcome::Stayed
         }
     }
 }

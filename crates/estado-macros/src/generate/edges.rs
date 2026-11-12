@@ -8,16 +8,46 @@ use quote::{format_ident, quote};
 use syn::Ident;
 
 use super::context::Generation;
-use super::naming::{enter_function, exit_function, exiting_struct, payload_binding};
+use super::naming::{
+    enter_function, exit_function, exiting_struct, payload_binding, state_constant,
+};
 use super::tasks::{cancel_call, start_call};
 use super::walk::{
-    Binding, borrowed_walk, fields_references, owned_pattern, owned_rebuild, variant_pattern,
+    Binding, borrowed_walk, fields_references, owned_pattern, owned_rebuild, shared_field_pairs,
+    struct_field_pairs, tuple_field_bindings, variant_pattern,
 };
 use crate::construct::exiting_type;
 use crate::model::{
     GotoForm, GotoOccurrence, HandlerModel, HistoryKind, Payload, StateId, TransitionKind,
 };
-use crate::naming::state_constant_name;
+use crate::naming::exiting_name;
+
+/// The expression that reads the part of the active configuration a
+/// transition with this `lca` can change, for `Outcome::Transitioned { changed }`
+/// (ADR 0006, ADR 0013 item 5): the leaf of its region when the transition
+/// stays inside one, the leaf id when the machine has no parallel state, else
+/// the whole `path()`, which sees the regions of a parallel state a leaf id
+/// cannot (it names the parallel state itself).
+pub fn configuration_probe(
+    generation: &Generation<'_>,
+    handler_state: StateId,
+    lca: StateId,
+) -> TokenStream {
+    let tree = generation.tree;
+    let root = generation.root;
+    if let Some(region) = tree
+        .region_of(handler_state)
+        .filter(|&region| tree.is_ancestor_or_self(region, lca))
+    {
+        let function = super::regions::region_leaf_function(generation, region);
+        return quote! { #function(slot) };
+    }
+    if tree.has_parallel() {
+        quote! { <#root as __estado_core::Spec>::path(slot.live_mut()) }
+    } else {
+        quote! { <#root as __estado_core::Spec>::state_id(slot.live_mut()) }
+    }
+}
 
 /// The edge enums of every handler that has a `goto!`.
 pub fn edge_items(generation: &Generation<'_>) -> TokenStream {
@@ -35,13 +65,6 @@ pub fn edge_items(generation: &Generation<'_>) -> TokenStream {
 fn constructor_parameter(goto: &GotoOccurrence) -> Ident {
     let variant = goto.variant.to_string();
     format_ident!("{}Constructor", variant.trim_start_matches("To"))
-}
-
-/// `Root::PLAYING`.
-fn state_constant(generation: &Generation<'_>, node: StateId) -> TokenStream {
-    let root = generation.root;
-    let constant = format_ident!("{}", state_constant_name(&generation.tree.node(node).name));
-    quote! { #root::#constant }
 }
 
 /// The type of the value of the child of `lca`: its children enum.
@@ -126,12 +149,12 @@ fn edge_enum(generation: &Generation<'_>, handler: &HandlerModel) -> TokenStream
             #(#variants,)*
         }
 
-        impl<#(#bounds),*> ::estado_core::Edge<#root> for #name #generics {
-            const TARGETS: &'static [::estado_core::StateId] = &[#(#targets),*];
+        impl<#(#bounds),*> __estado_core::Edge<#root> for #name #generics {
+            const TARGETS: &'static [__estado_core::StateId] = &[#(#targets),*];
 
             fn apply<#sink_parameter>(
                 self,
-                slot: &mut ::estado_core::Slot<#root>,
+                slot: &mut __estado_core::Slot<#root>,
                 cx: &mut #cx_type,
             ) -> bool {
                 match self {
@@ -180,26 +203,16 @@ fn apply_arm(
     handler_state: StateId,
 ) -> TokenStream {
     let tree = generation.tree;
-    let root = generation.root;
     let variant = &goto.variant;
-    // Inside a region the active leaf is the region's, not the machine's.
-    let leaf = match tree
-        .region_of(handler_state)
-        .filter(|&region| tree.is_ancestor_or_self(region, goto.lca))
-    {
-        Some(region) => {
-            let function = super::regions::region_leaf_function(generation, region);
-            quote! { #function(slot) }
-        }
-        None => quote! { <#root as ::estado_core::Spec>::state_id(slot.live_mut()) },
-    };
-    let before = goto
-        .compares_leaf
-        .then(|| quote! { let leaf_before = #leaf; });
-    let changed = if goto.compares_leaf {
-        quote! { #leaf != leaf_before }
+    let (before, changed) = if goto.compares_leaf {
+        let configuration = configuration_probe(generation, handler_state, goto.lca);
+        let before = quote! { let configuration_before = #configuration; };
+        (
+            Some(before),
+            quote! { #configuration != configuration_before },
+        )
     } else {
-        quote! { true }
+        (None, quote! { true })
     };
     let exit = exit_function(tree, goto.lca);
     let enter = enter_function(tree, goto.lca);
@@ -291,35 +304,21 @@ fn exiting_conversion(generation: &Generation<'_>, exiting: StateId) -> TokenStr
             // The substate moves into the history; the constructor gets the rest.
             let payload = payload_binding(tree, exiting);
             let record = super::history::record_deep(generation, exiting, &quote! { #payload });
-            let shared = tree.shared_fields(exiting);
-            let pairs = shared
-                .iter()
-                .filter_map(|field| field.ident.as_ref())
-                .map(|name| {
-                    let binding = super::naming::field_binding(tree, exiting, &name.to_string());
-                    quote! { #name: #binding }
-                });
+            let pairs = shared_field_pairs(generation, exiting);
             let struct_name = state.composite_struct.as_ref().expect("a compound");
-            let remaining = format_ident!("{}Exiting", struct_name);
+            let remaining = exiting_name(struct_name);
             quote! { { #record #remaining { #(#pairs),* } } }
         }
         Payload::Newtype(_) => {
             let payload = payload_binding(tree, exiting);
             quote! { #payload }
         }
-        Payload::Struct(fields) => {
-            let pairs = fields
-                .iter()
-                .filter_map(|field| field.ident.as_ref())
-                .map(|name| {
-                    let binding = super::naming::field_binding(tree, exiting, &name.to_string());
-                    quote! { #name: #binding }
-                });
+        Payload::Struct(_) => {
+            let pairs = struct_field_pairs(generation, exiting);
             quote! { #structure { #(#pairs),* } }
         }
-        Payload::Tuple(fields) => {
-            let names = (0..fields.len())
-                .map(|index| super::naming::field_binding(tree, exiting, &index.to_string()));
+        Payload::Tuple(_) => {
+            let names = tuple_field_bindings(generation, exiting);
             quote! { #structure(#(#names),*) }
         }
         Payload::Unit | Payload::None => quote! { () },

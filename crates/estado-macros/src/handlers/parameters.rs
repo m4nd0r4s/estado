@@ -9,6 +9,7 @@ use syn::{FnArg, Ident, ImplItemFn, Type};
 use crate::model::{
     Diagnostic, HandlerParameter, HandlerRole, Payload, StateId, StateKind, StateTree,
 };
+use crate::naming::plain_name;
 
 /// The parameters of one function.
 pub struct ParameterList {
@@ -18,6 +19,9 @@ pub struct ParameterList {
     pub context_index: Option<usize>,
     /// Index of the event parameter, if any.
     pub event_index: Option<usize>,
+    /// The names the handler binds the data of its state, its view and the
+    /// `*Fields` of its ancestors to: a constructor cannot use them (E0046).
+    pub borrowed_names: Vec<Ident>,
 }
 
 /// What the recognition needs to know about the function.
@@ -59,6 +63,7 @@ pub fn classify_parameters(
         parameters: Vec::new(),
         context_index: None,
         event_index: None,
+        borrowed_names: Vec::new(),
     };
     let mut last_key: Option<(u8, usize)> = None;
     for (index, argument) in function.sig.inputs.iter().enumerate() {
@@ -103,6 +108,16 @@ pub fn classify_parameters(
             continue;
         }
         last_key = Some(key);
+        if matches!(
+            recognised.parameter,
+            HandlerParameter::OwnData { .. }
+                | HandlerParameter::OwnView
+                | HandlerParameter::Fields { .. }
+        ) {
+            if let syn::Pat::Ident(binding) = &*typed.pat {
+                list.borrowed_names.push(binding.ident.clone());
+            }
+        }
         match recognised.parameter {
             HandlerParameter::Context => list.context_index = Some(index),
             HandlerParameter::Event => list.event_index = Some(index),
@@ -322,7 +337,8 @@ fn recognise_view(
 
     if let Some(variant) = written.strip_suffix("Mut") {
         let owner = tree.nodes.iter().skip(1).find(|node| {
-            node.name == variant && matches!(node.payload, Payload::Struct(_) | Payload::Tuple(_))
+            plain_name(&node.name) == variant
+                && matches!(node.payload, Payload::Struct(_) | Payload::Tuple(_))
         });
         if let Some(owner) = owner {
             if owner.id != environment.state {

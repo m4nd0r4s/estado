@@ -1,13 +1,10 @@
 //! The role attributes of the functions of a `#[handlers]` impl (spec 6.1):
 //! `#[on(S)]`, `#[entry(S)]`, `#[exit(S)]`, `#[always(S)]`, `#[on_done(S)]`.
 
-use syn::spanned::Spanned;
 use syn::{Attribute, Ident, ImplItemFn};
 
-use crate::model::{Diagnostic, HandlerRole};
-
-/// Facade crates an attribute may be qualified with (`#[estado::on(..)]`).
-const FACADE_CRATES: [&str; 2] = ["estado", "estado_macros"];
+use crate::model::{Diagnostic, Extent, HandlerRole};
+use crate::naming::facade_name;
 
 /// Attributes that are part of the macro language but not supported yet.
 const UNSUPPORTED_ROLES: [&str; 6] = [
@@ -38,18 +35,7 @@ pub enum FunctionRole {
 }
 
 fn attribute_name(attribute: &Attribute) -> Option<String> {
-    let path = attribute.path();
-    let segment = match path.segments.len() {
-        1 => &path.segments[0],
-        2 if FACADE_CRATES
-            .iter()
-            .any(|facade| path.segments[0].ident == facade) =>
-        {
-            &path.segments[1]
-        }
-        _ => return None,
-    };
-    Some(segment.ident.to_string())
+    facade_name(attribute.path()).map(ToString::to_string)
 }
 
 fn role_of(name: &str) -> Option<HandlerRole> {
@@ -61,6 +47,35 @@ fn role_of(name: &str) -> Option<HandlerRole> {
         "always" => HandlerRole::Always,
         _ => return None,
     })
+}
+
+/// Removes the role attributes (`#[on]`, `#[entry]`, ..) from an item that
+/// is not a function, reporting each one: left in place, rustc would say
+/// "cannot find attribute `on` in this scope" and nothing more.
+pub fn reject_role_attributes(
+    attributes: &mut Vec<Attribute>,
+    item: &str,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    attributes.retain(|attribute| {
+        let Some(name) = attribute_name(attribute) else {
+            return true;
+        };
+        if role_of(&name).is_none() && !UNSUPPORTED_ROLES.contains(&name.as_str()) {
+            return true;
+        }
+        diagnostics.push(
+            Diagnostic::new(
+                "E0017",
+                Extent::of(attribute),
+                format!("`#[{name}]` must be on a function, not on {item}"),
+            )
+            .with_help(
+                "handlers, entries, exits and the like are functions of the `#[handlers]` impl",
+            ),
+        );
+        false
+    });
 }
 
 /// Reads and removes the role attributes of `function`.
@@ -75,7 +90,7 @@ pub fn take_role(function: &mut ImplItemFn, diagnostics: &mut Vec<Diagnostic>) -
             diagnostics.push(
                 Diagnostic::new(
                     "E0090",
-                    attribute.path().span(),
+                    Extent::of(attribute),
                     format!("`#[{name}]` is not supported yet by this version of `estado`"),
                 )
                 .with_help("it is part of the planned macro language (spec 6.1)"),

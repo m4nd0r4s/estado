@@ -7,7 +7,7 @@ use syn::spanned::Spanned;
 use syn::{BinOp, Expr, ExprClosure, Ident, Token};
 
 use crate::construct::SuppliedData;
-use crate::model::Diagnostic;
+use crate::model::{Diagnostic, Extent};
 
 /// Code for a malformed transition (not in the spec table).
 pub const MALFORMED_TRANSITION: &str = "E0043";
@@ -41,7 +41,7 @@ pub struct GotoSyntax {
     pub extra: GotoExtra,
 }
 
-fn malformed(span: proc_macro2::Span, message: impl Into<String>) -> Diagnostic {
+fn malformed(span: impl Into<Extent>, message: impl Into<String>) -> Diagnostic {
     Diagnostic::new(MALFORMED_TRANSITION, span, message).with_help(
         "write `goto!(State)`, `goto!(State { field: value })`, `goto!(State(value))`, \
          `goto!(Outer { .. } / Inner { .. })`, `goto!(State, external)`, \
@@ -50,7 +50,7 @@ fn malformed(span: proc_macro2::Span, message: impl Into<String>) -> Diagnostic 
 }
 
 /// Parses the tokens inside `goto!(..)`.
-pub fn parse_goto(tokens: TokenStream) -> Result<GotoSyntax, Diagnostic> {
+pub fn parse_goto(tokens: TokenStream, macro_extent: Extent) -> Result<GotoSyntax, Diagnostic> {
     let arguments = syn::parse::Parser::parse2(
         Punctuated::<Expr, Token![,]>::parse_terminated,
         tokens.clone(),
@@ -58,10 +58,7 @@ pub fn parse_goto(tokens: TokenStream) -> Result<GotoSyntax, Diagnostic> {
     .map_err(|error| malformed(error.span(), format!("cannot read this `goto!`: {error}")))?;
     let mut arguments = arguments.into_iter();
     let Some(target) = arguments.next() else {
-        return Err(malformed(
-            proc_macro2::Span::call_site(),
-            "`goto!` needs a target state",
-        ));
+        return Err(malformed(macro_extent, "`goto!` needs a target state"));
     };
     let mut levels = Vec::new();
     flatten_path(&target, &mut levels)?;

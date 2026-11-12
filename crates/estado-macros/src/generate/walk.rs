@@ -20,6 +20,49 @@ pub enum Binding {
     Everything,
 }
 
+/// `pos: playing_pos` for every named field of the struct-like variant
+/// `node`: the fields of a pattern, or of an expression built from the
+/// bindings of that pattern.
+pub fn struct_field_pairs(generation: &Generation<'_>, node: StateId) -> Vec<TokenStream> {
+    let tree = generation.tree;
+    let Payload::Struct(fields) = &tree.node(node).payload else {
+        return Vec::new();
+    };
+    fields
+        .iter()
+        .filter_map(|field| field.ident.as_ref())
+        .map(|name| {
+            let binding = field_binding(tree, node, &name.to_string());
+            quote! { #name: #binding }
+        })
+        .collect()
+}
+
+/// The bindings of the fields of the tuple variant `node`: `playing_0`, ..
+pub fn tuple_field_bindings(generation: &Generation<'_>, node: StateId) -> Vec<Ident> {
+    let tree = generation.tree;
+    let Payload::Tuple(fields) = &tree.node(node).payload else {
+        return Vec::new();
+    };
+    (0..fields.len())
+        .map(|index| field_binding(tree, node, &index.to_string()))
+        .collect()
+}
+
+/// `track: active_track` for every shared field of the compound or parallel
+/// state `node` (its struct without `#[substates]` and `#[region]` fields).
+pub fn shared_field_pairs(generation: &Generation<'_>, node: StateId) -> Vec<TokenStream> {
+    let tree = generation.tree;
+    tree.shared_fields(node)
+        .iter()
+        .filter_map(|field| field.ident.as_ref())
+        .map(|name| {
+            let binding = field_binding(tree, node, &name.to_string());
+            quote! { #name: #binding }
+        })
+        .collect()
+}
+
 fn variant_path(generation: &Generation<'_>, node: StateId) -> TokenStream {
     let state = generation.tree.node(node);
     let owner = state.owner_enum.as_ref().expect("a variant has an owner");
@@ -45,19 +88,12 @@ pub fn variant_pattern(
             let payload = payload_binding(tree, node);
             quote! { #path(#payload) }
         }
-        (Payload::Tuple(fields), Binding::Everything) => {
-            let names =
-                (0..fields.len()).map(|index| field_binding(tree, node, &index.to_string()));
+        (Payload::Tuple(_), Binding::Everything) => {
+            let names = tuple_field_bindings(generation, node);
             quote! { #path(#(#names),*) }
         }
-        (Payload::Struct(fields), Binding::Everything) => {
-            let pairs = fields
-                .iter()
-                .filter_map(|field| field.ident.as_ref())
-                .map(|name| {
-                    let binding = field_binding(tree, node, &name.to_string());
-                    quote! { #name: #binding }
-                });
+        (Payload::Struct(_), Binding::Everything) => {
+            let pairs = struct_field_pairs(generation, node);
             quote! { #path { #(#pairs),* } }
         }
     }
@@ -69,32 +105,34 @@ pub fn own_view(generation: &Generation<'_>, node: StateId) -> TokenStream {
     let tree = generation.tree;
     let view = view_type(tree, node);
     match &tree.node(node).payload {
-        Payload::Struct(fields) => {
-            let pairs = fields
-                .iter()
-                .filter_map(|field| field.ident.as_ref())
-                .map(|name| {
-                    let binding = field_binding(tree, node, &name.to_string());
-                    quote! { #name: #binding }
-                });
+        Payload::Struct(_) => {
+            let pairs = struct_field_pairs(generation, node);
             quote! { #view { #(#pairs),* } }
         }
-        Payload::Tuple(fields) => {
-            let names =
-                (0..fields.len()).map(|index| field_binding(tree, node, &index.to_string()));
+        Payload::Tuple(_) => {
+            let names = tuple_field_bindings(generation, node);
             quote! { #view(#(#names),*) }
         }
         _ => quote! { () },
     }
 }
 
+/// How a call hands the `*Fields` bindings of the ancestors to a user function.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum FieldsAccess {
+    /// The binding itself: the call is the last use of the view.
+    Binding,
+    /// `binding.reborrow()`: the view is used again afterwards.
+    Reborrow,
+}
+
 /// The arguments of a call to a user function, in the order of its
-/// parameters. `fields` gives the expression for the `*Fields` view of a
-/// compound state; the own data comes from the bindings of the variant.
+/// parameters. The own data comes from the bindings of the variant, the
+/// `*Fields` views of the ancestors from their bindings.
 pub fn handler_arguments(
     generation: &Generation<'_>,
     handler: &HandlerModel,
-    fields: &dyn Fn(StateId) -> TokenStream,
+    fields: FieldsAccess,
     output: Option<&TokenStream>,
 ) -> Vec<TokenStream> {
     handler
@@ -106,7 +144,13 @@ pub fn handler_arguments(
                 quote! { #payload }
             }
             HandlerParameter::OwnView => own_view(generation, handler.state),
-            HandlerParameter::Fields { ancestor } => fields(*ancestor),
+            HandlerParameter::Fields { ancestor } => {
+                let binding = fields_binding(generation.tree, *ancestor);
+                match fields {
+                    FieldsAccess::Binding => quote! { #binding },
+                    FieldsAccess::Reborrow => quote! { #binding.reborrow() },
+                }
+            }
             HandlerParameter::Output => output
                 .cloned()
                 .unwrap_or_else(|| quote! { ::core::unreachable!("no output here") }),
@@ -120,7 +164,7 @@ pub fn handler_arguments(
 pub fn call_handler(
     generation: &Generation<'_>,
     handler: &HandlerModel,
-    fields: &dyn Fn(StateId) -> TokenStream,
+    fields: FieldsAccess,
     output: Option<&TokenStream>,
 ) -> TokenStream {
     let root = generation.root;
@@ -154,31 +198,80 @@ pub struct Walk {
     pub children: Ident,
 }
 
+/// `let (mut fields, substates) = payload.__estado_split();` for a compound
+/// state, `let (mut fields, region, ..) = ..` for a parallel one: the split
+/// borrow of the struct bound as `payload`.
+pub fn split_payload(generation: &Generation<'_>, node: StateId) -> TokenStream {
+    let tree = generation.tree;
+    let payload = payload_binding(tree, node);
+    let fields = fields_binding(tree, node);
+    let parts: Vec<Ident> = tree
+        .children_owners(node)
+        .into_iter()
+        .map(|owner| children_binding(tree, owner))
+        .collect();
+    quote! { let (mut #fields, #(#parts),*) = #payload.__estado_split(); }
+}
+
 /// The statement that destructures the variant of `node` and splits its
-/// borrow: `(fields, substates)` of a compound, `(fields, region, ..)` of a
-/// parallel state.
+/// borrow.
 fn split_statement(
     generation: &Generation<'_>,
     node: StateId,
     scrutinee: &TokenStream,
 ) -> TokenStream {
-    let tree = generation.tree;
-    let state = tree.node(node);
+    let state = generation.tree.node(node);
     let pattern = variant_pattern(generation, node, Binding::Everything);
-    let payload = payload_binding(tree, node);
-    let fields = fields_binding(tree, node);
     let message = format!("`{}` is active", state.name);
-    let parts: Vec<Ident> = match state.kind {
-        StateKind::Parallel => state
-            .children
-            .iter()
-            .map(|&region| children_binding(tree, region))
-            .collect(),
-        _ => vec![children_binding(tree, node)],
-    };
+    let split = split_payload(generation, node);
     quote! {
         let #pattern = #scrutinee else { ::core::unreachable!(#message) };
-        let (mut #fields, #(#parts),*) = #payload.split();
+        #split
+    }
+}
+
+/// A function `name(slot, cx) -> Outcome` that walks to the state `node`,
+/// binds its variant (and its split borrow when it has substates or regions)
+/// and runs `body` there. `Stayed` when `node` is not active. Used for the
+/// `#[always]` and `#[on_done]` handlers, which run on a state and not on an
+/// event.
+pub fn state_function(
+    generation: &Generation<'_>,
+    node: StateId,
+    name: &Ident,
+    documentation: &str,
+    body: TokenStream,
+) -> TokenStream {
+    let tree = generation.tree;
+    let root = generation.root;
+    let sink_parameter = generation.sink_parameter();
+    let cx_type = generation.cx_type();
+    let parent = tree.node(node).parent.unwrap_or(0);
+    let walk = borrowed_walk(generation, parent);
+    let prelude = &walk.prelude;
+    let children = &walk.children;
+    let pattern = variant_pattern(generation, node, Binding::Everything);
+    let split = matches!(
+        tree.node(node).kind,
+        StateKind::Compound | StateKind::Parallel
+    )
+    .then(|| split_payload(generation, node));
+    quote! {
+        #[doc = #documentation]
+        pub fn #name<#sink_parameter>(
+            slot: &mut __estado_core::Slot<#root>,
+            cx: &mut #cx_type,
+        ) -> __estado_core::Outcome {
+            #prelude
+            match #children {
+                #pattern => {
+                    #split
+                    #body
+                }
+                #[allow(unreachable_patterns)]
+                _ => __estado_core::Outcome::Stayed,
+            }
+        }
     }
 }
 
@@ -269,15 +362,7 @@ fn owned_levels(
     let tree = generation.tree;
     let state = tree.node(node);
     let struct_name = state.composite_struct.as_ref().expect("a composite state");
-    let shared = tree.shared_fields(node);
-    let mut pairs: Vec<TokenStream> = shared
-        .iter()
-        .filter_map(|field| field.ident.as_ref())
-        .map(|name| {
-            let binding = field_binding(tree, node, &name.to_string());
-            quote! { #name: #binding }
-        })
-        .collect();
+    let mut pairs = shared_field_pairs(generation, node);
     if state.kind == StateKind::Parallel {
         let on_path = rest.first().copied();
         let below = owned_levels(generation, rest.get(1..).unwrap_or(&[]), innermost);

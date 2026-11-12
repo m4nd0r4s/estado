@@ -4,20 +4,12 @@
 use std::collections::HashSet;
 
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote};
+use quote::quote;
 
 use super::context::Generation;
-use super::naming::payload_binding;
+use super::naming::{payload_binding, state_constant};
 use super::walk::{Binding, variant_pattern};
 use crate::model::{HandlerRole, HistoryKind, StateId, StateKind, TransitionKind};
-use crate::naming::state_constant_name;
-
-/// `Root::PLAYING`.
-fn constant(generation: &Generation<'_>, node: StateId) -> TokenStream {
-    let root = generation.root;
-    let name = format_ident!("{}", state_constant_name(&generation.tree.node(node).name));
-    quote! { #root::#name }
-}
 
 /// `STATES`, `EDGES` and `GRAPH`.
 pub fn graph_items(generation: &Generation<'_>) -> TokenStream {
@@ -25,11 +17,11 @@ pub fn graph_items(generation: &Generation<'_>) -> TokenStream {
     let root_name = generation.root.to_string();
     let count = tree.nodes.len() - 1;
     let states = tree.nodes.iter().skip(1).map(|node| {
-        let id = constant(generation, node.id);
-        let name = node.name.to_string();
+        let id = state_constant(generation, node.id);
+        let name = crate::naming::plain_name(&node.name);
         let parent = match node.parent {
             Some(parent) if parent != 0 => {
-                let parent = constant(generation, parent);
+                let parent = state_constant(generation, parent);
                 quote! { ::core::option::Option::Some(#parent) }
             }
             _ => quote! { ::core::option::Option::None },
@@ -43,13 +35,13 @@ pub fn graph_items(generation: &Generation<'_>) -> TokenStream {
         };
         let depth = node.depth;
         let initial = node.initial.map(|initial| {
-            let initial = constant(generation, initial);
+            let initial = state_constant(generation, initial);
             quote! { .with_initial(#initial) }
         });
         let history = match node.history {
             HistoryKind::None => None,
-            HistoryKind::Shallow => Some(quote! { .with_history(::estado_core::HistoryKind::Shallow) }),
-            HistoryKind::DeepKeep => Some(quote! { .with_history(::estado_core::HistoryKind::DeepKeep) }),
+            HistoryKind::Shallow => Some(quote! { .with_history(__estado_core::HistoryKind::Shallow) }),
+            HistoryKind::DeepKeep => Some(quote! { .with_history(__estado_core::HistoryKind::DeepKeep) }),
         };
         let tasks = (!node.timers.is_empty() || !node.invokes.is_empty()).then(|| {
             let timers = u8::try_from(node.timers.len()).unwrap_or(u8::MAX);
@@ -57,7 +49,7 @@ pub fn graph_items(generation: &Generation<'_>) -> TokenStream {
             quote! { .with_tasks(#timers, #invokes) }
         });
         quote! {
-            ::estado_core::StateInfo::new(#id, #name, #parent, ::estado_core::StateKind::#kind, #depth)
+            __estado_core::StateInfo::new(#id, #name, #parent, __estado_core::StateKind::#kind, #depth)
                 #initial #history #tasks
         }
     });
@@ -66,8 +58,8 @@ pub fn graph_items(generation: &Generation<'_>) -> TokenStream {
     let mut edges = Vec::new();
     for handler in &generation.model.analysed_handlers {
         for goto in &handler.gotos {
-            let from = constant(generation, handler.state);
-            let to = constant(generation, goto.target);
+            let from = state_constant(generation, handler.state);
+            let to = state_constant(generation, goto.target);
             let is_timer = handler.role == HandlerRole::On
                 && goto.event_hint.as_ref().is_some_and(|hint| {
                     generation
@@ -89,17 +81,20 @@ pub fn graph_items(generation: &Generation<'_>) -> TokenStream {
                 || quote! { ::core::option::Option::None },
                 |hint| quote! { ::core::option::Option::Some(#hint) },
             );
+            // Two edges are the same only when everything the graph says about
+            // them is: `goto!(T)` and `goto!(T, history)` in one arm are two.
             if seen.insert((
                 handler.state,
                 goto.target,
                 goto.event_hint.clone(),
-                goto.kind == TransitionKind::External,
+                handler.role,
+                goto.kind,
             )) {
                 edges.push(quote! {
-                    ::estado_core::EdgeInfo {
+                    __estado_core::EdgeInfo {
                         from: #from,
-                        to: ::estado_core::EdgeTarget::State(#to),
-                        kind: ::estado_core::EdgeKind::#kind,
+                        to: __estado_core::EdgeTarget::State(#to),
+                        kind: __estado_core::EdgeKind::#kind,
                         event_hint: #hint,
                     }
                 });
@@ -107,10 +102,10 @@ pub fn graph_items(generation: &Generation<'_>) -> TokenStream {
         }
     }
     quote! {
-        static STATES: [::estado_core::StateInfo; #count] = [ #(#states),* ];
+        static STATES: [__estado_core::StateInfo; #count] = [ #(#states),* ];
 
         /// The static graph: the exact union of the edges of the handlers (spec 6.3).
-        pub static GRAPH: ::estado_core::Graph = ::estado_core::Graph {
+        pub static GRAPH: __estado_core::Graph = __estado_core::Graph {
             machine: #root_name,
             states: &STATES,
             edges: &[ #(#edges),* ],
@@ -145,7 +140,7 @@ fn timer_event_hint(expression: &syn::Expr) -> Option<String> {
 pub fn path_body(generation: &Generation<'_>) -> TokenStream {
     let arms = path_arms(generation, 0);
     quote! {
-        let mut path = ::estado_core::StatePath::new(&GRAPH);
+        let mut path = __estado_core::StatePath::new(&GRAPH);
         match self { #arms }
         path
     }
@@ -154,7 +149,7 @@ pub fn path_body(generation: &Generation<'_>) -> TokenStream {
 fn path_arms(generation: &Generation<'_>, owner: StateId) -> TokenStream {
     let tree = generation.tree;
     let arms = tree.node(owner).children.iter().map(|&child| {
-        let id = constant(generation, child);
+        let id = state_constant(generation, child);
         match tree.node(child).kind {
             StateKind::Compound => {
                 let pattern = variant_pattern(generation, child, Binding::Everything);
@@ -167,7 +162,7 @@ fn path_arms(generation: &Generation<'_>, owner: StateId) -> TokenStream {
                 let pattern = variant_pattern(generation, child, Binding::Everything);
                 let payload = payload_binding(tree, child);
                 let regions = tree.node(child).children.iter().map(|&region| {
-                    let region_id = constant(generation, region);
+                    let region_id = state_constant(generation, region);
                     let field = tree.node(region).children_field.as_ref().expect("region");
                     let inner = path_arms_over(generation, region, quote! { &#payload.#field });
                     quote! { path.push(#region_id); #inner }
@@ -208,7 +203,7 @@ pub fn leaf_arms(generation: &Generation<'_>, owner: StateId) -> TokenStream {
             let inner = leaf_arms(generation, child);
             quote! { #pattern => match &#payload.#field { #inner }, }
         } else {
-            let id = constant(generation, child);
+            let id = state_constant(generation, child);
             let pattern = variant_pattern(generation, child, Binding::Nothing);
             quote! { #pattern => #id, }
         }

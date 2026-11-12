@@ -11,6 +11,7 @@ use syn::{Field, Visibility};
 use super::context::Generation;
 use super::naming::{exiting_struct, fields_type, ref_view_type, view_type};
 use crate::model::{GotoForm, HistoryKind, Payload, StateId, StateKind};
+use crate::naming::exiting_name;
 
 /// Every view of the machine.
 pub fn view_items(generation: &Generation<'_>) -> TokenStream {
@@ -93,6 +94,9 @@ fn fields_view(generation: &Generation<'_>, node: StateId) -> TokenStream {
         .filter_map(|field| field.ident.as_ref())
         .collect();
     let types: Vec<_> = shared.iter().map(|field| &field.ty).collect();
+    // A view never widens what the struct hides: each field keeps its own
+    // visibility (ADR 0013 item 9).
+    let field_visibilities: Vec<_> = shared.iter().map(|field| &field.vis).collect();
     let documentation = format!(
         "The fields of [`{struct_name}`] without its `#[substates]` or `#[region]` fields: the split borrow of ADR 0007."
     );
@@ -101,7 +105,7 @@ fn fields_view(generation: &Generation<'_>, node: StateId) -> TokenStream {
         .map(|name| format!("`{struct_name}::{name}`."))
         .collect();
     let marker = if names.is_empty() {
-        quote! { #[doc(hidden)] pub _lifetime: ::core::marker::PhantomData<&'a mut ()>, }
+        quote! { #[doc(hidden)] _lifetime: ::core::marker::PhantomData<&'a mut ()>, }
     } else {
         TokenStream::new()
     };
@@ -113,7 +117,7 @@ fn fields_view(generation: &Generation<'_>, node: StateId) -> TokenStream {
     quote! {
         #[doc = #documentation]
         #visibility struct #view<'a> {
-            #( #[doc = #field_docs] pub #names: &'a mut #types, )*
+            #( #[doc = #field_docs] #field_visibilities #names: &'a mut #types, )*
             #marker
         }
 
@@ -126,7 +130,9 @@ fn fields_view(generation: &Generation<'_>, node: StateId) -> TokenStream {
 
         impl #struct_name {
             /// Splits the borrow: the shared fields, then the substates or the regions.
-            pub fn split(&mut self) -> (#view<'_>, #(&mut #children_enums),*) {
+            #[doc(hidden)]
+            #[allow(dead_code)]
+            fn __estado_split(&mut self) -> (#view<'_>, #(&mut #children_enums),*) {
                 let Self { #(#names,)* #(#children_fields,)* } = self;
                 (#view { #(#names,)* #marker_value }, #(#children_fields),*)
             }
@@ -186,11 +192,13 @@ fn ref_view(generation: &Generation<'_>, node: StateId, fields: &[Field]) -> Tok
             .collect();
         quote! {
             #[doc = #documentation]
+            #[doc(hidden)]
             #visibility struct #view<'a> { #( #[doc = #docs] pub #names: &'a #types, )* }
         }
     } else {
         quote! {
             #[doc = #documentation]
+            #[doc(hidden)]
             #visibility struct #view<'a>( #( pub &'a #types, )* );
         }
     }
@@ -222,7 +230,7 @@ fn exiting_structs(generation: &Generation<'_>) -> TokenStream {
                         .composite_struct
                         .as_ref()
                         .expect("compound");
-                    let name = quote::format_ident!("{}Exiting", struct_name);
+                    let name = exiting_name(struct_name);
                     let shared = tree.shared_fields(exiting);
                     let names: Vec<_> = shared
                         .iter()

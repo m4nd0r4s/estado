@@ -10,7 +10,7 @@ use syn::{Expr, ExprClosure, Ident, Pat, PatType, Type};
 use super::goto_syntax::{GotoExtra, GotoSyntax, LevelSyntax, MALFORMED_TRANSITION};
 use crate::construct::{MissingData, SuppliedData, initial_value, variant_value};
 use crate::model::{
-    Diagnostic, HistoryKind, Payload, StateId, StateKind, StateTree, TransitionKind,
+    Diagnostic, Extent, HistoryKind, Payload, StateId, StateKind, StateTree, TransitionKind,
 };
 use crate::suggest::did_you_mean;
 
@@ -45,7 +45,7 @@ pub fn resolve_goto(
     tree: &StateTree,
     handler_state: StateId,
     syntax: GotoSyntax,
-    macro_span: Span,
+    macro_span: Extent,
     exiting_type: &dyn Fn(StateId) -> TokenStream,
 ) -> Result<ResolvedGoto, Diagnostic> {
     let chain = resolve_names(tree, &syntax.levels)?;
@@ -102,7 +102,7 @@ pub fn resolve_goto(
     })
 }
 
-fn malformed(span: Span, message: impl Into<String>) -> Diagnostic {
+fn malformed(span: impl Into<Extent>, message: impl Into<String>) -> Diagnostic {
     Diagnostic::new(MALFORMED_TRANSITION, span, message)
 }
 
@@ -217,7 +217,7 @@ fn exiting_child(
     handler: StateId,
     lca: StateId,
     target: StateId,
-    macro_span: Span,
+    macro_span: Extent,
 ) -> Result<StateId, Diagnostic> {
     tree.ancestors(handler)
         .into_iter()
@@ -308,7 +308,7 @@ fn build_value(
     target: StateId,
     chain: &[StateId],
     levels: Vec<LevelSyntax>,
-    macro_span: Span,
+    macro_span: Extent,
 ) -> Result<Expr, Diagnostic> {
     let target_name = tree.node(target).name.clone();
     // The levels that are built: below the LCA, down to the target. When the
@@ -378,7 +378,7 @@ pub fn missing_data_error(
     tree: &StateTree,
     missing: &MissingData,
     target: &Ident,
-    macro_span: Span,
+    macro_span: Extent,
 ) -> Diagnostic {
     let node = tree.node(missing.node);
     let list = missing

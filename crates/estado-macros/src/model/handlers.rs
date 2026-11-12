@@ -54,7 +54,7 @@ pub enum GotoForm {
 }
 
 /// The flavour of a transition, for the graph and for entry resolution.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum TransitionKind {
     /// Plain `goto!(T)` (local or external by geometry, table 5.2).
     Normal,

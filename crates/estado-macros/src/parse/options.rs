@@ -14,7 +14,7 @@ use crate::suggest::did_you_mean;
 const INVALID_OPTION: &str = "E0016";
 
 /// Every option name, for the "did you mean" help.
-const OPTION_NAMES: [&str; 14] = [
+const OPTION_NAMES: [&str; 15] = [
     "event",
     "effect",
     "ctx",
@@ -27,6 +27,7 @@ const OPTION_NAMES: [&str; 14] = [
     "size_warn",
     "typestate",
     "infallible",
+    "tracks_active",
     "version",
     "allow",
 ];
@@ -111,10 +112,16 @@ fn parse_one_option(
             }
         }
         "defer_cap" => {
-            options.defer_cap = parse_number(meta, diagnostics, name)?.unwrap_or(options.defer_cap)
+            options.defer_cap = parse_number(meta, diagnostics, name)?.unwrap_or(options.defer_cap);
+            options.defer_cap_given = true;
         }
         "raise_cap" => {
-            options.raise_cap = parse_number(meta, diagnostics, name)?.unwrap_or(options.raise_cap)
+            options.raise_cap = parse_number(meta, diagnostics, name)?.unwrap_or(options.raise_cap);
+            options.raise_cap_given = true;
+        }
+        "tracks_active" => {
+            options.tracks_active =
+                parse_flag(meta, diagnostics, name)?.unwrap_or(options.tracks_active)
         }
         "fx_inline" => {
             options.fx_inline = parse_number(meta, diagnostics, name)?.unwrap_or(options.fx_inline)
@@ -243,7 +250,7 @@ mod tests {
         let (options, diagnostics) = parse_options(quote! {
             event = Ev, effect = Cmd, ctx = Env, unhandled = panic, defer_cap = 3,
             defer_overflow = drop_oldest, raise_cap = 5, fx_inline = 2, max_microsteps = 10,
-            size_warn = 64, typestate, infallible, version = 7, allow(W0001, W0004)
+            size_warn = 64, typestate, infallible, tracks_active, version = 7, allow(W0001, W0004)
         });
         assert!(diagnostics.is_empty());
         assert!(options.event_declared);
@@ -256,7 +263,8 @@ mod tests {
             (options.max_microsteps, options.size_warn, options.version),
             (10, 64, 7)
         );
-        assert!(options.typestate && options.infallible);
+        assert!(options.typestate && options.infallible && options.tracks_active);
+        assert!(options.raise_cap_given && options.defer_cap_given);
         assert_eq!(options.allowed_warnings.len(), 2);
     }
 
@@ -265,6 +273,7 @@ mod tests {
         let (options, diagnostics) = parse_options(TokenStream::new());
         assert!(diagnostics.is_empty());
         assert!(!options.event_declared);
+        assert!(!options.tracks_active && !options.raise_cap_given && !options.defer_cap_given);
         assert_eq!(
             (options.defer_cap, options.raise_cap, options.fx_inline),
             (8, 8, 4)

@@ -3,18 +3,21 @@
 //! variant of the handler's edge enum, whatever the nesting (closures,
 //! blocks, match arms).
 
+use std::collections::HashSet;
+
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::spanned::Spanned;
 use syn::visit_mut::{self, VisitMut};
 use syn::{Arm, Block, Expr, ExprMacro, Ident, Macro, Pat, Stmt, parse_quote};
 
+use super::captures::captured_binding;
 use super::goto_resolve::{ResolvedPayload, resolve_goto};
 use super::goto_syntax::parse_goto;
 use crate::construct::exiting_type;
 use crate::model::{
-    Diagnostic, GotoForm, GotoOccurrence, HandlerRole, HandlerUses, StateId, StateTree,
+    Diagnostic, Extent, GotoForm, GotoOccurrence, HandlerRole, HandlerUses, StateId, StateTree,
 };
+use crate::naming::{facade_name, plain_name};
 
 /// How the body is rewritten.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -38,6 +41,8 @@ pub struct BodyEnvironment<'model> {
     pub edges_enum: &'model Ident,
     /// The mode.
     pub mode: BodyMode,
+    /// What the handler borrows by name: a constructor may not use it.
+    pub borrowed_names: &'model [Ident],
 }
 
 /// What the scan found.
@@ -76,14 +81,7 @@ enum TransitionMacro {
 }
 
 fn transition_macro(mac: &Macro) -> Option<TransitionMacro> {
-    let segments = &mac.path.segments;
-    let name = match segments.len() {
-        1 => &segments[0].ident,
-        2 if segments[0].ident == "estado" || segments[0].ident == "estado_macros" => {
-            &segments[1].ident
-        }
-        _ => return None,
-    };
+    let name = facade_name(&mac.path)?;
     Some(match name.to_string().as_str() {
         "goto" => TransitionMacro::Goto,
         "stay" => TransitionMacro::Stay,
@@ -117,23 +115,42 @@ impl BodyRewriter<'_, '_> {
         if matches!(environment.role, HandlerRole::Entry | HandlerRole::Exit) {
             let diagnostic = Diagnostic::new(
                 "E0042",
-                mac.path.span(),
+                Extent::of(mac),
                 "entries and exits cannot transition or return a `Next`",
             )
             .with_help("do the work here and let a handler decide the transition (spec 5.3)");
             return self.fail(diagnostic);
         }
+        let reacts_to_the_state =
+            matches!(environment.role, HandlerRole::Always | HandlerRole::OnDone);
+        if reacts_to_the_state && !matches!(kind, TransitionMacro::Stay | TransitionMacro::Goto) {
+            let name = mac
+                .path
+                .segments
+                .last()
+                .map(|segment| segment.ident.to_string())
+                .unwrap_or_default();
+            let diagnostic = Diagnostic::new(
+                "E0045",
+                Extent::of(mac),
+                format!("`{name}!` has no meaning in `#[always]` and `#[on_done]`"),
+            )
+            .with_help(
+                "these handlers react to their state, not to an event: only `stay!()` and `goto!` are allowed",
+            );
+            return self.fail(diagnostic);
+        }
         match kind {
-            TransitionMacro::Stay => parse_quote!(::estado_core::Next::Stay),
-            TransitionMacro::Bubble => parse_quote!(::estado_core::Next::Bubble),
-            TransitionMacro::Unhandled => parse_quote!(::estado_core::Next::Unhandled),
+            TransitionMacro::Stay => parse_quote!(__estado_core::Next::Stay),
+            TransitionMacro::Bubble => parse_quote!(__estado_core::Next::Bubble),
+            TransitionMacro::Unhandled => parse_quote!(__estado_core::Next::Unhandled),
             TransitionMacro::Defer => {
                 self.report.uses.defer = true;
-                parse_quote!(::estado_core::Next::Defer)
+                parse_quote!(__estado_core::Next::Defer)
             }
             TransitionMacro::Reenter => {
                 self.report.uses.reenter = true;
-                parse_quote!(::estado_core::Next::Reenter)
+                parse_quote!(__estado_core::Next::Reenter)
             }
             TransitionMacro::Goto => self.replace_goto(mac),
         }
@@ -145,8 +162,8 @@ impl BodyRewriter<'_, '_> {
             return parse_quote!(::core::unreachable!());
         }
         let tree = environment.tree;
-        let macro_span = mac.path.span();
-        let syntax = match parse_goto(mac.tokens.clone()) {
+        let macro_span = Extent::of(mac);
+        let syntax = match parse_goto(mac.tokens.clone(), macro_span) {
             Ok(syntax) => syntax,
             Err(diagnostic) => return self.fail(diagnostic),
         };
@@ -168,19 +185,32 @@ impl BodyRewriter<'_, '_> {
             return self.fail(diagnostic);
         }
 
+        if let ResolvedPayload::Constructor { closure, .. } = &resolved.payload {
+            if let Some(captured) = captured_binding(closure, environment.borrowed_names) {
+                let diagnostic = Diagnostic::new(
+                    "E0046",
+                    captured.span(),
+                    format!(
+                        "the constructor of this `goto!` uses `{captured}`, which the handler borrows"
+                    ),
+                )
+                .with_help(
+                    "the constructor runs after the handler returned: copy what it needs \
+                     into a local before the `goto!` and use a `move` closure",
+                )
+                .with_note(macro_span, "the constructor form of this `goto!`");
+                return self.fail(diagnostic);
+            }
+        }
+
         let target_name = tree.node(resolved.target).name.clone();
-        let repeats = self
+        let used: Vec<String> = self
             .report
             .gotos
             .iter()
-            .filter(|occurrence| tree.node(occurrence.target).name == target_name)
-            .count();
-        let variant_name = if repeats == 0 {
-            format!("To{target_name}")
-        } else {
-            format!("To{target_name}{}", repeats + 1)
-        };
-        let variant = Ident::new(&variant_name, target_name.span());
+            .map(|occurrence| occurrence.variant.to_string())
+            .collect();
+        let variant = Ident::new(&variant_name(tree, &target_name, &used), target_name.span());
         let edges = environment.edges_enum;
         let argument: TokenStream = match &resolved.payload {
             ResolvedPayload::Value(value) => quote! { #value },
@@ -199,7 +229,7 @@ impl BodyRewriter<'_, '_> {
             compares_leaf: tree.is_ancestor_or_self(resolved.target, environment.state),
             event_hint: self.current_hint(),
         });
-        parse_quote!(::estado_core::Next::Goto(__estado::#edges::#variant(#argument)))
+        parse_quote!(__estado_core::Next::Goto(__estado::#edges::#variant(#argument)))
     }
 
     fn macro_expression(&mut self, attrs: Vec<syn::Attribute>, mac: &Macro) -> Option<Expr> {
@@ -213,7 +243,7 @@ impl BodyRewriter<'_, '_> {
                 .unwrap_or_default();
             let diagnostic = Diagnostic::new(
                 "E0043",
-                mac.path.span(),
+                Extent::of(mac),
                 format!("`{name}!` takes no arguments"),
             );
             return Some(self.fail(diagnostic));
@@ -266,6 +296,28 @@ impl VisitMut for BodyRewriter<'_, '_> {
         visit_mut::visit_arm_mut(self, arm);
         self.hints.pop();
     }
+}
+
+/// The edge variant of a `goto!` to `target` given the variants the handler
+/// already has: `ToFoo` for the first one, then `ToFoo2`, `ToFoo3`, ... A
+/// numbered name never equals the plain name another state would get
+/// (`ToFoo2` for a state called `Foo2`): that number is skipped (ADR 0013
+/// item 10).
+fn variant_name(tree: &StateTree, target: &Ident, used: &[String]) -> String {
+    let plain = format!("To{}", plain_name(target));
+    if !used.contains(&plain) {
+        return plain;
+    }
+    let state_variants: HashSet<String> = tree
+        .nodes
+        .iter()
+        .skip(1)
+        .map(|node| format!("To{}", plain_name(&node.name)))
+        .collect();
+    (2..)
+        .map(|occurrence| format!("{plain}{occurrence}"))
+        .find(|candidate| !state_variants.contains(candidate) && !used.contains(candidate))
+        .expect("an unused number exists")
 }
 
 fn path_text(path: &syn::Path) -> String {

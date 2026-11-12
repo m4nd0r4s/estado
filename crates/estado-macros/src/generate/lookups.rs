@@ -7,11 +7,9 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use super::context::Generation;
-use super::naming::payload_binding;
+use super::naming::{children_function, hygienic_local, payload_binding, state_constant};
 use super::runtime::{epoch_field, runtime_name};
-use super::tasks::{
-    data_reference, evaluate, function_name, has_invokes, has_timers, state_constant,
-};
+use super::tasks::{data_reference, evaluate, has_invokes, has_timers};
 use super::walk::{Binding, variant_pattern};
 use crate::model::{StateId, StateKind};
 
@@ -35,15 +33,13 @@ pub fn lookup_functions(generation: &Generation<'_>) -> TokenStream {
 }
 
 fn has_timers_below(generation: &Generation<'_>, node: StateId) -> bool {
-    generation.tree.node(node).children.iter().any(|&child| {
-        !generation.tree.node(child).timers.is_empty() || has_timers_below(generation, child)
-    })
+    let tree = generation.tree;
+    tree.any_below(node, &|child| !tree.node(child).timers.is_empty())
 }
 
 fn has_invokes_below(generation: &Generation<'_>, node: StateId) -> bool {
-    generation.tree.node(node).children.iter().any(|&child| {
-        !generation.tree.node(child).invokes.is_empty() || has_invokes_below(generation, child)
-    })
+    let tree = generation.tree;
+    tree.any_below(node, &|child| !tree.node(child).invokes.is_empty())
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -60,18 +56,22 @@ fn lookup(generation: &Generation<'_>, owner: StateId, kind: Lookup) -> TokenStr
     let (prefix, key_type, key_function, documentation) = match kind {
         Lookup::Timer => (
             "timer_event",
-            quote! { ::estado_core::TimerKey },
+            quote! { __estado_core::TimerKey },
             quote! { timer_key },
             "The event of the timer `key`, when it belongs to the active instance.",
         ),
         Lookup::Invoke => (
             "accepts_invoke",
-            quote! { ::estado_core::InvokeKey },
+            quote! { __estado_core::InvokeKey },
             quote! { invoke_key },
             "Whether the invoke `key` belongs to the active instance.",
         ),
     };
-    let name = function_name(prefix, generation, owner);
+    let name = children_function(prefix, generation.tree, owner);
+    // The data of the state and the user's expressions share this function.
+    let children = hygienic_local("children");
+    let runtime_parameter = hygienic_local("runtime");
+    let key_parameter = hygienic_local("key");
     let (return_type, nothing) = match kind {
         Lookup::Timer => (
             quote! { ::core::option::Option<#event> },
@@ -100,31 +100,27 @@ fn lookup(generation: &Generation<'_>, owner: StateId, kind: Lookup) -> TokenStr
         let data = data_reference(generation, child);
         let checks = (0..own_count).map(|index| {
             let number = u8::try_from(index).unwrap_or(u8::MAX);
-            let key = quote! { #key_function(#id, runtime.#field, #number) };
+            let key = quote! { #key_function(#id, #runtime_parameter.#field, #number) };
             match kind {
                 Lookup::Timer => {
                     let expression = evaluate(&state.timers[index].event, &data);
-                    quote! { if key == #key { return ::core::option::Option::Some(#expression); } }
+                    quote! { if #key_parameter == #key { return ::core::option::Option::Some(#expression); } }
                 }
-                Lookup::Invoke => quote! { if key == #key { return true; } },
+                Lookup::Invoke => quote! { if #key_parameter == #key { return true; } },
             }
         });
         let payload = payload_binding(tree, child);
         let nested = below.then(|| {
-            let owners: Vec<StateId> = if state.kind == StateKind::Parallel {
-                state.children.clone()
-            } else {
-                vec![child]
-            };
+            let owners = tree.children_owners(child);
             let calls = owners.iter().filter_map(|&inner| {
                 let present = match kind {
                     Lookup::Timer => has_timers_below(generation, inner),
                     Lookup::Invoke => has_invokes_below(generation, inner),
                 };
                 present.then(|| {
-                    let function = function_name(prefix, generation, inner);
+                    let function = children_function(prefix, generation.tree, inner);
                     let field = tree.node(inner).children_field.as_ref().expect("field");
-                    quote! { #function(&#payload.#field, runtime, key) }
+                    quote! { #function(&#payload.#field, #runtime_parameter, #key_parameter) }
                 })
             });
             match kind {
@@ -145,9 +141,9 @@ fn lookup(generation: &Generation<'_>, owner: StateId, kind: Lookup) -> TokenStr
     quote! {
         #[doc = #documentation]
         #[allow(unreachable_patterns)]
-        pub fn #name(children: &#enum_name, runtime: &#runtime, key: #key_type) -> #return_type {
-            let _ = (runtime, key);
-            match children {
+        pub fn #name(#children: &#enum_name, #runtime_parameter: &#runtime, #key_parameter: #key_type) -> #return_type {
+            let _ = (#runtime_parameter, #key_parameter);
+            match #children {
                 #(#arms)*
                 _ => #nothing,
             }
@@ -159,24 +155,24 @@ fn lookup(generation: &Generation<'_>, owner: StateId, kind: Lookup) -> TokenStr
 pub fn spec_methods(generation: &Generation<'_>) -> TokenStream {
     let event = &generation.model.options.event;
     let timer = has_timers(generation).then(|| {
-        let function = function_name("timer_event", generation, 0);
+        let function = children_function("timer_event", generation.tree, 0);
         quote! {
             fn timer_event(
                 &self,
                 runtime: &Self::Runtime,
-                key: ::estado_core::TimerKey,
+                key: __estado_core::TimerKey,
             ) -> ::core::option::Option<#event> {
                 #function(self, runtime, key)
             }
         }
     });
     let invoke = has_invokes(generation).then(|| {
-        let function = function_name("accepts_invoke", generation, 0);
+        let function = children_function("accepts_invoke", generation.tree, 0);
         quote! {
             fn accepts_invoke(
                 &self,
                 runtime: &Self::Runtime,
-                key: ::estado_core::InvokeKey,
+                key: __estado_core::InvokeKey,
             ) -> bool {
                 #function(self, runtime, key)
             }

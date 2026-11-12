@@ -1,13 +1,11 @@
 //! Parser of the per-state attributes of spec 6.1: `#[initial]`, `#[final]`,
 //! `#[history]`, `#[after]`, `#[invoke]`, `#[unhandled]`.
 
-use proc_macro2::Span;
 use syn::parse::ParseStream;
-use syn::spanned::Spanned;
 use syn::{Attribute, Expr, Ident, Meta, Path, Token};
 
 use super::clean::marker_name;
-use crate::model::{AfterSpec, Diagnostic, HistoryKind, InvokeSpec, UnhandledPolicy};
+use crate::model::{AfterSpec, Diagnostic, Extent, HistoryKind, InvokeSpec, UnhandledPolicy};
 use crate::suggest::did_you_mean;
 
 /// Code for a malformed state attribute (not in the spec table; errata 8).
@@ -59,7 +57,7 @@ impl NodeAttributes {
     }
 }
 
-fn malformed(span: Span, message: impl Into<String>) -> Diagnostic {
+fn malformed(span: impl Into<Extent>, message: impl Into<String>) -> Diagnostic {
     Diagnostic::new(MALFORMED_ATTRIBUTE, span, message)
 }
 
@@ -82,7 +80,7 @@ pub fn parse_node_attributes(
         let Some(marker) = marker_name(attribute) else {
             continue;
         };
-        let span = attribute.path().span();
+        let span = Extent::of(attribute);
         match (marker, site) {
             ("initial" | "terminal", AttributeSite::CompositeStruct) => diagnostics.push(
                 malformed(
@@ -164,7 +162,7 @@ fn parse_initial(
         }
     } else if !matches!(attribute.meta, Meta::Path(_)) {
         diagnostics.push(malformed(
-            attribute.path().span(),
+            Extent::of(attribute),
             "write `#[initial]` or `#[initial(with = path)]`",
         ));
         return;
@@ -200,7 +198,7 @@ fn parse_history(
         Ok(()) if deep && keep => parsed.history = HistoryKind::DeepKeep,
         Ok(()) => diagnostics.push(
             malformed(
-                attribute.path().span(),
+                Extent::of(attribute),
                 "deep history needs both `deep` and `keep`",
             )
             .with_help("write `#[history(deep, keep)]`"),

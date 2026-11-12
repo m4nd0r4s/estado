@@ -1,8 +1,6 @@
 //! Transitions whose LCA is a parallel state (spec 5.2).
 
-use proc_macro2::Span;
-
-use crate::model::{Diagnostic, StateId, StateKind, StateTree};
+use crate::model::{Diagnostic, Extent, StateId, StateKind, StateTree};
 
 /// Transitions whose LCA is a parallel state: between sibling regions
 /// (E0021, spec 5.2), or local ones that would reset every region (not
@@ -12,7 +10,7 @@ pub fn check_parallel_geometry(
     handler: StateId,
     target: StateId,
     lca: StateId,
-    macro_span: Span,
+    macro_span: Extent,
 ) -> Result<(), Diagnostic> {
     if tree.node(lca).kind != StateKind::Parallel {
         return Ok(());

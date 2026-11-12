@@ -3,6 +3,8 @@
 
 use syn::{Attribute, Fields, ItemEnum, ItemImpl, ItemStruct};
 
+use crate::naming::facade_name;
+
 /// Marker attributes consumed by `#[machine]`.
 const MARKERS: [&str; 11] = [
     "root",
@@ -18,24 +20,10 @@ const MARKERS: [&str; 11] = [
     "unhandled",
 ];
 
-/// Facade crates a marker may be qualified with (`#[estado::state]`).
-const FACADE_CRATES: [&str; 2] = ["estado", "estado_macros"];
-
 /// The marker name of an attribute (`"initial"`, ..), or `None` when it is
 /// an attribute of someone else (`derive`, `doc`, ..).
 pub fn marker_name(attribute: &Attribute) -> Option<&'static str> {
-    let path = attribute.path();
-    let segment = match path.segments.len() {
-        1 => &path.segments[0],
-        2 if FACADE_CRATES
-            .iter()
-            .any(|facade| path.segments[0].ident == facade) =>
-        {
-            &path.segments[1]
-        }
-        _ => return None,
-    };
-    let written = &segment.ident;
+    let written = facade_name(attribute.path())?;
     MARKERS.iter().copied().find(|marker| written == marker)
 }
 

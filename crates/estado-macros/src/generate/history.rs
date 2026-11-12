@@ -11,9 +11,9 @@ use quote::{format_ident, quote};
 use syn::Ident;
 
 use super::context::Generation;
-use super::naming::{children_binding, field_binding, payload_binding};
+use super::naming::{children_binding, payload_binding};
 use super::runtime::history_field;
-use super::walk::{Binding, variant_pattern};
+use super::walk::{Binding, shared_field_pairs, variant_pattern};
 use crate::model::{HistoryKind, Payload, StateId, StateKind};
 use crate::naming::snake_case_name;
 
@@ -36,13 +36,8 @@ pub fn retire_function(enum_name: &Ident) -> Ident {
 /// has deep history.
 pub fn has_deep_below(generation: &Generation<'_>, owner: StateId) -> bool {
     let tree = generation.tree;
-    tree.node(owner).children.iter().any(|&child| {
-        let node = tree.node(child);
-        node.history == HistoryKind::DeepKeep
-            || (matches!(
-                node.kind,
-                StateKind::Compound | StateKind::Parallel | StateKind::Region
-            ) && has_deep_below(generation, child))
+    tree.any_below(owner, &|child| {
+        tree.node(child).history == HistoryKind::DeepKeep
     })
 }
 
@@ -128,14 +123,7 @@ pub fn record_deep(generation: &Generation<'_>, node: StateId, state: &TokenStre
     let node_info = tree.node(node);
     let struct_name = node_info.composite_struct.as_ref().expect("a compound");
     let children_field = node_info.children_field.as_ref().expect("substates");
-    let shared = tree.shared_fields(node);
-    let pairs = shared
-        .iter()
-        .filter_map(|field| field.ident.as_ref())
-        .map(|name| {
-            let binding = field_binding(tree, node, &name.to_string());
-            quote! { #name: #binding }
-        });
+    let pairs = shared_field_pairs(generation, node);
     let field = history_field(generation, node);
     quote! {
         let #struct_name { #(#pairs,)* #children_field: recorded } = #state;

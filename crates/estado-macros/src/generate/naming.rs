@@ -5,10 +5,22 @@ use proc_macro2::Span;
 use syn::Ident;
 
 use crate::model::{StateId, StateTree};
-use crate::naming::snake_case_name;
+use proc_macro2::TokenStream;
+use quote::{format_ident, quote};
+
+use super::context::Generation;
+use crate::naming::{exiting_name, plain_name, snake_case_name, state_constant_name};
 
 fn ident(text: &str, span: Span) -> Ident {
     Ident::new(text, span)
+}
+
+/// A local variable or parameter of generated code that user expressions
+/// pasted next to it (the closures of `#[after]` and `#[invoke]`) must not
+/// see: with a `mixed_site` span it is hygienic, so a function of the user's
+/// called `epoch` or `key` still resolves to the function (ADR 0013 item 15).
+pub fn hygienic_local(text: &str) -> Ident {
+    Ident::new(text, Span::mixed_site())
 }
 
 /// `active_fields`: the binding of the `*Fields` view of a compound state.
@@ -43,22 +55,31 @@ pub fn field_binding(tree: &StateTree, node: StateId, field: &str) -> Ident {
     )
 }
 
-/// `exit_active_sub`: exits the active child of the children enum of `owner`.
-pub fn exit_function(tree: &StateTree, owner: StateId) -> Ident {
+/// `exit_active_sub`, `start_active_sub`, `timer_event_active_sub`, ..: the
+/// function of one kind over the children enum of `owner`.
+pub fn children_function(prefix: &str, tree: &StateTree, owner: StateId) -> Ident {
     let enum_name = tree.node(owner).children_enum.as_ref().expect("an enum");
     ident(
-        &format!("exit_{}", snake_case_name(enum_name)),
+        &format!("{prefix}_{}", snake_case_name(enum_name)),
         enum_name.span(),
     )
 }
 
+/// `exit_active_sub`: exits the active child of the children enum of `owner`.
+pub fn exit_function(tree: &StateTree, owner: StateId) -> Ident {
+    children_function("exit", tree, owner)
+}
+
 /// `enter_active_sub`.
 pub fn enter_function(tree: &StateTree, owner: StateId) -> Ident {
-    let enum_name = tree.node(owner).children_enum.as_ref().expect("an enum");
-    ident(
-        &format!("enter_{}", snake_case_name(enum_name)),
-        enum_name.span(),
-    )
+    children_function("enter", tree, owner)
+}
+
+/// `Root::PLAYING`: the id constant of a state.
+pub fn state_constant(generation: &Generation<'_>, node: StateId) -> TokenStream {
+    let root = generation.root;
+    let constant = format_ident!("{}", state_constant_name(&generation.tree.node(node).name));
+    quote! { #root::#constant }
 }
 
 /// `bubble_to_active`: runs the handler of a compound ancestor.
@@ -80,24 +101,24 @@ pub fn fields_type(tree: &StateTree, node: StateId) -> Ident {
         .composite_struct
         .as_ref()
         .expect("a composite");
-    ident(&format!("{name}Fields"), name.span())
+    ident(&format!("{}Fields", plain_name(name)), name.span())
 }
 
 /// `PlayingMut`.
 pub fn view_type(tree: &StateTree, node: StateId) -> Ident {
     let name = &tree.node(node).name;
-    ident(&format!("{name}Mut"), name.span())
+    ident(&format!("{}Mut", plain_name(name)), name.span())
 }
 
 /// `FailedExiting`.
 pub fn exiting_struct(tree: &StateTree, node: StateId) -> Ident {
     let name = &tree.node(node).name;
-    ident(&format!("{name}Exiting"), name.span())
+    exiting_name(name)
 }
 
 /// `BackoffRef`: the shared view of a struct-like or tuple variant that
 /// timer and invoke closures receive (spec 7.1).
 pub fn ref_view_type(tree: &StateTree, node: StateId) -> Ident {
     let name = &tree.node(node).name;
-    ident(&format!("{name}Ref"), name.span())
+    ident(&format!("{}Ref", plain_name(name)), name.span())
 }

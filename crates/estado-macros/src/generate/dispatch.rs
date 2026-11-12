@@ -7,8 +7,8 @@ use quote::quote;
 
 use super::bubble::{bubble_functions, bubble_out_of, handle_at, reenter_functions};
 use super::context::Generation;
-use super::naming::{children_binding, fields_binding, payload_binding};
-use super::walk::{Binding, call_handler, variant_pattern};
+use super::naming::children_binding;
+use super::walk::{Binding, FieldsAccess, call_handler, split_payload, variant_pattern};
 use crate::model::{HandlerRole, StateId, StateKind};
 
 /// `Resolution`, `resolve`, the bubbling functions and `microstep`.
@@ -34,19 +34,19 @@ fn resolution_items(generation: &Generation<'_>) -> TokenStream {
                 /// Exit and enter the handler's own state.
                 Reenter,
             },
-            quote! { ::estado_core::Next::Reenter => Resolution::Reenter, },
+            quote! { __estado_core::Next::Reenter => Resolution::Reenter, },
         )
     } else {
         (
             TokenStream::new(),
-            quote! { ::estado_core::Next::Reenter => ::core::unreachable!(), },
+            quote! { __estado_core::Next::Reenter => ::core::unreachable!(), },
         )
     };
     quote! {
         /// What the dispatch does after a handler returned.
         pub enum Resolution {
             /// The microstep is over.
-            Done(::estado_core::Outcome),
+            Done(__estado_core::Outcome),
             /// Delegate to the parent.
             Bubble,
             #reenter_variant
@@ -54,23 +54,23 @@ fn resolution_items(generation: &Generation<'_>) -> TokenStream {
 
         /// Turns the `Next` of a handler into a [`Resolution`], executing the edge.
         #[inline(always)]
-        pub fn resolve<Edges: ::estado_core::Edge<#root>, #sink_parameter>(
-            next: ::estado_core::Next<#root, Edges>,
-            slot: &mut ::estado_core::Slot<#root>,
+        pub fn resolve<Edges: __estado_core::Edge<#root>, #sink_parameter>(
+            next: __estado_core::Next<#root, Edges>,
+            slot: &mut __estado_core::Slot<#root>,
             cx: &mut #cx_type,
         ) -> Resolution {
             match next {
-                ::estado_core::Next::Stay => Resolution::Done(::estado_core::Outcome::Stayed),
-                ::estado_core::Next::Bubble => Resolution::Bubble,
-                ::estado_core::Next::Unhandled => Resolution::Done(::estado_core::Outcome::Unhandled(
-                    <#root as ::estado_core::Spec>::UNHANDLED,
+                __estado_core::Next::Stay => Resolution::Done(__estado_core::Outcome::Stayed),
+                __estado_core::Next::Bubble => Resolution::Bubble,
+                __estado_core::Next::Unhandled => Resolution::Done(__estado_core::Outcome::Unhandled(
+                    <#root as __estado_core::Spec>::UNHANDLED,
                 )),
-                ::estado_core::Next::Defer => Resolution::Done(::estado_core::Outcome::Deferred),
+                __estado_core::Next::Defer => Resolution::Done(__estado_core::Outcome::Deferred),
                 #reenter_arm
-                ::estado_core::Next::Goto(edge) => Resolution::Done(::estado_core::Outcome::Transitioned {
+                __estado_core::Next::Goto(edge) => Resolution::Done(__estado_core::Outcome::Transitioned {
                     changed: edge.apply(slot, cx),
                 }),
-                ::estado_core::Next::__Never(_, never) => match never {},
+                __estado_core::Next::__Never(_, never) => match never {},
             }
         }
     }
@@ -87,10 +87,10 @@ fn microstep_function(generation: &Generation<'_>) -> TokenStream {
         /// One microstep: the nested `match` from the root to the active leaf.
         #[inline(always)]
         pub fn microstep<#sink_parameter>(
-            slot: &mut ::estado_core::Slot<#root>,
+            slot: &mut __estado_core::Slot<#root>,
             cx: &mut #cx_type,
             event: &#event,
-        ) -> ::estado_core::Outcome {
+        ) -> __estado_core::Outcome {
             match slot.live_mut() {
                 #arms
             }
@@ -119,17 +119,11 @@ pub fn children_arms(generation: &Generation<'_>, owner: StateId) -> TokenStream
         };
         let pattern = variant_pattern(generation, child, binding);
         let body = match handler {
-            Some(handler) => {
-                let fields = |ancestor: StateId| {
-                    let binding = fields_binding(tree, ancestor);
-                    quote! { #binding }
-                };
-                handle_at(
-                    generation,
-                    child,
-                    call_handler(generation, handler, &fields, None),
-                )
-            }
+            Some(handler) => handle_at(
+                generation,
+                child,
+                call_handler(generation, handler, FieldsAccess::Binding, None),
+            ),
             None => bubble_out_of(generation, child),
         };
         quote! { #pattern => #body, }
@@ -141,13 +135,12 @@ pub fn children_arms(generation: &Generation<'_>, owner: StateId) -> TokenStream
 fn compound_arm(generation: &Generation<'_>, node: StateId) -> TokenStream {
     let tree = generation.tree;
     let pattern = variant_pattern(generation, node, Binding::Everything);
-    let payload = payload_binding(tree, node);
-    let fields = fields_binding(tree, node);
     let substates = children_binding(tree, node);
+    let split = split_payload(generation, node);
     let arms = children_arms(generation, node);
     quote! {
         #pattern => {
-            let (#fields, #substates) = #payload.split();
+            #split
             match #substates {
                 #arms
             }

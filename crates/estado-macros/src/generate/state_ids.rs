@@ -34,7 +34,7 @@ pub fn state_id_constants(model: &MachineModel) -> TokenStream {
         let runtime_id = tree.runtime_id(node.id);
         Some(quote! {
             #[doc = #documentation]
-            pub const #constant: ::estado_core::StateId = ::estado_core::StateId::new(#runtime_id);
+            pub const #constant: __estado_core::StateId = __estado_core::StateId::new(#runtime_id);
         })
     });
     quote! {

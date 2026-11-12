@@ -9,9 +9,7 @@ use syn::{
 };
 
 use super::parameters::ParameterList;
-
-/// Name of the generic sink parameter added to every handler.
-pub const SINK_PARAMETER: &str = "EffectSink";
+use crate::naming::SINK_PARAMETER;
 
 /// How the return type changes.
 pub enum EdgeType {
@@ -45,7 +43,7 @@ pub fn rewrite_signature(
     }
     generics
         .params
-        .push(parse_quote!(#sink: ::estado_core::Sink<#effect>));
+        .push(parse_quote!(#sink: __estado_core::Sink<#effect>));
 
     for (index, argument) in function.sig.inputs.iter_mut().enumerate() {
         let syn::FnArg::Typed(typed) = argument else {
@@ -65,10 +63,10 @@ pub fn rewrite_signature(
             EdgeType::None => None,
             EdgeType::Named(path) => Some(parse_quote!(#path)),
             EdgeType::Opaque if name_event_lifetime => Some(parse_quote!(
-                impl ::estado_core::Edge<Self> + use<'event, #sink>
+                impl __estado_core::Edge<Self> + use<'event, #sink>
             )),
             EdgeType::Opaque => Some(parse_quote!(
-                impl ::estado_core::Edge<Self> + use<#sink>
+                impl __estado_core::Edge<Self> + use<#sink>
             )),
             EdgeType::OpaqueRegion if name_event_lifetime => Some(parse_quote!(
                 impl __estado::RegionEdge + use<'event, #sink>

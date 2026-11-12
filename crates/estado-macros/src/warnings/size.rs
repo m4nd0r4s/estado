@@ -30,7 +30,7 @@ pub fn oversized_variants(model: &MachineModel) -> Vec<Warning> {
             Some(Warning {
                 code: WarningCode::OversizedVariant,
                 span: node.name.span(),
-                subject: node.name.to_string(),
+                subject: crate::naming::plain_name(&node.name),
                 message: format!(
                     "variant `{}` holds more than {limit} bytes (`size_warn`); \
                      consider boxing its data with `Box<..>`, or raise `size_warn`",
