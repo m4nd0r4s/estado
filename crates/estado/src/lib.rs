@@ -64,3 +64,76 @@ pub mod prelude {
 #[cfg(doctest)]
 #[doc = include_str!("../../../README.md")]
 mod readme {}
+
+/// The user guide's examples (`docs/guide/`), compiled and run as doctests.
+#[cfg(doctest)]
+mod guide {
+    #[doc = include_str!("../../../docs/guide/01-getting-started.md")]
+    mod getting_started {}
+
+    #[doc = include_str!("../../../docs/guide/02-states.md")]
+    mod states {}
+
+    #[doc = include_str!("../../../docs/guide/03-state-data.md")]
+    mod state_data {}
+
+    #[doc = include_str!("../../../docs/guide/04-handlers.md")]
+    mod handlers {}
+
+    #[doc = include_str!("../../../docs/guide/05-transitions.md")]
+    mod transitions {}
+
+    #[doc = include_str!("../../../docs/guide/06-transition-kinds.md")]
+    mod transition_kinds {}
+
+    #[doc = include_str!("../../../docs/guide/07-unhandled-events.md")]
+    mod unhandled_events {}
+
+    #[doc = include_str!("../../../docs/guide/08-entry-exit.md")]
+    mod entry_exit {}
+
+    #[doc = include_str!("../../../docs/guide/09-always.md")]
+    mod always {}
+
+    #[doc = include_str!("../../../docs/guide/10-on-done.md")]
+    mod on_done {}
+
+    #[doc = include_str!("../../../docs/guide/11-context-and-effects.md")]
+    mod context_and_effects {}
+
+    #[doc = include_str!("../../../docs/guide/12-sinks-and-drivers.md")]
+    mod sinks_and_drivers {}
+
+    #[doc = include_str!("../../../docs/guide/13-regions.md")]
+    mod regions {}
+
+    #[doc = include_str!("../../../docs/guide/14-region-coordination.md")]
+    mod region_coordination {}
+
+    #[doc = include_str!("../../../docs/guide/15-timers.md")]
+    mod timers {}
+
+    #[doc = include_str!("../../../docs/guide/16-tasks.md")]
+    mod tasks {}
+
+    #[doc = include_str!("../../../docs/guide/17-history.md")]
+    mod history {}
+
+    #[doc = include_str!("../../../docs/guide/18-defer-and-raise.md")]
+    mod defer_and_raise {}
+
+    #[doc = include_str!("../../../docs/guide/19-testing.md")]
+    mod testing {}
+
+    #[doc = include_str!("../../../docs/guide/20-testing-tasks-and-errors.md")]
+    mod testing_tasks_and_errors {}
+
+    #[doc = include_str!("../../../docs/guide/21-errors-and-safety.md")]
+    mod errors_and_safety {}
+
+    #[doc = include_str!("../../../docs/guide/22-warnings-and-options.md")]
+    mod warnings_and_options {}
+
+    #[doc = include_str!("../../../docs/guide/23-no-std.md")]
+    mod no_std {}
+}
