@@ -8,7 +8,7 @@ Spec: 4.1, 4.2, 6.3, risk R1
 
 Spec 4.2 wants every handler to return `Next<Self, impl Edge<Self>>`, where the hidden type is an edge enum generated per handler and generic over the types of the constructor closures of `goto!(T, |old| ..)`. Risk R1: inference might fail in real handlers (several branches, nested matches, early return, `?`, `goto!` inside closures). Plan B was to require non-capturing constructors (`fn` pointers) and a non-generic edge enum.
 
-The spike in `spikes/typed-edges/` hand-writes the code the macro would generate for the media player of spec 3.2 and checks it on stable Rust (edition 2024).
+The spike in `spikes/typed-edges/` (removed from the tree after M1; see commit `4ef3b52`) hand-writes the code the macro would generate for the media player of spec 3.2 and checks it on stable Rust (edition 2024).
 
 ## Decision
 

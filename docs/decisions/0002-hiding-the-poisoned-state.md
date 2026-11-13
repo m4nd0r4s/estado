@@ -8,7 +8,7 @@ Spec: 3.5, 3.6, 5.11, 13.1
 
 A panic between the take and the write of a transition (5.3 steps 4-6), or in any in-place phase (handler, exit, entry), must leave the machine poisoned. The user's root enum `M` must not show a `__Poisoned` variant in `match`, graph or snapshot. AC-15 requires `size_of::<Machine<M>>() == size_of::<M>() + size_of::<M::Ctx>()` with no optional features.
 
-Spike: `spikes/poison/` (hand-written machines, 45 poison/leak tests with `catch_unwind` and drop-counting payloads, size tests, all green under `cargo +nightly miri test`). Compared:
+Spike: `spikes/poison/` (removed from the tree after M1; see commit `7d72d6c`) (hand-written machines, 45 poison/leak tests with `catch_unwind` and drop-counting payloads, size tests, all green under `cargo +nightly miri test`). Compared:
 
 | Option | Safe? | `state() -> &M` | Notes |
 | --- | --- | --- | --- |

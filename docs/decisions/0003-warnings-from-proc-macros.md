@@ -9,7 +9,7 @@ AC-17
 
 Spec 6.7 defines warnings W0001-W0010. Stable proc-macros cannot emit warnings
 (`proc_macro::Diagnostic` is nightly-only, and nightly is forbidden). A spike in
-`spikes/warnings/` (edition 2024, tested on stable 1.96 and 1.99; 1.85 is not
+`spikes/warnings/` (removed from the tree after M1; see commit `4e18273`) (edition 2024, tested on stable 1.96 and 1.99; 1.85 is not
 installed in the spike environment, but the technique only uses `#[deprecated]`
 and `quote_spanned!`, stable since Rust 1.x) verified the technique required by
 the spec and compared variants.
