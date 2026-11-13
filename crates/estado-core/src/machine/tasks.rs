@@ -1,6 +1,6 @@
 //! Timer and invoke results entering the machine (spec 7.1, 7.2).
 
-use super::Machine;
+use super::{Machine, PoisonGuard};
 use crate::effect::{InvokeKey, TimerKey};
 use crate::error::SendError;
 use crate::report::{IgnoreReason, Report, Step};
@@ -35,7 +35,19 @@ impl<M: Spec> Machine<M> {
         let event = match &self.slot {
             Slot::Poisoned => return Err(SendError::Poisoned),
             Slot::Unstarted | Slot::Finished => None,
-            Slot::Live(state) => state.timer_event(&self.runtime, key),
+            Slot::Live(_) => {
+                // The `#[after(.. => event)]` expression is user code run at
+                // fire time: a panic in it poisons like any other (spec 5.11).
+                let guard = PoisonGuard {
+                    slot: &mut self.slot,
+                };
+                let event = guard
+                    .slot
+                    .live()
+                    .and_then(|state| state.timer_event(&self.runtime, key));
+                guard.disarm();
+                event
+            }
         };
         match event {
             Some(event) => self.send_into(event, sink),

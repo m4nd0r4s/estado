@@ -50,9 +50,7 @@ A poisoned machine has lost its state. It has no way back: build a new `Machine`
 
 A machine becomes poisoned when:
 
-1. Any code that runs while `send`, `start`, `fire` or `complete` processes an event **panics**: a handler, an entry, an exit, a constructor, a closure of a timer or task that runs inside the step, or the `panic` unhandled policy. The panic propagates to the caller as usual, and the machine is poisoned when it unwinds. With `panic = "abort"` the process ends instead.
-
-   One known exception: the event closure of an `#[after]` timer runs inside `fire`, before the event is sent and before the guard that poisons. A panic there propagates but does not poison the machine. This is a known issue.
+1. Any code that runs while `send`, `start`, `fire` or `complete` processes an event **panics**: a handler, an entry, an exit, a constructor, the event expression of an `#[after]` timer when `fire` evaluates it, a closure of a task that runs inside the step, or the `panic` unhandled policy. The panic propagates to the caller as usual, and the machine is poisoned when it unwinds. With `panic = "abort"` the process ends instead.
 2. A step fails with `RaiseOverflow` or `Livelock`.
 3. A `start` fails with any error, including an effect overflow in an entry.
 

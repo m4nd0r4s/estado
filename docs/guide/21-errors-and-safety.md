@@ -75,7 +75,7 @@ fn main() {
 
 ## Poisoning
 
-During the middle of a transition (after the old state left, before the new one is written) the machine holds no valid state. If a panic unwinds through that window, from a handler, an entry, an exit or a constructor, the machine stays **poisoned**. The same holds for a panic anywhere else while `send`, `start`, `fire` or `complete` processes an event. The one known exception is the event closure of an `#[after]` timer: `fire` evaluates it before the event is sent, so a panic there does not poison the machine (a known issue). Every later `send` returns `Err(SendError::Poisoned)`. The same happens after `RaiseOverflow`, after a `Livelock`, and after any error while the machine starts.
+During the middle of a transition (after the old state left, before the new one is written) the machine holds no valid state. If a panic unwinds through that window, from a handler, an entry, an exit or a constructor, the machine stays **poisoned**. The same holds for a panic anywhere else while `send`, `start`, `fire` or `complete` processes an event. That includes the event expression of an `#[after]` timer, which `fire` evaluates when the timer fires. Every later `send` returns `Err(SendError::Poisoned)`. The same happens after `RaiseOverflow`, after a `Livelock`, and after any error while the machine starts.
 
 On a poisoned machine:
 
