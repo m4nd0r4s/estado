@@ -24,6 +24,10 @@
       </history>
       <state id="Inner">
         <transition event="Event.Surface" target="Idle" type="external"/>
+        <transition event="Event.Again" target="Idle_18" type="external"/>
+      </state>
+      <state id="Idle_18">
+        <transition event="Event.Back" target="Idle" type="external"/>
       </state>
     </state>
     <transition event="Event.Stop Event.Halt" target="Idle" type="external"/>
@@ -62,4 +66,14 @@
     <transition target="end_15" type="external"/>
   </state>
   <state id="end_15"/>
+  <state id="state">
+    <transition event="Event.Note" target="note" type="external"/>
+  </state>
+  <state id="note">
+    <transition event="Event.Class" target="class" type="external"/>
+  </state>
+  <state id="class">
+    <transition event="Event.{ a: #1 } -&gt; &lt;b&gt;; &quot;c&quot; &amp; &apos;d&apos;" target="direction" type="external"/>
+  </state>
+  <state id="direction"/>
 </scxml>

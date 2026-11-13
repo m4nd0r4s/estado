@@ -9,20 +9,22 @@ stateDiagram-v2
         state Nested {
             state "H*" as Nested_history
             Inner
+            state "Idle" as Idle_18
             [*] --> Inner
+            Inner --> Idle_18 : Event#58;#58;Again
         }
         [*] --> Playing
-        Playing --> Paused : Event::Pause
-        Paused --> Playing : Event::Play
-        Playing --> Playing : Event::Tick [timer]
-        Playing --> Nested : Event::Dive
+        Playing --> Paused : Event#58;#58;Pause
+        Paused --> Playing : Event#58;#58;Play
+        Playing --> Playing : Event#58;#58;Tick [timer]
+        Playing --> Nested : Event#58;#58;Dive
     }
     state Alive {
         %% region left
         LeftA
         LeftB
         [*] --> LeftA
-        LeftA --> LeftB : Event::Left
+        LeftA --> LeftB : Event#58;#58;Left
         --
         %% region right
         RightA
@@ -32,23 +34,31 @@ stateDiagram-v2
     Done
     Finished
     state "end" as end_15
-    state "Odd #quot;name#quot; & <tag>" as Odd__name_____tag_
+    state "Odd #quot;name#quot; #amp; #lt;tag#gt;" as Odd__name_____tag_
     state "end_15" as end_15_17
+    state "state" as state_19
+    state "note" as note_20
+    state "class" as class_21
+    state "direction" as direction_22
     [*] --> Idle
     Done --> [*]
     Finished --> [*]
-    Idle --> Active : Event::Start | Event::Resume [external]
-    Active --> Idle : Event::Stop | Event::Halt
-    Active --> Inner : Event::Zoom
-    Inner --> Idle : Event::Surface
-    Idle --> Active_history : Event::Continue [history]
-    Idle --> Nested_history : Event::Deeper [history]
-    RightA --> Idle : Event::Out
+    Idle --> Active : Event#58;#58;Start | Event#58;#58;Resume [external]
+    Active --> Idle : Event#58;#58;Stop | Event#58;#58;Halt
+    Active --> Inner : Event#58;#58;Zoom
+    Inner --> Idle : Event#58;#58;Surface
+    Idle --> Active_history : Event#58;#58;Continue [history]
+    Idle --> Nested_history : Event#58;#58;Deeper [history]
+    RightA --> Idle : Event#58;#58;Out
     Alive --> Done : [done]
     Idle --> Pick : [always]
-    Pick --> Done : Event::Yes
-    Pick --> Finished : Event::No
-    Pick --> dynamic : Event::Any
-    Done --> Idle : Event::Reset
-    end_15 --> Odd__name_____tag_ : Event::Bad("x") & <y>, \ done [error]
+    Pick --> Done : Event#58;#58;Yes
+    Pick --> Finished : Event#58;#58;No
+    Pick --> dynamic : Event#58;#58;Any
+    Done --> Idle : Event#58;#58;Reset
+    end_15 --> Odd__name_____tag_ : Event#58;#58;Bad(#quot;x#quot;) #amp; #lt;y#gt;#59; #92; done [error]
     Odd__name_____tag_ --> end_15_17
+    Idle_18 --> Idle : Event#58;#58;Back
+    state_19 --> note_20 : Event#58;#58;Note
+    note_20 --> class_21 : Event#58;#58;Class
+    class_21 --> direction_22 : Event#58;#58;{ a#58; #35;1 } -#gt; #lt;b#gt;#59; #quot;c#quot; #amp; 'd'

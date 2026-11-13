@@ -8,25 +8,25 @@ stateDiagram-v2
         Idle
         Sending
         [*] --> Idle
-        Idle --> Sending : Event::Send
-        Sending --> Idle : Event::FrameSent
+        Idle --> Sending : Event#58;#58;Send
+        Sending --> Idle : Event#58;#58;FrameSent
         --
         %% region keepalive
         Pinging
         AwaitingPong
         Dead
         [*] --> Pinging
-        Pinging --> AwaitingPong : Event::PingDue [timer]
-        AwaitingPong --> Pinging : Event::Pong
-        AwaitingPong --> Dead : Event::PongTimeout [timer]
+        Pinging --> AwaitingPong : Event#58;#58;PingDue [timer]
+        AwaitingPong --> Pinging : Event#58;#58;Pong
+        AwaitingPong --> Dead : Event#58;#58;PongTimeout [timer]
     }
     [*] --> Disconnected
-    Disconnected --> Connecting : Event::Connect
-    Connecting --> Connected : Event::Connected
-    Connecting --> Disconnected : Event::ConnectTimeout [timer]
-    Connecting --> Backoff : Event::ConnectTimeout [timer]
-    Connecting --> Disconnected : Event::Disconnect
-    Backoff --> Connecting : Event::Retry [timer]
-    Backoff --> Disconnected : Event::Disconnect
-    Connected --> Disconnected : Event::Disconnect
-    Dead --> Backoff : Event::KeepaliveDead
+    Disconnected --> Connecting : Event#58;#58;Connect
+    Connecting --> Connected : Event#58;#58;Connected
+    Connecting --> Disconnected : Event#58;#58;ConnectTimeout [timer]
+    Connecting --> Backoff : Event#58;#58;ConnectTimeout [timer]
+    Connecting --> Disconnected : Event#58;#58;Disconnect
+    Backoff --> Connecting : Event#58;#58;Retry [timer]
+    Backoff --> Disconnected : Event#58;#58;Disconnect
+    Connected --> Disconnected : Event#58;#58;Disconnect
+    Dead --> Backoff : Event#58;#58;KeepaliveDead

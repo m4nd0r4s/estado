@@ -47,7 +47,12 @@ const RESERVED: [&str; 22] = [
 ///   compound state with history holds a pseudostate labelled `H` (shallow)
 ///   or `H*` (deep) that `history` edges point to.
 /// - An edge is labelled with its event hint and, unless it is a plain
-///   transition, its kind in brackets: `Event::Land [timer]`.
+///   transition, its kind in brackets: `Event::Land [timer]`. Text that
+///   Mermaid would read as syntax is written as an entity, which Mermaid
+///   shows as the character: `:` is `#58;`, `;` is `#59;`, `#` is `#35;`,
+///   `"` is `#quot;`, `<` is `#lt;`, `>` is `#gt;`, `&` is `#amp;` and `\`
+///   is `#92;`. So the label of `Event::Land` reads `Event#58;#58;Land` in
+///   the source.
 /// - A state id is the state name with every character outside `A-Za-z0-9_`
 ///   replaced by `_`. An id that clashes with another, or with a Mermaid
 ///   keyword, gets the state index appended, and the name stays as its label.
@@ -69,7 +74,7 @@ const RESERVED: [&str; 22] = [
 ///
 /// let diagram = estado_graph::to_mermaid(&GRAPH);
 /// assert!(diagram.starts_with("stateDiagram-v2\n"));
-/// assert!(diagram.contains("    Off --> On : Event::Toggle\n"));
+/// assert!(diagram.contains("    Off --> On : Event#58;#58;Toggle\n"));
 /// ```
 pub fn to_mermaid(graph: &Graph) -> String {
     let tree = Tree::new(graph);
@@ -196,9 +201,31 @@ fn single_line(text: &str) -> String {
     line
 }
 
-/// A text for a quoted label: one line, double quotes as the `#quot;` entity.
-fn quoted_text(text: &str) -> String {
-    single_line(text).replace('"', "#quot;")
+/// A text for a label, an alias or an edge: one line, with the characters
+/// the state-diagram grammar reads as syntax written as Mermaid entities
+/// (`#58;` is `:`). Mermaid shows the character, not the entity.
+///
+/// - `:` starts the label of a transition, so a second one (`Event::Pause`)
+///   is a parse error.
+/// - `;` ends a statement and `#` starts an entity.
+/// - `"` ends a quoted alias; `<`, `>` and `&` would be read as HTML; `\`
+///   would be read as an escape.
+fn escape_text(text: &str) -> String {
+    let mut escaped = String::new();
+    for character in single_line(text).chars() {
+        match character {
+            '#' => escaped.push_str("#35;"),
+            ':' => escaped.push_str("#58;"),
+            ';' => escaped.push_str("#59;"),
+            '"' => escaped.push_str("#quot;"),
+            '<' => escaped.push_str("#lt;"),
+            '>' => escaped.push_str("#gt;"),
+            '&' => escaped.push_str("#amp;"),
+            '\\' => escaped.push_str("#92;"),
+            other => escaped.push(other),
+        }
+    }
+    escaped
 }
 
 struct Renderer<'graph> {
@@ -297,7 +324,7 @@ impl Renderer<'_> {
     }
 
     fn alias(&mut self, state: usize) {
-        let name = quoted_text(self.tree.graph.states[state].name);
+        let name = escape_text(self.tree.graph.states[state].name);
         self.lines
             .line_of(&["state \"", &name, "\" as ", &self.names.states[state]]);
     }
@@ -305,7 +332,7 @@ impl Renderer<'_> {
     fn edge(&mut self, edge: &EdgeInfo) {
         let from = &self.names.states[edge.from.index()];
         let target = self.names.target(edge);
-        let label = edge_label(edge).replace(';', ",");
+        let label = escape_text(&edge_label(edge));
         if label.is_empty() {
             self.lines.line_of(&[from, " --> ", target]);
         } else {

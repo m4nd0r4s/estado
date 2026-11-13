@@ -105,12 +105,12 @@ stateDiagram-v2
         Playing
         Paused
         [*] --> Playing
-        Playing --> Paused : Event::Pause
-        Paused --> Playing : Event::Play
+        Playing --> Paused : Event#58;#58;Pause
+        Paused --> Playing : Event#58;#58;Play
     }
     [*] --> Idle
-    Idle --> Active : Event::Play
-    Active --> Idle : Event::Stop
+    Idle --> Active : Event#58;#58;Play
+    Active --> Idle : Event#58;#58;Stop
 "
     );
 }
@@ -125,12 +125,12 @@ stateDiagram-v2
         Playing
         Paused
         [*] --> Playing
-        Playing --> Paused : Event::Pause
-        Paused --> Playing : Event::Play
+        Playing --> Paused : Event#58;#58;Pause
+        Paused --> Playing : Event#58;#58;Play
     }
     [*] --> Idle
-    Idle --> Active : Event::Play
-    Active --> Idle : Event::Stop
+    Idle --> Active : Event#58;#58;Play
+    Active --> Idle : Event#58;#58;Stop
 ```
 
 The graph is exact. Every transition your code can make is an edge, and an edge that no code can take does not exist, so the picture cannot drift from the machine.

@@ -199,6 +199,61 @@
       "timers": 0,
       "invokes": 0,
       "depth": 0
+    },
+    {
+      "id": 18,
+      "name": "Idle",
+      "parent": 4,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 2
+    },
+    {
+      "id": 19,
+      "name": "state",
+      "parent": null,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 0
+    },
+    {
+      "id": 20,
+      "name": "note",
+      "parent": null,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 0
+    },
+    {
+      "id": 21,
+      "name": "class",
+      "parent": null,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 0
+    },
+    {
+      "id": 22,
+      "name": "direction",
+      "parent": null,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 0
     }
   ],
   "edges": [
@@ -321,6 +376,36 @@
       "to": { "type": "state", "id": 17 },
       "kind": "normal",
       "event": null
+    },
+    {
+      "from": 5,
+      "to": { "type": "state", "id": 18 },
+      "kind": "normal",
+      "event": "Event::Again"
+    },
+    {
+      "from": 18,
+      "to": { "type": "state", "id": 0 },
+      "kind": "normal",
+      "event": "Event::Back"
+    },
+    {
+      "from": 19,
+      "to": { "type": "state", "id": 20 },
+      "kind": "normal",
+      "event": "Event::Note"
+    },
+    {
+      "from": 20,
+      "to": { "type": "state", "id": 21 },
+      "kind": "normal",
+      "event": "Event::Class"
+    },
+    {
+      "from": 21,
+      "to": { "type": "state", "id": 22 },
+      "kind": "normal",
+      "event": "Event::{ a: #1 } -> <b>; \"c\" & 'd'"
     }
   ]
 }

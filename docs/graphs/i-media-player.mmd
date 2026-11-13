@@ -5,14 +5,14 @@ stateDiagram-v2
         Playing
         Paused
         [*] --> Playing
-        Playing --> Paused : Event::Pause
-        Paused --> Playing : Event::Resume
+        Playing --> Paused : Event#58;#58;Pause
+        Paused --> Playing : Event#58;#58;Resume
     }
     Failed
     [*] --> Idle
-    Idle --> Active : Event::Play
-    Active --> Active : Event::Play
-    Active --> Idle : Event::Stop
-    Active --> Failed : Event::Error
-    Failed --> Active : Event::Play
-    Failed --> Idle : Event::Stop
+    Idle --> Active : Event#58;#58;Play
+    Active --> Active : Event#58;#58;Play
+    Active --> Idle : Event#58;#58;Stop
+    Active --> Failed : Event#58;#58;Error
+    Failed --> Active : Event#58;#58;Play
+    Failed --> Idle : Event#58;#58;Stop

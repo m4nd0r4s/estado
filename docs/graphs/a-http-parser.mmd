@@ -27,8 +27,8 @@ stateDiagram-v2
     Error --> [*]
     Method --> Error
     Target --> Error
-    Version --> Headers : VersionStep::Complete
-    Version --> Error : VersionStep::Unsupported
+    Version --> Headers : VersionStep#58;#58;Complete
+    Version --> Error : VersionStep#58;#58;Unsupported
     RequestLine --> Error
     Value --> Error
     BlockLf --> RequestLine

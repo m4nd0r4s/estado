@@ -22,6 +22,7 @@ digraph "Kitchen \"Sink\"" {
             i4 [shape=circle, style=filled, fillcolor=black, label="", width=0.2, fixedsize=true];
             i4 -> s5;
             s5 [label="Inner"];
+            s18 [label="Idle"];
         }
     }
     subgraph cluster_s6 {
@@ -50,6 +51,10 @@ digraph "Kitchen \"Sink\"" {
     s15 [label="end"];
     s16 [label="Odd \"name\" & <tag>"];
     s17 [label="end_15"];
+    s19 [label="state"];
+    s20 [label="note"];
+    s21 [label="class"];
+    s22 [label="direction"];
     s0 -> a1 [label="Event::Start | Event::Resume [external]", lhead=cluster_s1];
     a1 -> s0 [label="Event::Stop | Event::Halt", ltail=cluster_s1];
     s2 -> s3 [label="Event::Pause"];
@@ -70,4 +75,9 @@ digraph "Kitchen \"Sink\"" {
     s13 -> s0 [label="Event::Reset"];
     s15 -> s16 [label="Event::Bad(\"x\") & <y>; \\ done [error]"];
     s16 -> s17;
+    s5 -> s18 [label="Event::Again"];
+    s18 -> s0 [label="Event::Back"];
+    s19 -> s20 [label="Event::Note"];
+    s20 -> s21 [label="Event::Class"];
+    s21 -> s22 [label="Event::{ a: #1 } -> <b>; \"c\" & 'd'"];
 }

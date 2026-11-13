@@ -27,8 +27,13 @@ const FINISHED: StateId = id(14);
 const END: StateId = id(15);
 const ODD: StateId = id(16);
 const END_CLASH: StateId = id(17);
+const IDLE_AGAIN: StateId = id(18);
+const STATE_WORD: StateId = id(19);
+const NOTE_WORD: StateId = id(20);
+const CLASS_WORD: StateId = id(21);
+const DIRECTION_WORD: StateId = id(22);
 
-static STATES: [StateInfo; 18] = [
+static STATES: [StateInfo; 23] = [
     StateInfo::new(IDLE, "Idle", None, StateKind::Atomic, 0),
     StateInfo::new(ACTIVE, "Active", None, StateKind::Compound, 0)
         .with_initial(PLAYING)
@@ -51,6 +56,13 @@ static STATES: [StateInfo; 18] = [
     StateInfo::new(END, "end", None, StateKind::Atomic, 0),
     StateInfo::new(ODD, "Odd \"name\" & <tag>", None, StateKind::Atomic, 0),
     StateInfo::new(END_CLASH, "end_15", None, StateKind::Atomic, 0),
+    // The same name as `Idle`, in another place: ids must stay unique.
+    StateInfo::new(IDLE_AGAIN, "Idle", Some(NESTED), StateKind::Atomic, 2),
+    // Names that are words of the Mermaid grammar.
+    StateInfo::new(STATE_WORD, "state", None, StateKind::Atomic, 0),
+    StateInfo::new(NOTE_WORD, "note", None, StateKind::Atomic, 0),
+    StateInfo::new(CLASS_WORD, "class", None, StateKind::Atomic, 0),
+    StateInfo::new(DIRECTION_WORD, "direction", None, StateKind::Atomic, 0),
 ];
 
 const fn edge(
@@ -71,7 +83,7 @@ const fn to(state: StateId) -> EdgeTarget {
     EdgeTarget::State(state)
 }
 
-static EDGES: [EdgeInfo; 20] = [
+static EDGES: [EdgeInfo; 25] = [
     edge(
         IDLE,
         to(ACTIVE),
@@ -112,6 +124,31 @@ static EDGES: [EdgeInfo; 20] = [
         Some("Event::Bad(\"x\") & <y>; \\ done"),
     ),
     edge(ODD, to(END_CLASH), EdgeKind::Normal, None),
+    edge(
+        INNER,
+        to(IDLE_AGAIN),
+        EdgeKind::Normal,
+        Some("Event::Again"),
+    ),
+    edge(IDLE_AGAIN, to(IDLE), EdgeKind::Normal, Some("Event::Back")),
+    edge(
+        STATE_WORD,
+        to(NOTE_WORD),
+        EdgeKind::Normal,
+        Some("Event::Note"),
+    ),
+    edge(
+        NOTE_WORD,
+        to(CLASS_WORD),
+        EdgeKind::Normal,
+        Some("Event::Class"),
+    ),
+    edge(
+        CLASS_WORD,
+        to(DIRECTION_WORD),
+        EdgeKind::Normal,
+        Some("Event::{ a: #1 } -> <b>; \"c\" & 'd'"),
+    ),
 ];
 
 /// Every state kind, history kind, edge kind and target.

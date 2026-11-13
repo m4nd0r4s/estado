@@ -126,13 +126,13 @@ stateDiagram-v2
         Playing
         Paused
         [*] --> Playing
-        Playing --> Paused : Event::Pause
-        Paused --> Playing : Event::Play
+        Playing --> Paused : Event#58;#58;Pause
+        Paused --> Playing : Event#58;#58;Play
     }
     [*] --> Idle
-    Idle --> Active : Event::Play
-    Idle --> Active_history : Event::Resume [history]
-    Active --> Idle : Event::Stop
+    Idle --> Active : Event#58;#58;Play
+    Idle --> Active_history : Event#58;#58;Resume [history]
+    Active --> Idle : Event#58;#58;Stop
 "
     );
 
@@ -209,9 +209,22 @@ An edge line is `From --> To : label`, with no label when the label is empty. Th
 | `always` | `[always]` |
 | `done` | `[done]` |
 
-`Event::Land [timer]`, `[always]` (no hint), `Event::Resume [history]`. White space in a hint, including line breaks, becomes one space, and `;` becomes `,` because Mermaid ends a statement at it.
+`Event::Land [timer]`, `[always]` (no hint), `Event::Resume [history]`. White space in a hint, including line breaks, becomes one space.
 
-State ids are the state names with every character outside `A-Za-z0-9_` replaced by `_`, a leading `s_` for a name that starts with a digit, and `state_<index>` for an empty name. An id that another state already has, or that is a word of the Mermaid grammar (`end`, `state`, `note`, `class`, `default`, `style`, ..., compared ignoring case), gets `_<index>` appended. When the id differs from the name, a `state "Name" as id` line keeps the name as the label, with `"` written as `#quot;`.
+Mermaid reads several characters as syntax, even in a label (a second `:` in a transition line is a parse error), so every label and every state name in a `state "Name" as id` line is written with Mermaid entities, which Mermaid draws as the character:
+
+| Character | Written as |
+| --- | --- |
+| `:` | `#58;` |
+| `;` | `#59;` |
+| `#` | `#35;` |
+| `"` | `#quot;` |
+| `<` `>` `&` | `#lt;` `#gt;` `#amp;` |
+| `\` | `#92;` |
+
+So `Event::Pause` is written `Event#58;#58;Pause` in the source and reads `Event::Pause` in the picture.
+
+State ids are the state names with every character outside `A-Za-z0-9_` replaced by `_`, a leading `s_` for a name that starts with a digit, and `state_<index>` for an empty name. An id that another state already has, or that is a word of the Mermaid grammar (`end`, `state`, `note`, `class`, `default`, `style`, ..., compared ignoring case), gets `_<index>` appended, so two states with the same name still get two nodes (Mermaid ids are global). When the id differs from the name, a `state "Name" as id` line keeps the name as the label.
 
 ## DOT
 

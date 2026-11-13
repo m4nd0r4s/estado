@@ -7,14 +7,14 @@ stateDiagram-v2
         Jumping
         Crouching
         [*] --> Standing
-        Standing --> Walking : Event::Move
-        Standing --> Jumping : Event::Jump
-        Standing --> Crouching : Event::Crouch
-        Walking --> Standing : Event::Stop
-        Walking --> Jumping : Event::Jump
-        Walking --> Crouching : Event::Crouch
-        Jumping --> Standing : Event::Land [timer]
-        Crouching --> Standing : Event::Stand
+        Standing --> Walking : Event#58;#58;Move
+        Standing --> Jumping : Event#58;#58;Jump
+        Standing --> Crouching : Event#58;#58;Crouch
+        Walking --> Standing : Event#58;#58;Stop
+        Walking --> Jumping : Event#58;#58;Jump
+        Walking --> Crouching : Event#58;#58;Crouch
+        Jumping --> Standing : Event#58;#58;Land [timer]
+        Crouching --> Standing : Event#58;#58;Stand
         --
         %% region weapon
         Ready
@@ -22,12 +22,12 @@ stateDiagram-v2
         Reloading
         Empty
         [*] --> Ready
-        Ready --> Firing : Event::Fire
-        Ready --> Reloading : Event::ReloadRequest
-        Firing --> Empty : Event::CooldownElapsed [timer]
-        Firing --> Ready : Event::CooldownElapsed [timer]
-        Reloading --> Ready : Event::ReloadDone [timer]
-        Empty --> Reloading : Event::ReloadRequest
+        Ready --> Firing : Event#58;#58;Fire
+        Ready --> Reloading : Event#58;#58;ReloadRequest
+        Firing --> Empty : Event#58;#58;CooldownElapsed [timer]
+        Firing --> Ready : Event#58;#58;CooldownElapsed [timer]
+        Reloading --> Ready : Event#58;#58;ReloadDone [timer]
+        Empty --> Reloading : Event#58;#58;ReloadRequest
         --
         %% region anim
         Idle
@@ -35,20 +35,20 @@ stateDiagram-v2
         Jump
         Shoot
         [*] --> Idle
-        Idle --> Run : Anim::Run
-        Idle --> Jump : Anim::Jump
-        Idle --> Shoot : Anim::Shoot
-        Run --> Idle : Anim::Idle
-        Run --> Jump : Anim::Jump
-        Run --> Shoot : Anim::Shoot
-        Jump --> Idle : Anim::Idle
-        Jump --> Run : Anim::Run
-        Jump --> Shoot : Anim::Shoot
-        Shoot --> Idle : Anim::Idle
-        Shoot --> Run : Anim::Run
-        Shoot --> Jump : Anim::Jump
+        Idle --> Run : Anim#58;#58;Run
+        Idle --> Jump : Anim#58;#58;Jump
+        Idle --> Shoot : Anim#58;#58;Shoot
+        Run --> Idle : Anim#58;#58;Idle
+        Run --> Jump : Anim#58;#58;Jump
+        Run --> Shoot : Anim#58;#58;Shoot
+        Jump --> Idle : Anim#58;#58;Idle
+        Jump --> Run : Anim#58;#58;Run
+        Jump --> Shoot : Anim#58;#58;Shoot
+        Shoot --> Idle : Anim#58;#58;Idle
+        Shoot --> Run : Anim#58;#58;Run
+        Shoot --> Jump : Anim#58;#58;Jump
     }
     Dead
     [*] --> Alive
-    Alive --> Dead : Event::Damage
-    Dead --> Alive : Event::Respawn
+    Alive --> Dead : Event#58;#58;Damage
+    Dead --> Alive : Event#58;#58;Respawn

@@ -65,12 +65,41 @@ fn mermaid_ids_are_unique_and_avoid_keywords() {
 }
 
 #[test]
-fn mermaid_quotes_and_semicolons_cannot_break_a_line() {
+fn mermaid_text_is_written_as_entities() {
     let graph = graph_of(&["Say \"hi\"", "B"], Some("Event::A;\n  Event::B"));
     let diagram = to_mermaid(&graph);
     assert!(diagram.contains("state \"Say #quot;hi#quot;\" as Say__hi_\n"));
-    assert!(diagram.contains("Say__hi_ --> B : Event::A, Event::B\n"));
-    assert!(!diagram.contains("Event::A;"));
+    assert!(diagram.contains("Say__hi_ --> B : Event#58;#58;A#59; Event#58;#58;B\n"));
+}
+
+#[test]
+fn mermaid_labels_hold_no_character_of_the_grammar() {
+    // Mermaid rejects a second `:` in a transition line, and reads `;`, `#`,
+    // quotes and angle brackets as syntax; they must all be entities.
+    let graph = graph_of(&["A", "B"], Some("Ev::X { a: #1 } -> <b>; \"c\" & 'd' \\"));
+    let diagram = to_mermaid(&graph);
+    let line = diagram
+        .lines()
+        .find(|line| line.contains(" --> B : "))
+        .expect("an edge line");
+    let mut label = line.split_once(" : ").unwrap().1.to_string();
+    for entity in [
+        "#35;", "#58;", "#59;", "#quot;", "#lt;", "#gt;", "#amp;", "#92;",
+    ] {
+        label = label.replace(entity, "");
+    }
+    for forbidden in [':', ';', '"', '<', '>', '&', '\\', '#'] {
+        assert!(!label.contains(forbidden), "{forbidden:?} in {label}");
+    }
+}
+
+#[test]
+fn mermaid_ids_are_unique_for_repeated_names() {
+    let graph = graph_of(&["Idle", "Idle", "Idle"], None);
+    let diagram = to_mermaid(&graph);
+    assert!(diagram.contains("\n    Idle\n"), "{diagram}");
+    assert!(diagram.contains("state \"Idle\" as Idle_1\n"), "{diagram}");
+    assert!(diagram.contains("state \"Idle\" as Idle_2\n"), "{diagram}");
 }
 
 #[test]

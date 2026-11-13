@@ -42,7 +42,7 @@
 //! let diagram = GRAPH.to_mermaid();
 //! assert!(diagram.starts_with("stateDiagram-v2\n"));
 //! assert!(diagram.contains("    [*] --> Off\n"));
-//! assert!(diagram.contains("    Off --> On : Event::Toggle\n"));
+//! assert!(diagram.contains("    Off --> On : Event#58;#58;Toggle\n"));
 //! ```
 //!
 //! # Limits
