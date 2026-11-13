@@ -1,5 +1,6 @@
 //! `Machine<M>` and the run-to-completion `send` algorithm (spec 4.5, 5.4).
 
+mod batch;
 mod tasks;
 
 use crate::context::{Cx, Fault};
@@ -217,30 +218,15 @@ impl<M: Spec> Machine<M> {
         let guard = PoisonGuard {
             slot: &mut self.slot,
         };
-        if guard.slot.live().is_some_and(M::is_done) {
-            report.ignored = Some(IgnoreReason::Unhandled);
-            guard.disarm();
-            return Ok(report);
-        }
-        let first = microstep(
+        let stepped = step_live(
             guard.slot,
             &mut self.ctx,
             &mut self.runtime,
             sink,
             event,
-            Source::External,
             &mut report,
         );
-        if let Err(error) = first {
-            return Err(settle_error(guard, error));
-        }
-        if let Err(error) = drain::<M, S>(
-            guard.slot,
-            &mut self.ctx,
-            &mut self.runtime,
-            sink,
-            &mut report,
-        ) {
+        if let Err(error) = stepped {
             return Err(settle_error(guard, error));
         }
         guard.disarm();
@@ -288,38 +274,6 @@ impl<M: Spec> Machine<M> {
         on_effect: impl FnMut(Effect<M::Effect>),
     ) -> Result<Report, SendError<M::Event>> {
         self.send_into(event, &mut FnSink(on_effect))
-    }
-
-    /// Sends every event in order; stops at the first error. The report
-    /// accumulates counters; `handled` and `ignored` describe the last event.
-    ///
-    /// # Errors
-    ///
-    /// See [`SendError`].
-    pub fn send_batch<S: Sink<M::Effect>>(
-        &mut self,
-        events: impl IntoIterator<Item = M::Event>,
-        sink: &mut S,
-    ) -> Result<Report, SendError<M::Event>> {
-        let mut total = Report::default();
-        // Wide counters, clamped once: the same value as saturating at every
-        // event (all addends are non-negative), without the compare per event.
-        let mut transitions = 0_u64;
-        let mut microsteps = 0_u64;
-        let mut unhandled_internal = 0_u64;
-        for event in events {
-            let report = self.send_into(event, sink)?;
-            total.handled = report.handled;
-            total.ignored = report.ignored;
-            transitions += u64::from(report.transitions);
-            microsteps += u64::from(report.microsteps);
-            unhandled_internal += u64::from(report.unhandled_internal);
-        }
-        let clamp = |count: u64| u16::try_from(count).unwrap_or(u16::MAX);
-        total.transitions = clamp(transitions);
-        total.microsteps = clamp(microsteps);
-        total.unhandled_internal = clamp(unhandled_internal);
-        Ok(total)
     }
 
     /// The root state.
@@ -414,6 +368,25 @@ impl<M: Spec> Machine<M> {
     pub fn runtime(&self) -> &M::Runtime {
         &self.runtime
     }
+}
+
+/// One event of a live slot, to completion: the done check, the microstep and
+/// the drain. The caller owns the poison guard and the error handling.
+#[inline(always)]
+fn step_live<M: Spec, S: Sink<M::Effect>>(
+    slot: &mut Slot<M>,
+    ctx: &mut M::Ctx,
+    runtime: &mut M::Runtime,
+    sink: &mut S,
+    event: M::Event,
+    report: &mut Report,
+) -> Result<(), SendError<M::Event>> {
+    if slot.live().is_some_and(M::is_done) {
+        report.ignored = Some(IgnoreReason::Unhandled);
+        return Ok(());
+    }
+    microstep(slot, ctx, runtime, sink, event, Source::External, report)?;
+    drain::<M, S>(slot, ctx, runtime, sink, report)
 }
 
 /// Ends a failed step: poisons for a fatal error, otherwise leaves the state.
