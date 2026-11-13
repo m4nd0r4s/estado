@@ -65,6 +65,9 @@ pub mod prelude {
 #[doc = include_str!("../../../README.md")]
 mod readme {}
 
+#[cfg(doctest)]
+mod reference_docs;
+
 /// The user guide's examples (`docs/guide/`), compiled and run as doctests.
 #[cfg(doctest)]
 mod guide {
