@@ -95,7 +95,7 @@ Write options inside the attribute, separated by commas: `#[estado::machine(even
 | `tracks_active` | off | Forces `cx.in_state` on. See below. |
 | `allow(W0001, ..)` | none | Silences warnings. |
 
-The options `typestate`, `infallible` and `version` are accepted but have no effect yet. They belong to the typestate and snapshot features of later milestones. The one check that exists today: `typestate` together with a `#[region]` field is [E0050](../errors/E0050.md).
+The options `typestate`, `infallible` and `version` are not supported yet. They belong to the typestate and snapshot features of later milestones, and writing one is [E0090](../errors/E0090.md) (`typestate` on a machine with a `#[region]` field is [E0050](../errors/E0050.md)), so none of them silently does nothing.
 
 The [configuration reference](../reference/configuration.md) lists every option with its limits.
 

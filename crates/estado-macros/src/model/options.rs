@@ -46,6 +46,17 @@ pub struct MachineOptions {
     pub version: u32,
     /// `allow(W0001, ..)`.
     pub allowed_warnings: Vec<Ident>,
+    /// Options that parse but that no version generates code for yet
+    /// (`typestate`, `infallible`, `version`), in the order written.
+    pub unsupported: Vec<UnsupportedOption>,
+}
+
+/// An option written in `#[machine(..)]` that is not supported yet (E0090).
+pub struct UnsupportedOption {
+    /// The option name.
+    pub name: &'static str,
+    /// Where the option is written.
+    pub span: Span,
 }
 
 /// Unhandled-event policy (spec 5.7).
@@ -101,6 +112,7 @@ impl MachineOptions {
             infallible: false,
             version: 1,
             allowed_warnings: Vec::new(),
+            unsupported: Vec::new(),
         }
     }
 }

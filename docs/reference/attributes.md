@@ -30,7 +30,7 @@ The attributes `#[choice]`, `#[on_child_done]`, `#[on_resume]`, `#[invariant]`, 
 
 **Rules**
 
-- Each option can appear once. An unknown option, a repeated option, a bad value, or a flag given a value (`typestate = true`) is [`E0016`](../errors/E0016.md), with a "did you mean" suggestion.
+- Each option can appear once. An unknown option, a repeated option, a bad value, or a flag given a value (`tracks_active = true`) is [`E0016`](../errors/E0016.md), with a "did you mean" suggestion.
 - `event` is required ([`E0002`](../errors/E0002.md)).
 - On anything but an inline module with one `#[root]` enum the error is [`E0001`](../errors/E0001.md).
 
@@ -50,9 +50,9 @@ The attributes `#[choice]`, `#[on_child_done]`, `#[on_resume]`, `#[invariant]`, 
 | `size_warn` | bytes | `128` | A variant larger than this triggers [`W0004`](../errors/W0004.md). |
 | `tracks_active` | flag | off | Keeps the active-configuration snapshot that `cx.in_state` reads. See below. |
 | `allow(W0001, ..)` | warning codes | none | Silences warnings. See [errors](errors.md#warnings). |
-| `typestate` | flag | off | Reserved. The macro accepts it and rejects regions with it ([`E0050`](../errors/E0050.md)); it generates nothing else yet. |
-| `infallible` | flag | off | Reserved. Accepted; no effect yet. |
-| `version` | integer | `1` | Reserved for snapshots. Accepted; no effect yet. |
+| `typestate` | flag | off | Not supported yet: [`E0090`](../errors/E0090.md) (with regions, [`E0050`](../errors/E0050.md)). Reserved for the typestate mode. |
+| `infallible` | flag | off | Not supported yet: [`E0090`](../errors/E0090.md). |
+| `version` | integer | `1` | Not supported yet: [`E0090`](../errors/E0090.md). Reserved for snapshots. |
 
 The options reach the `Spec` implementation as associated constants: `Spec::UNHANDLED`, `Spec::DEFER_OVERFLOW`, `Spec::MAX_MICROSTEPS` and `Spec::TRACKS_ACTIVE`.
 

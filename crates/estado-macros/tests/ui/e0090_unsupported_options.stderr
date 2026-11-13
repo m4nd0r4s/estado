@@ -1,0 +1,20 @@
+error: estado::E0090: the option `typestate` is not supported yet by this version of `estado`
+         = help: it is part of the planned macro language; remove it for now
+ --> tests/ui/e0090_unsupported_options.rs:8:23
+  |
+8 | #[machine(event = Ev, typestate, infallible, version = 2)]
+  |                       ^^^^^^^^^
+
+error: estado::E0090: the option `infallible` is not supported yet by this version of `estado`
+         = help: it is part of the planned macro language; remove it for now
+ --> tests/ui/e0090_unsupported_options.rs:8:34
+  |
+8 | #[machine(event = Ev, typestate, infallible, version = 2)]
+  |                                  ^^^^^^^^^^
+
+error: estado::E0090: the option `version` is not supported yet by this version of `estado`
+         = help: it is part of the planned macro language; remove it for now
+ --> tests/ui/e0090_unsupported_options.rs:8:46
+  |
+8 | #[machine(event = Ev, typestate, infallible, version = 2)]
+  |                                              ^^^^^^^

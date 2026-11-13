@@ -15,7 +15,7 @@ pub use handlers::{
     EventCoverage, GotoForm, GotoOccurrence, HandlerModel, HandlerParameter, HandlerRole,
     HandlerUses, TransitionKind,
 };
-pub use options::{DeferOverflow, MachineOptions, UnhandledPolicy};
+pub use options::{DeferOverflow, MachineOptions, UnhandledPolicy, UnsupportedOption};
 pub use tree::{
     AfterSpec, HistoryKind, InvokeSpec, Payload, StateId, StateKind, StateNode, StateTree, TypeDecl,
 };

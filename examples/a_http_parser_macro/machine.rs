@@ -12,7 +12,8 @@ use estado_core::{Cx, Next};
 use super::grammar::*;
 use super::{Method, ParseError, ParserCtx, RequestSummary};
 
-#[estado_macros::machine(event = u8, ctx = ParserCtx, infallible)]
+// The spec writes scenario A with `infallible`, which is not supported yet (E0090).
+#[estado_macros::machine(event = u8, ctx = ParserCtx)]
 pub mod parser {
     use super::*;
 

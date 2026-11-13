@@ -7,7 +7,7 @@ use syn::meta::ParseNestedMeta;
 use syn::parse::Parser;
 use syn::{Expr, Ident, LitInt, Token, Type};
 
-use crate::model::{DeferOverflow, Diagnostic, MachineOptions, UnhandledPolicy};
+use crate::model::{DeferOverflow, Diagnostic, MachineOptions, UnhandledPolicy, UnsupportedOption};
 use crate::suggest::did_you_mean;
 
 /// Code for malformed machine options (not in the spec table; errata 8).
@@ -134,13 +134,22 @@ fn parse_one_option(
                 parse_number(meta, diagnostics, name)?.unwrap_or(options.max_microsteps);
         }
         "version" => {
-            options.version = parse_number(meta, diagnostics, name)?.unwrap_or(options.version)
+            if let Some(version) = parse_number(meta, diagnostics, name)? {
+                options.version = version;
+                note_unsupported(meta, "version", options);
+            }
         }
         "typestate" => {
-            options.typestate = parse_flag(meta, diagnostics, name)?.unwrap_or(options.typestate)
+            if parse_flag(meta, diagnostics, name)?.is_some() {
+                options.typestate = true;
+                note_unsupported(meta, "typestate", options);
+            }
         }
         "infallible" => {
-            options.infallible = parse_flag(meta, diagnostics, name)?.unwrap_or(options.infallible)
+            if parse_flag(meta, diagnostics, name)?.is_some() {
+                options.infallible = true;
+                note_unsupported(meta, "infallible", options);
+            }
         }
         "allow" => meta.parse_nested_meta(|warning| {
             match warning.path.get_ident() {
@@ -159,6 +168,15 @@ fn parse_one_option(
         }
     }
     Ok(())
+}
+
+/// Remembers an option that parses but is not supported yet; analysis
+/// reports it (E0090).
+fn note_unsupported(meta: &ParseNestedMeta<'_>, name: &'static str, options: &mut MachineOptions) {
+    options.unsupported.push(UnsupportedOption {
+        name,
+        span: meta.path.segments[0].ident.span(),
+    });
 }
 
 fn unknown_option(meta: &ParseNestedMeta<'_>, name: &str) -> Diagnostic {

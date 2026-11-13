@@ -1,4 +1,5 @@
-//! Checks of the `#[machine(..)]` options against the tree (E0002, E0050).
+//! Checks of the `#[machine(..)]` options against the tree (E0002, E0050,
+//! E0090).
 
 use crate::model::{Diagnostic, MachineModel, StateKind};
 use crate::suggest::did_you_mean;
@@ -15,22 +16,36 @@ pub fn check(model: &MachineModel, diagnostics: &mut Vec<Diagnostic>) {
             .with_help("add `event = MyEvent`, e.g. `#[machine(event = MyEvent)]`"),
         );
     }
-    if model.options.typestate {
-        let first_region = model
-            .tree
-            .nodes
-            .iter()
-            .find(|node| node.kind == StateKind::Region);
-        if let Some(region) = first_region {
-            diagnostics.push(
-                Diagnostic::new(
-                    "E0050",
-                    region.name.span(),
-                    "regions are not supported in `typestate` mode",
-                )
-                .with_help("remove `typestate`, or split the regions into separate machines"),
-            );
+    let first_region = model
+        .tree
+        .nodes
+        .iter()
+        .find(|node| node.kind == StateKind::Region);
+    for option in &model.options.unsupported {
+        if option.name == "typestate" {
+            if let Some(region) = first_region {
+                diagnostics.push(
+                    Diagnostic::new(
+                        "E0050",
+                        region.name.span(),
+                        "regions are not supported in `typestate` mode",
+                    )
+                    .with_help("remove `typestate`, or split the regions into separate machines"),
+                );
+                continue;
+            }
         }
+        diagnostics.push(
+            Diagnostic::new(
+                "E0090",
+                option.span,
+                format!(
+                    "the option `{}` is not supported yet by this version of `estado`",
+                    option.name
+                ),
+            )
+            .with_help("it is part of the planned macro language; remove it for now"),
+        );
     }
     check_allowed_warnings(model, diagnostics);
 }
