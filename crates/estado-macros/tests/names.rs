@@ -59,7 +59,7 @@ mod names {
                     *view.n += 1;
                     stay!()
                 }
-                Event::Leave => goto!(r#type(7), |old: Exiting![r#loop]| Names::r#type(old.n)),
+                Event::Leave => goto!(r#type, |old: Exiting![r#loop]| Names::r#type(old.n)),
                 _ => bubble!(),
             }
         }

@@ -70,6 +70,23 @@ pub fn resolve_goto(
 
     let payload = match syntax.extra {
         GotoExtra::Constructor(closure) => {
+            if let Some(level) = syntax
+                .levels
+                .iter()
+                .find(|level| !matches!(level.data, SuppliedData::None))
+            {
+                return Err(malformed(
+                    level.name.span(),
+                    format!(
+                        "`{}` is given data, but the constructor closure builds the value",
+                        level.name
+                    ),
+                )
+                .with_help(
+                    "write the target without data, `goto!(State, |old: Exiting![Source]| value)`, \
+                     and build the whole value in the closure",
+                ));
+            }
             let exiting = exiting_child(tree, handler_state, lca, target, macro_span)?;
             if let Some(deep) = deep_history_below(tree, exiting) {
                 return Err(Diagnostic::new(

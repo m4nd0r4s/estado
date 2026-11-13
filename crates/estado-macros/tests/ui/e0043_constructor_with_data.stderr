@@ -1,0 +1,6 @@
+error: estado::E0043: `Failed` is given data, but the constructor closure builds the value
+         = help: write the target without data, `goto!(State, |old: Exiting![Source]| value)`, and build the whole value in the closure
+  --> tests/ui/e0043_constructor_with_data.rs:39:19
+   |
+39 |             goto!(Failed { reason: 1 }, |old: Exiting![Active]| Player::Failed { reason: 2 })
+   |                   ^^^^^^

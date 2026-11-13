@@ -38,21 +38,21 @@ fn is_rejected(body: TokenStream) -> bool {
 #[test]
 fn a_method_call_on_the_parameter_is_caught() {
     assert!(is_rejected(quote! {
-        goto!(Failed { code: 0 }, |old: Exiting![Active]| M::Failed { code: up.rounds.clone() })
+        goto!(Failed, |old: Exiting![Active]| M::Failed { code: up.rounds.clone() })
     }));
 }
 
 #[test]
 fn a_borrow_of_the_parameter_in_a_call_is_caught() {
     assert!(is_rejected(quote! {
-        goto!(Failed { code: 0 }, |old: Exiting![Active]| M::Failed { code: read(&up.rounds) })
+        goto!(Failed, |old: Exiting![Active]| M::Failed { code: read(&up.rounds) })
     }));
 }
 
 #[test]
 fn a_use_inside_a_nested_closure_is_caught() {
     assert!(is_rejected(quote! {
-        goto!(Failed { code: 0 }, |old: Exiting![Active]| {
+        goto!(Failed, |old: Exiting![Active]| {
             let add = |extra: u8| extra + *up.rounds;
             M::Failed { code: add(1) }
         })
@@ -62,7 +62,7 @@ fn a_use_inside_a_nested_closure_is_caught() {
 #[test]
 fn a_use_in_the_arguments_of_a_macro_is_caught() {
     assert!(is_rejected(quote! {
-        goto!(Failed { code: 0 }, |old: Exiting![Active]| {
+        goto!(Failed, |old: Exiting![Active]| {
             M::Failed { code: format!("{}", up.rounds).len() as u8 }
         })
     }));
@@ -71,7 +71,7 @@ fn a_use_in_the_arguments_of_a_macro_is_caught() {
 #[test]
 fn an_inline_format_argument_is_caught() {
     assert!(is_rejected(quote! {
-        goto!(Failed { code: 0 }, |old: Exiting![Active]| {
+        goto!(Failed, |old: Exiting![Active]| {
             M::Failed { code: format!("{up:?}").len() as u8 }
         })
     }));
@@ -80,7 +80,7 @@ fn an_inline_format_argument_is_caught() {
 #[test]
 fn a_use_after_the_scope_of_a_shadowing_binding_ended_is_caught() {
     assert!(is_rejected(quote! {
-        goto!(Failed { code: 0 }, |old: Exiting![Active]| {
+        goto!(Failed, |old: Exiting![Active]| {
             { let up = old.rounds; let _ = up; }
             M::Failed { code: *up.rounds }
         })
@@ -90,7 +90,7 @@ fn a_use_after_the_scope_of_a_shadowing_binding_ended_is_caught() {
 #[test]
 fn a_use_after_a_closure_that_shadows_the_name_is_caught() {
     assert!(is_rejected(quote! {
-        goto!(Failed { code: 0 }, |old: Exiting![Active]| {
+        goto!(Failed, |old: Exiting![Active]| {
             let keep = |up: u8| up;
             M::Failed { code: keep(1) + *up.rounds }
         })
@@ -100,7 +100,7 @@ fn a_use_after_a_closure_that_shadows_the_name_is_caught() {
 #[test]
 fn the_initialiser_of_a_let_still_sees_the_parameter() {
     assert!(is_rejected(quote! {
-        goto!(Failed { code: 0 }, |old: Exiting![Active]| {
+        goto!(Failed, |old: Exiting![Active]| {
             let up = *up.rounds;
             M::Failed { code: up }
         })
@@ -110,7 +110,7 @@ fn the_initialiser_of_a_let_still_sees_the_parameter() {
 #[test]
 fn a_binding_made_after_the_goto_does_not_hide_a_capture() {
     assert!(is_rejected(quote! {
-        let result = goto!(Failed { code: 0 }, |old: Exiting![Active]| M::Failed { code: *up.rounds });
+        let result = goto!(Failed, |old: Exiting![Active]| M::Failed { code: *up.rounds });
         let up = 1;
         let _ = up;
         result
@@ -120,7 +120,7 @@ fn a_binding_made_after_the_goto_does_not_hide_a_capture() {
 #[test]
 fn a_struct_field_named_like_the_parameter_does_not_hide_a_capture() {
     assert!(is_rejected(quote! {
-        goto!(Failed { code: 0 }, |old: Exiting![Active]| {
+        goto!(Failed, |old: Exiting![Active]| {
             let info = Info { up: 1 };
             M::Failed { code: info.up + *up.rounds }
         })

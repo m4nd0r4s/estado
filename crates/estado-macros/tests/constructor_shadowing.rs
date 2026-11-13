@@ -66,42 +66,42 @@ mod player {
                 // The fix the E0046 page recommends.
                 Event::CopiedFirst => {
                     let up = *up.rounds;
-                    goto!(Failed { code: 0 }, move |old: Exiting![Active]| {
+                    goto!(Failed, move |old: Exiting![Active]| {
                         Player::Failed {
                             code: up + old.rounds,
                         }
                     })
                 }
-                Event::LetInside => goto!(Failed { code: 0 }, |old: Exiting![Active]| {
+                Event::LetInside => goto!(Failed, |old: Exiting![Active]| {
                     let up = old.rounds;
                     Player::Failed { code: up + 1 }
                 }),
-                Event::NestedParameter => goto!(Failed { code: 0 }, |old: Exiting![Active]| {
+                Event::NestedParameter => goto!(Failed, |old: Exiting![Active]| {
                     let bump = |up: u8| up + 2;
                     Player::Failed {
                         code: bump(old.rounds),
                     }
                 }),
-                Event::MatchArm => goto!(Failed { code: 0 }, |old: Exiting![Active]| {
+                Event::MatchArm => goto!(Failed, |old: Exiting![Active]| {
                     match Some(old.rounds) {
                         Some(up) => Player::Failed { code: up + 3 },
                         None => Player::Failed { code: 0 },
                     }
                 }),
-                Event::IfLet => goto!(Failed { code: 0 }, |old: Exiting![Active]| {
+                Event::IfLet => goto!(Failed, |old: Exiting![Active]| {
                     if let Some(up) = Some(old.rounds) {
                         Player::Failed { code: up + 4 }
                     } else {
                         Player::Failed { code: 0 }
                     }
                 }),
-                Event::FieldAccess => goto!(Failed { code: 0 }, |old: Exiting![Active]| {
+                Event::FieldAccess => goto!(Failed, |old: Exiting![Active]| {
                     let report = Report { up: old.rounds };
                     Player::Failed {
                         code: format!("{}", report.up).parse().unwrap(),
                     }
                 }),
-                Event::NamedArgument => goto!(Failed { code: 0 }, |old: Exiting![Active]| {
+                Event::NamedArgument => goto!(Failed, |old: Exiting![Active]| {
                     Player::Failed {
                         code: format!("{up}", up = old.rounds).parse().unwrap(),
                     }

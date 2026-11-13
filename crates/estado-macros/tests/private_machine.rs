@@ -154,7 +154,7 @@ mod harbor {
             match event {
                 Event::Crash => {
                     let code = active.name.len() as u8;
-                    goto!(Fault { code }, move |old: Exiting![Active]| {
+                    goto!(Fault, move |old: Exiting![Active]| {
                         Harbor::Fault {
                             code: code + old.name.len() as u8,
                         }

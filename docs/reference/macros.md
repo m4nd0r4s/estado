@@ -250,7 +250,7 @@ The closure builds the value that replaces the state that exits. Use it to move 
   | A struct-like or tuple variant | `<X>Exiting`, with the fields as `pub` owned fields (`old.code`, or `old.0`) |
   | A compound state with `#[history(deep, keep)]` | `<Struct>Exiting`, the shared fields without the substates |
 
-- The closure returns the new value of the child of the least common ancestor, as the enum that owns it (for example `Door::Broken(..)`, or `Link::Up` for a state of a region). The data you write in the first argument is not used.
+- The closure returns the new value of the child of the least common ancestor, as the enum that owns it (for example `Door::Broken(..)`, or `Link::Up` for a state of a region). The target takes no data in this form: `goto!(Failed { code: 1 }, |old| ..)` is [`E0043`](../errors/E0043.md), because the data would be ignored.
 - The closure runs after the handler returned. It cannot use anything the handler borrows: the own data, the view and the `*Fields` parameters. That is [`E0046`](../errors/E0046.md). Copy what you need into a local and use a `move` closure.
 - It is `E0090` when the exiting state contains a deep history, because the constructor would drop it. It is `E0043` when going to a substate of the handler's own state, because it is not known which substate exits.
 
