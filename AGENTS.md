@@ -125,3 +125,27 @@ bd prime                # Refresh Beads context
 
 **Architecture in one line:** issues live in a local Dolt DB; sync uses `refs/dolt/data` on your git remote; `.beads/issues.jsonl` is a passive export. See https://github.com/gastownhall/beads/blob/main/docs/core-concepts/sync-concepts.md for details and anti-patterns.
 <!-- END BEADS CODEX SETUP -->
+
+## Build & Test
+
+```bash
+cargo fmt --all --check
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo test --workspace --all-features                      # also with --release (AC-19)
+cargo build -p estado-core --no-default-features --target thumbv7em-none-eabihf   # AC-16
+cargo +nightly miri test -p estado-core                    # AC-18
+```
+
+## Architecture Overview
+
+Cargo workspace: published crates in `crates/<name>`, test-only crates in `checks/<name>`, reference scenarios in `examples/`, tools in `tools/`. `estado-core` is the only required crate and builds as `no_std` without `alloc`. The normative spec is `docs/spec.md`; section 5 (semantics) is the source of truth. Work follows the milestones of spec section 12 (M0-M6), tracked in Beads: epic `estado-99i`, milestones `estado-99i.1`..`estado-99i.7`.
+
+## Conventions & Patterns
+
+- **English everywhere:** code, comments, docs, commit messages, diagnostics.
+- **Descriptive names:** full words, no single-letter identifiers outside tiny closures.
+- **Small modules:** `lib.rs` mostly re-exports; split a file before it grows past ~400 lines.
+- **Decisions:** every [OPEN] item from the spec gets an ADR in `docs/decisions/NNNN-title.md`; contradictions with section 5 go to `docs/spec-errata.md`.
+- **Acceptance criteria:** the test name carries the id (`ac_01_...`, `bm_02_...`).
+- **Commits:** small, focused, short imperative message, no AI attribution. Identity is repo-local (`M4nd0r4s`, GitHub noreply address). Push only when asked.
+- **Beads:** search before creating a bead; claim before coding; close when the commit lands; review the epic and milestones at the end of each delivery.
