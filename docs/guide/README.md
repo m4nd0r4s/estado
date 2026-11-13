@@ -34,4 +34,4 @@ For exhaustive lists of attributes, macros, methods and options, see the referen
 
 ## What is not available yet
 
-Graph export (Mermaid, DOT, SCXML, JSON), the Tokio and Embassy runtimes, serde snapshots, the live inspector and the typestate mode belong to later milestones. `#[choice]`, `#[edges]`, `#[on_error]`, child machines (`#[child]`) and `#[invariant]` are planned and report error [E0090](../errors/E0090.md) today. `goto_dyn!` is planned too, but today it reports [E0040](../errors/E0040.md), and a handler that returns `Result` reports [E0061](../errors/E0061.md).
+Graph export (Mermaid, DOT, SCXML, JSON), the Tokio and Embassy runtimes, serde snapshots, the live inspector and the typestate mode belong to later milestones. `#[choice]`, `#[edges]`, `goto_dyn!`, `#[on_error]`, child machines (`#[child]`) and `#[invariant]` are planned and report error [E0090](../errors/E0090.md) today. A handler that returns `Result` reports [E0061](../errors/E0061.md).

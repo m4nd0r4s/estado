@@ -40,6 +40,8 @@ macro_rules! goto {
 /// Transition to a state computed at run time (spec 6.3). Only valid inside
 /// a `#[handlers]` function of a `#[machine]` module.
 ///
+/// Not supported yet: inside a handler it is error `E0090`.
+///
 /// The argument is an already built value of the machine; the least common
 /// ancestor is computed at run time and the graph records a `*` edge.
 ///
@@ -221,6 +223,8 @@ macro_rules! reenter {
 /// The type of a helper that declares its edges: `Next<Self, edges![A | B]>`
 /// (spec 6.3). Only valid in the signature of a function of a `#[handlers]`
 /// impl, next to `#[edges(A | B)]`.
+///
+/// Not supported yet: inside a handler it is error `E0090`.
 ///
 /// ```ignore
 /// #[edges(Paused | Stopped)]

@@ -1,0 +1,13 @@
+error: estado::E0090: `goto_dyn!` is not supported yet by this version of `estado`
+         = help: it is part of the planned macro language; use `goto!` with a state of the machine
+  --> tests/ui/e0090_goto_dyn_in_a_handler.rs:20:13
+   |
+20 |             goto_dyn!(Player::Playing)
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: estado::E0090: `edges!` is not supported yet by this version of `estado`
+         = help: it belongs to `#[edges]` helpers, which are not supported yet; return `Next<Self>` from a handler
+  --> tests/ui/e0090_goto_dyn_in_a_handler.rs:24:67
+   |
+24 |         fn playing(_cx: &mut Cx<Self>, _event: &Ev) -> Next<Self, edges![Idle | Playing]> {
+   |                                                                   ^^^^^^^^^^^^^^^^^^^^^^

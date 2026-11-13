@@ -375,7 +375,7 @@ fn main() {
 
 | Macro | Status |
 | --- | --- |
-| `goto_dyn!(value)` | Transition to a value built at run time. Not implemented. It is exported and in the prelude, but `#[machine]` does not rewrite it yet, so a use inside a handler is reported as `E0040`. [`E0090`](../errors/E0090.md) lists it as not supported yet. |
-| `edges![A \| B]` | The return type of an `#[edges(A \| B)]` helper. `#[edges]` is `E0090`. |
+| `goto_dyn!(value)` | Transition to a value built at run time. Not implemented. It is exported and in the prelude, and a use inside a handler is reported as [`E0090`](../errors/E0090.md), not supported yet. Outside a handler it is [`E0040`](../errors/E0040.md). |
+| `edges![A \| B]` | The return type of an `#[edges(A \| B)]` helper. Not implemented: `#[edges]` and a use of `edges!` inside a handler are `E0090`. |
 
 The attributes `#[choice]`, `#[on_child_done]`, `#[on_resume]`, `#[invariant]`, `#[edges]` and `#[on_error]` are also not supported yet; each is `E0090`.

@@ -23,6 +23,7 @@ mod scopes;
 mod signature;
 #[cfg(test)]
 mod tests;
+mod unsupported_macros;
 
 use std::collections::HashMap;
 
@@ -44,6 +45,7 @@ use event_coverage::event_coverage;
 use parameters::{ParameterEnvironment, ParameterList, classify_parameters};
 use roles::{FunctionRole, RoleAttribute, take_role};
 use signature::{EdgeType, rewrite_signature};
+use unsupported_macros::reject_unsupported_macros;
 
 /// Analyses every handler of `model`: fills `analysed_handlers` and
 /// `rewritten_handlers`, and returns the diagnostics. `model.handlers` keeps
@@ -75,6 +77,8 @@ pub fn analyse(model: &mut MachineModel) -> Vec<Diagnostic> {
             let (ImplItem::Fn(degraded), ImplItem::Fn(full)) = (degraded_item, full_item) else {
                 continue;
             };
+            reject_unsupported_macros(degraded, &mut diagnostics);
+            reject_unsupported_macros(full, &mut Vec::new());
             let role = take_role(degraded, &mut diagnostics);
             let _ = take_role(full, &mut Vec::new());
             let handler = match role {

@@ -23,7 +23,7 @@ A malformed `goto!` is [E0043](../errors/E0043.md).
 
 ## Not supported yet
 
-Some forms of the macro language are planned and report [E0090](../errors/E0090.md) when you use them: `#[choice]` pseudostates, `#[edges]` helpers, `#[on_error]` and `#[invariant]`. Two more fail with other codes today: `goto_dyn!` (a target decided at run time) reports [E0040](../errors/E0040.md), and a handler that returns `Result` reports [E0061](../errors/E0061.md). Express the same logic with a `match` in a handler and a `goto!` for each case.
+Some forms of the macro language are planned and report [E0090](../errors/E0090.md) when you use them: `#[choice]` pseudostates, `#[edges]` helpers (and `edges!`), `goto_dyn!` (a target decided at run time), `#[on_error]` and `#[invariant]`. A handler that returns `Result` fails with another code today, [E0061](../errors/E0061.md). Express the same logic with a `match` in a handler and a `goto!` for each case.
 
 ## `reenter!()`
 

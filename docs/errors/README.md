@@ -1,6 +1,6 @@
 # Error and warning codes
 
-One page per code (`E0001.md`, `W0001.md`, ...), with an example that triggers it, the message and the fix. Every code has a matching `trybuild` test: errors in `crates/estado-macros/tests/ui/` (and `crates/estado/tests/ui/` for E0040), warnings in `crates/estado-macros/tests/warnings/`.
+One page per code (`E0001.md`, `W0001.md`, ...), with an example that triggers it, the message and the fix. Every code has a matching `trybuild` test: errors in `crates/estado-macros/tests/ui/` (and `crates/estado/tests/ui/` for E0040 and for `goto_dyn!` and `edges!` in E0090, which need the facade prelude), warnings in `crates/estado-macros/tests/warnings/`.
 
 Every diagnostic reads `estado::<code>: <message>`, with a `help:` line when there is a fix to suggest. Warnings use rustc's `deprecated` lint and are silenced with `#[machine(allow(WNNNN))]`.
 
