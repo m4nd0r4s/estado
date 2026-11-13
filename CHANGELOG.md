@@ -8,6 +8,7 @@
 - Diagnostics: 30 error codes and warnings W0001-W0005, each with a page in `docs/errors/` and a trybuild snapshot (AC-17).
 - Core fixes from the reviews: `in_state` in `#[always]` and initial entries, implicit start drains, any start fault poisons, one livelock budget per send.
 - BM-05: about 0.9 s for a 200-state, 600-edge machine (target 3 s). BM-01 still above target (CI: macro `send_into` 1.17x, `send_batch` 1.48x), tracked in bead estado-99i.3.16.
+- `send_batch` has a dedicated loop over a live machine: the macro machine drops about 12% on Apple Silicon and 23% under Rosetta (x86_64), BM-02 unchanged. BM-01 target revised for a one-event-per-byte machine (ADR 0017, errata 18); the CI x86_64 run after this change decides.
 - Four review rounds; decisions in ADR 0013 (with amendments 1-20); errata 7-15.
 
 ## M2 — hand-written core

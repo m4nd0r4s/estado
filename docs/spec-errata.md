@@ -82,7 +82,7 @@ Contradictions and errors in the spec. By rule 2 of section 0, section 5 wins. E
   | macro-generated estado, `microstep` called directly | 1.23-1.26 ms | 1.25-1.27 |
 
 - **Reading.** The generated code is as fast as the hand-written code of M2 (in-place writes and the forced inline of ADR 0009 are in, see entry 10), and both are about 1.25x of the baseline when `Machine` is left out. The rest of the distance to the baseline, 1.7x in total, is the per-event cost of `Machine::send_batch` (poison guard, report, queue checks around every microstep), which lives in `estado-core`.
-- **Resolution.** Open, for the owner of the spec. Either revise the target of BM-01 for a one-event-per-byte machine to about 2x of a hand-written parser, as ADR 0009 allows, or take the loop of `send_batch` out of `Machine` (one running report, no per-event guard), which touches the BM-02 layout that M2 found sensitive. This entry does neither; the BM-01 test does not assert the ratio.
+- **Resolution.** Open, for the owner of the spec. Either revise the target of BM-01 for a one-event-per-byte machine to about 2x of a hand-written parser, as ADR 0009 allows, or take the loop of `send_batch` out of `Machine` (one running report, no per-event guard), which touches the BM-02 layout that M2 found sensitive. This entry does neither; the BM-01 test does not assert the ratio. Superseded by entry 18.
 
 ## 14. 6.7: new error codes E0042-E0046 and E0090 (not in the table of 6.7)
 
@@ -116,3 +116,8 @@ Contradictions and errors in the spec. By rule 2 of section 0, section 5 wins. E
 
 - **Problem.** 5.5 says `defer_overflow = error` returns `Err(DeferOverflow(ev))` without changing state. That is true for the external event, but a raised or redelivered event can overflow after transitions of the same step already ran, so the state has changed and the step is cut half-way. 5.11 lists only panics and the raise overflow as poisoning.
 - **Resolution** (bead 4.17, ADR 0014 amendment). A `DeferOverflow` in the microstep of the external event keeps the 5.5 behaviour: the event is given back, nothing changed, the machine is not poisoned. In any later microstep of the same step it poisons the machine, like `RaiseOverflow`, `EffectOverflow` and `Livelock`; the error still carries the event that did not fit.
+
+## 18. 10.3, BM-01: a revised target for a one-event-per-byte machine
+
+- **Problem.** Entry 13 left BM-01 open. The remaining cost is not in the generated code: the macro machine called through `microstep` is 1.27x of the hand-written parser on Apple Silicon, and `Machine` adds about 0.2 ms per MB on top, for a machine whose state is a nested pair of enums where the baseline is one flat `enum`.
+- **Resolution** (ADR 0017, bead 3.16). `send_batch` got a dedicated loop (no per-event `Result`, one slot test before the loop; the measured effect on the macro machine is -12% on aarch64 and -23% under Rosetta for x86_64, with BM-02 unchanged), and BM-01 now reads the batch report like a caller. The 5% target stays for flat machines (BM-02 is at parity). For a one-event-per-byte machine with a compound hierarchy the target of BM-01 is revised to 1.25x of the hand-written parser on the CI x86_64 runner (macro `send_batch`); Apple Silicon (about 1.5x) is reported, not asserted. If a CI run shows the original 5%, this entry is withdrawn. The spec text of 10.3 is for its owner to change.
