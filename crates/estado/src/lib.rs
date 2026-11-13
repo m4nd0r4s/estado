@@ -139,4 +139,7 @@ mod guide {
 
     #[doc = include_str!("../../../docs/guide/23-no-std.md")]
     mod no_std {}
+
+    #[doc = include_str!("../../../docs/guide/24-graphs.md")]
+    mod graphs {}
 }

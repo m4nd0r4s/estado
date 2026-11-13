@@ -150,6 +150,7 @@ name = "estado"
 version = "0.0.0"
 dependencies = [
  "estado-core",
+ "estado-graph",
  "estado-macros",
  "estado-test",
  "trybuild",

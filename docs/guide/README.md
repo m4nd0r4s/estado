@@ -31,7 +31,8 @@ For exhaustive lists of attributes, macros, methods and options, see the referen
 | [Errors and safety](./21-errors-and-safety.md) | `SendError`, poisoning, livelock and `max_microsteps`, effect overflow. |
 | [Warnings and options](./22-warnings-and-options.md) | W0001 to W0005, `allow(..)`, every `#[estado::machine]` option, feature detection. |
 | [no_std](./23-no-std.md) | The core without `std` or `alloc`, and the hand-written API against the macro. |
+| [Graphs](./24-graphs.md) | `estado-graph`: Mermaid, DOT, SCXML and JSON export, and `assert_snapshot!` to keep a diagram up to date. |
 
 ## What is not available yet
 
-Graph export (Mermaid, DOT, SCXML, JSON), the Tokio and Embassy runtimes, serde snapshots, the live inspector and the typestate mode belong to later milestones. `#[choice]`, `#[edges]`, `goto_dyn!`, `#[on_error]`, child machines (`#[child]`) and `#[invariant]` are planned and report error [E0090](../errors/E0090.md) today. A handler that returns `Result` reports [E0061](../errors/E0061.md).
+Graph analyses (reachability, paths), the Tokio and Embassy runtimes, serde snapshots, the live inspector and the typestate mode belong to later milestones. `#[choice]`, `#[edges]`, `goto_dyn!`, `#[on_error]`, child machines (`#[child]`) and `#[invariant]` are planned and report error [E0090](../errors/E0090.md) today. A handler that returns `Result` reports [E0061](../errors/E0061.md).

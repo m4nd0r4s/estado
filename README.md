@@ -160,7 +160,7 @@ Decisions and deviations from the spec are recorded in [`docs/decisions/`](docs/
 | `estado-core` | Traits, step algorithm, effects, graph types (`no_std`, no alloc) | usable |
 | `estado-macros` | `#[machine]`, `#[state]`, `#[handlers]`, `goto!` | usable |
 | `estado-test` | Harness with a virtual clock | basic |
-| `estado-graph` | Mermaid/DOT/SCXML/JSON export and analyses | M4 |
+| `estado-graph` | Mermaid/DOT/SCXML/JSON export and snapshot assertions (analyses in M4) | export usable |
 | `estado-serde` | Versioned snapshot and restore | M6 |
 | `estado-tokio` / `estado-embassy` | Runtimes | M5 |
 | `estado-inspect` | Live inspector and replay | M6 |

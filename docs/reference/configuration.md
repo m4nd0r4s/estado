@@ -24,7 +24,7 @@ Depend on the `estado` facade. It re-exports `estado-core` and the macros, and t
 | `estado-core` | `Spec`, `Machine`, `Cx`, effects, sinks, graph types. `no_std`, no `alloc` needed, no dependencies | usable |
 | `estado-macros` | `#[machine]`, `#[root]`, `#[state]`, `#[handlers]` and the markers they read | usable |
 | `estado-test` | `Harness`, virtual clock, `assert_state!` | basic. See [testing](testing.md) |
-| `estado-graph` | Mermaid, DOT, SCXML and JSON export, graph analyses | not implemented yet (empty crate) |
+| `estado-graph` | Mermaid, DOT, SCXML and JSON export, `assert_snapshot!` (analyses come later) | export usable. See [graph](graph.md) |
 | `estado-serde` | Versioned snapshot, restore and migration | not implemented yet (empty crate) |
 | `estado-tokio` | Tokio runtime: actor, timers, tasks | not implemented yet (empty crate) |
 | `estado-embassy` | Embassy runtime for `no_std` | not implemented yet (empty crate) |

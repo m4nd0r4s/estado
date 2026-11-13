@@ -25,4 +25,5 @@ serde = ["estado-core/serde"]
 
 [dev-dependencies]
 estado-test = { path = "../estado-test", version = "0.0.0" }
+estado-graph = { path = "../estado-graph", version = "0.0.0" }
 trybuild = "1"

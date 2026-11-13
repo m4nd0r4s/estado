@@ -27,6 +27,9 @@ pub mod errors {}
 #[doc = include_str!("../../../docs/reference/configuration.md")]
 pub mod configuration {}
 
+#[doc = include_str!("../../../docs/reference/graph.md")]
+pub mod graph {}
+
 #[doc = include_str!("../../../docs/reference/testing.md")]
 pub mod testing {}
 

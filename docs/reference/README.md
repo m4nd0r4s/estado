@@ -12,6 +12,7 @@ Lookup pages for `estado`. Each page answers precise questions: what an attribut
 | [Effects](effects.md) | `Effect`, `Sink`, `InlineEffects`, `Driver` and `drive`; timer and task keys, epochs, and how a runtime feeds results back. |
 | [Errors](errors.md) | `SendError`, poisoning, the livelock budget, and every compile-time code. |
 | [Configuration](configuration.md) | Crates and their status, Cargo features, the facade and prelude, `no_std`, the Rust version. |
+| [Graph](graph.md) | `estado-graph`: `to_mermaid`, `to_dot`, `to_scxml`, `to_json`, `GraphExport`, `Format`, `assert_snapshot!`, the JSON schema. |
 | [Testing](testing.md) | `estado-test`: `Harness`, the virtual clock, `assert_state!`. |
 | [Core](core.md) | `estado-core` without the macro: the `Spec` trait and hand-written machines. |
 
