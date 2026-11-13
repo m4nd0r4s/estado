@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" name="Player" initial="Idle">
+  <state id="Idle">
+    <transition event="Event.Play" target="Active" type="external"/>
+  </state>
+  <state id="Active" initial="Playing">
+    <state id="Playing">
+      <transition event="Event.Pause" target="Paused" type="external"/>
+    </state>
+    <state id="Paused">
+      <transition event="Event.Resume" target="Playing" type="external"/>
+    </state>
+    <transition event="Event.Play" target="Active" type="external"/>
+    <transition event="Event.Stop" target="Idle" type="external"/>
+    <transition event="Event.Error" target="Failed" type="external"/>
+  </state>
+  <state id="Failed">
+    <transition event="Event.Play" target="Active" type="external"/>
+    <transition event="Event.Stop" target="Idle" type="external"/>
+  </state>
+</scxml>

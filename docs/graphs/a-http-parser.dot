@@ -1,0 +1,47 @@
+digraph "HttpParser" {
+    compound=true;
+    label="HttpParser";
+    labelloc=t;
+    node [shape=box, style=rounded];
+    i_root [shape=circle, style=filled, fillcolor=black, label="", width=0.2, fixedsize=true];
+    i_root -> s0;
+    subgraph cluster_s0 {
+        label="RequestLine";
+        a0 [shape=point, style=invis, width=0, label=""];
+        i0 [shape=circle, style=filled, fillcolor=black, label="", width=0.2, fixedsize=true];
+        i0 -> s1;
+        s1 [label="Method"];
+        s2 [label="Target"];
+        s3 [label="Version"];
+    }
+    subgraph cluster_s4 {
+        label="Headers";
+        a4 [shape=point, style=invis, width=0, label=""];
+        i4 [shape=circle, style=filled, fillcolor=black, label="", width=0.2, fixedsize=true];
+        i4 -> s5;
+        s5 [label="LineStart"];
+        s6 [label="Name"];
+        s7 [label="Value"];
+        s8 [label="ValueLf"];
+        s9 [label="BlockLf"];
+    }
+    s10 [label="Body"];
+    s11 [label="Error", peripheries=2];
+    s1 -> s11;
+    s1 -> s2;
+    s2 -> s3;
+    s2 -> s11;
+    s3 -> a4 [label="VersionStep::Complete", lhead=cluster_s4];
+    s3 -> s11 [label="VersionStep::Unsupported"];
+    a0 -> s11 [ltail=cluster_s0];
+    s5 -> s9;
+    s5 -> s6;
+    s6 -> s7;
+    s7 -> s11;
+    s7 -> s8;
+    s8 -> s5;
+    s9 -> a0 [lhead=cluster_s0];
+    s9 -> s10;
+    a4 -> s11 [ltail=cluster_s4];
+    s10 -> a0 [lhead=cluster_s0];
+}

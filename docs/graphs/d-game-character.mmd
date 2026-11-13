@@ -1,0 +1,54 @@
+stateDiagram-v2
+    %% machine Character
+    state Alive {
+        %% region movement
+        Standing
+        Walking
+        Jumping
+        Crouching
+        [*] --> Standing
+        Standing --> Walking : Event::Move
+        Standing --> Jumping : Event::Jump
+        Standing --> Crouching : Event::Crouch
+        Walking --> Standing : Event::Stop
+        Walking --> Jumping : Event::Jump
+        Walking --> Crouching : Event::Crouch
+        Jumping --> Standing : Event::Land [timer]
+        Crouching --> Standing : Event::Stand
+        --
+        %% region weapon
+        Ready
+        Firing
+        Reloading
+        Empty
+        [*] --> Ready
+        Ready --> Firing : Event::Fire
+        Ready --> Reloading : Event::ReloadRequest
+        Firing --> Empty : Event::CooldownElapsed [timer]
+        Firing --> Ready : Event::CooldownElapsed [timer]
+        Reloading --> Ready : Event::ReloadDone [timer]
+        Empty --> Reloading : Event::ReloadRequest
+        --
+        %% region anim
+        Idle
+        Run
+        Jump
+        Shoot
+        [*] --> Idle
+        Idle --> Run : Anim::Run
+        Idle --> Jump : Anim::Jump
+        Idle --> Shoot : Anim::Shoot
+        Run --> Idle : Anim::Idle
+        Run --> Jump : Anim::Jump
+        Run --> Shoot : Anim::Shoot
+        Jump --> Idle : Anim::Idle
+        Jump --> Run : Anim::Run
+        Jump --> Shoot : Anim::Shoot
+        Shoot --> Idle : Anim::Idle
+        Shoot --> Run : Anim::Run
+        Shoot --> Jump : Anim::Jump
+    }
+    Dead
+    [*] --> Alive
+    Alive --> Dead : Event::Damage
+    Dead --> Alive : Event::Respawn

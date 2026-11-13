@@ -1,0 +1,32 @@
+stateDiagram-v2
+    %% machine Conn
+    Disconnected
+    Connecting
+    Backoff
+    state Connected {
+        %% region link
+        Idle
+        Sending
+        [*] --> Idle
+        Idle --> Sending : Event::Send
+        Sending --> Idle : Event::FrameSent
+        --
+        %% region keepalive
+        Pinging
+        AwaitingPong
+        Dead
+        [*] --> Pinging
+        Pinging --> AwaitingPong : Event::PingDue [timer]
+        AwaitingPong --> Pinging : Event::Pong
+        AwaitingPong --> Dead : Event::PongTimeout [timer]
+    }
+    [*] --> Disconnected
+    Disconnected --> Connecting : Event::Connect
+    Connecting --> Connected : Event::Connected
+    Connecting --> Disconnected : Event::ConnectTimeout [timer]
+    Connecting --> Backoff : Event::ConnectTimeout [timer]
+    Connecting --> Disconnected : Event::Disconnect
+    Backoff --> Connecting : Event::Retry [timer]
+    Backoff --> Disconnected : Event::Disconnect
+    Connected --> Disconnected : Event::Disconnect
+    Dead --> Backoff : Event::KeepaliveDead

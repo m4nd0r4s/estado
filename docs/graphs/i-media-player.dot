@@ -1,0 +1,26 @@
+digraph "Player" {
+    compound=true;
+    label="Player";
+    labelloc=t;
+    node [shape=box, style=rounded];
+    i_root [shape=circle, style=filled, fillcolor=black, label="", width=0.2, fixedsize=true];
+    i_root -> s0;
+    s0 [label="Idle"];
+    subgraph cluster_s1 {
+        label="Active";
+        a1 [shape=point, style=invis, width=0, label=""];
+        i1 [shape=circle, style=filled, fillcolor=black, label="", width=0.2, fixedsize=true];
+        i1 -> s2;
+        s2 [label="Playing"];
+        s3 [label="Paused"];
+    }
+    s4 [label="Failed"];
+    s0 -> a1 [label="Event::Play", lhead=cluster_s1];
+    s2 -> s3 [label="Event::Pause"];
+    s3 -> s2 [label="Event::Resume"];
+    a1 -> a1 [label="Event::Play"];
+    a1 -> s0 [label="Event::Stop", ltail=cluster_s1];
+    a1 -> s4 [label="Event::Error", ltail=cluster_s1];
+    s4 -> a1 [label="Event::Play", lhead=cluster_s1];
+    s4 -> s0 [label="Event::Stop"];
+}

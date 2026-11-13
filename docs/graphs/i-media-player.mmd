@@ -1,0 +1,18 @@
+stateDiagram-v2
+    %% machine Player
+    Idle
+    state Active {
+        Playing
+        Paused
+        [*] --> Playing
+        Playing --> Paused : Event::Pause
+        Paused --> Playing : Event::Resume
+    }
+    Failed
+    [*] --> Idle
+    Idle --> Active : Event::Play
+    Active --> Active : Event::Play
+    Active --> Idle : Event::Stop
+    Active --> Failed : Event::Error
+    Failed --> Active : Event::Play
+    Failed --> Idle : Event::Stop

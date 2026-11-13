@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "machine": "Player",
+  "states": [
+    {
+      "id": 0,
+      "name": "Idle",
+      "parent": null,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 0
+    },
+    {
+      "id": 1,
+      "name": "Active",
+      "parent": null,
+      "kind": "compound",
+      "initial": 2,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 0
+    },
+    {
+      "id": 2,
+      "name": "Playing",
+      "parent": 1,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 1
+    },
+    {
+      "id": 3,
+      "name": "Paused",
+      "parent": 1,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 1
+    },
+    {
+      "id": 4,
+      "name": "Failed",
+      "parent": null,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 0
+    }
+  ],
+  "edges": [
+    {
+      "from": 0,
+      "to": { "type": "state", "id": 1 },
+      "kind": "normal",
+      "event": "Event::Play"
+    },
+    {
+      "from": 2,
+      "to": { "type": "state", "id": 3 },
+      "kind": "normal",
+      "event": "Event::Pause"
+    },
+    {
+      "from": 3,
+      "to": { "type": "state", "id": 2 },
+      "kind": "normal",
+      "event": "Event::Resume"
+    },
+    {
+      "from": 1,
+      "to": { "type": "state", "id": 1 },
+      "kind": "normal",
+      "event": "Event::Play"
+    },
+    {
+      "from": 1,
+      "to": { "type": "state", "id": 0 },
+      "kind": "normal",
+      "event": "Event::Stop"
+    },
+    {
+      "from": 1,
+      "to": { "type": "state", "id": 4 },
+      "kind": "normal",
+      "event": "Event::Error"
+    },
+    {
+      "from": 4,
+      "to": { "type": "state", "id": 1 },
+      "kind": "normal",
+      "event": "Event::Play"
+    },
+    {
+      "from": 4,
+      "to": { "type": "state", "id": 0 },
+      "kind": "normal",
+      "event": "Event::Stop"
+    }
+  ]
+}

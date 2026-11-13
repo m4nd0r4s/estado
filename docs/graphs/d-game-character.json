@@ -1,0 +1,363 @@
+{
+  "version": 1,
+  "machine": "Character",
+  "states": [
+    {
+      "id": 0,
+      "name": "Alive",
+      "parent": null,
+      "kind": "parallel",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 0
+    },
+    {
+      "id": 1,
+      "name": "movement",
+      "parent": 0,
+      "kind": "region",
+      "initial": 2,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 1
+    },
+    {
+      "id": 2,
+      "name": "Standing",
+      "parent": 1,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 2
+    },
+    {
+      "id": 3,
+      "name": "Walking",
+      "parent": 1,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 2
+    },
+    {
+      "id": 4,
+      "name": "Jumping",
+      "parent": 1,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 1,
+      "invokes": 0,
+      "depth": 2
+    },
+    {
+      "id": 5,
+      "name": "Crouching",
+      "parent": 1,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 2
+    },
+    {
+      "id": 6,
+      "name": "weapon",
+      "parent": 0,
+      "kind": "region",
+      "initial": 7,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 1
+    },
+    {
+      "id": 7,
+      "name": "Ready",
+      "parent": 6,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 2
+    },
+    {
+      "id": 8,
+      "name": "Firing",
+      "parent": 6,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 1,
+      "invokes": 0,
+      "depth": 2
+    },
+    {
+      "id": 9,
+      "name": "Reloading",
+      "parent": 6,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 1,
+      "invokes": 0,
+      "depth": 2
+    },
+    {
+      "id": 10,
+      "name": "Empty",
+      "parent": 6,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 2
+    },
+    {
+      "id": 11,
+      "name": "anim",
+      "parent": 0,
+      "kind": "region",
+      "initial": 12,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 1
+    },
+    {
+      "id": 12,
+      "name": "Idle",
+      "parent": 11,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 2
+    },
+    {
+      "id": 13,
+      "name": "Run",
+      "parent": 11,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 2
+    },
+    {
+      "id": 14,
+      "name": "Jump",
+      "parent": 11,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 2
+    },
+    {
+      "id": 15,
+      "name": "Shoot",
+      "parent": 11,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 2
+    },
+    {
+      "id": 16,
+      "name": "Dead",
+      "parent": null,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 0
+    }
+  ],
+  "edges": [
+    {
+      "from": 0,
+      "to": { "type": "state", "id": 16 },
+      "kind": "normal",
+      "event": "Event::Damage"
+    },
+    {
+      "from": 16,
+      "to": { "type": "state", "id": 0 },
+      "kind": "normal",
+      "event": "Event::Respawn"
+    },
+    {
+      "from": 2,
+      "to": { "type": "state", "id": 3 },
+      "kind": "normal",
+      "event": "Event::Move"
+    },
+    {
+      "from": 2,
+      "to": { "type": "state", "id": 4 },
+      "kind": "normal",
+      "event": "Event::Jump"
+    },
+    {
+      "from": 2,
+      "to": { "type": "state", "id": 5 },
+      "kind": "normal",
+      "event": "Event::Crouch"
+    },
+    {
+      "from": 3,
+      "to": { "type": "state", "id": 2 },
+      "kind": "normal",
+      "event": "Event::Stop"
+    },
+    {
+      "from": 3,
+      "to": { "type": "state", "id": 4 },
+      "kind": "normal",
+      "event": "Event::Jump"
+    },
+    {
+      "from": 3,
+      "to": { "type": "state", "id": 5 },
+      "kind": "normal",
+      "event": "Event::Crouch"
+    },
+    {
+      "from": 4,
+      "to": { "type": "state", "id": 2 },
+      "kind": "timer",
+      "event": "Event::Land"
+    },
+    {
+      "from": 5,
+      "to": { "type": "state", "id": 2 },
+      "kind": "normal",
+      "event": "Event::Stand"
+    },
+    {
+      "from": 7,
+      "to": { "type": "state", "id": 8 },
+      "kind": "normal",
+      "event": "Event::Fire"
+    },
+    {
+      "from": 7,
+      "to": { "type": "state", "id": 9 },
+      "kind": "normal",
+      "event": "Event::ReloadRequest"
+    },
+    {
+      "from": 8,
+      "to": { "type": "state", "id": 10 },
+      "kind": "timer",
+      "event": "Event::CooldownElapsed"
+    },
+    {
+      "from": 8,
+      "to": { "type": "state", "id": 7 },
+      "kind": "timer",
+      "event": "Event::CooldownElapsed"
+    },
+    {
+      "from": 9,
+      "to": { "type": "state", "id": 7 },
+      "kind": "timer",
+      "event": "Event::ReloadDone"
+    },
+    {
+      "from": 10,
+      "to": { "type": "state", "id": 9 },
+      "kind": "normal",
+      "event": "Event::ReloadRequest"
+    },
+    {
+      "from": 12,
+      "to": { "type": "state", "id": 13 },
+      "kind": "normal",
+      "event": "Anim::Run"
+    },
+    {
+      "from": 12,
+      "to": { "type": "state", "id": 14 },
+      "kind": "normal",
+      "event": "Anim::Jump"
+    },
+    {
+      "from": 12,
+      "to": { "type": "state", "id": 15 },
+      "kind": "normal",
+      "event": "Anim::Shoot"
+    },
+    {
+      "from": 13,
+      "to": { "type": "state", "id": 12 },
+      "kind": "normal",
+      "event": "Anim::Idle"
+    },
+    {
+      "from": 13,
+      "to": { "type": "state", "id": 14 },
+      "kind": "normal",
+      "event": "Anim::Jump"
+    },
+    {
+      "from": 13,
+      "to": { "type": "state", "id": 15 },
+      "kind": "normal",
+      "event": "Anim::Shoot"
+    },
+    {
+      "from": 14,
+      "to": { "type": "state", "id": 12 },
+      "kind": "normal",
+      "event": "Anim::Idle"
+    },
+    {
+      "from": 14,
+      "to": { "type": "state", "id": 13 },
+      "kind": "normal",
+      "event": "Anim::Run"
+    },
+    {
+      "from": 14,
+      "to": { "type": "state", "id": 15 },
+      "kind": "normal",
+      "event": "Anim::Shoot"
+    },
+    {
+      "from": 15,
+      "to": { "type": "state", "id": 12 },
+      "kind": "normal",
+      "event": "Anim::Idle"
+    },
+    {
+      "from": 15,
+      "to": { "type": "state", "id": 13 },
+      "kind": "normal",
+      "event": "Anim::Run"
+    },
+    {
+      "from": 15,
+      "to": { "type": "state", "id": 14 },
+      "kind": "normal",
+      "event": "Anim::Jump"
+    }
+  ]
+}

@@ -1,0 +1,213 @@
+{
+  "version": 1,
+  "machine": "Conn",
+  "states": [
+    {
+      "id": 0,
+      "name": "Disconnected",
+      "parent": null,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 0
+    },
+    {
+      "id": 1,
+      "name": "Connecting",
+      "parent": null,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 1,
+      "invokes": 1,
+      "depth": 0
+    },
+    {
+      "id": 2,
+      "name": "Backoff",
+      "parent": null,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 1,
+      "invokes": 0,
+      "depth": 0
+    },
+    {
+      "id": 3,
+      "name": "Connected",
+      "parent": null,
+      "kind": "parallel",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 0
+    },
+    {
+      "id": 4,
+      "name": "link",
+      "parent": 3,
+      "kind": "region",
+      "initial": 5,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 1
+    },
+    {
+      "id": 5,
+      "name": "Idle",
+      "parent": 4,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 2
+    },
+    {
+      "id": 6,
+      "name": "Sending",
+      "parent": 4,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 1,
+      "depth": 2
+    },
+    {
+      "id": 7,
+      "name": "keepalive",
+      "parent": 3,
+      "kind": "region",
+      "initial": 8,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 1
+    },
+    {
+      "id": 8,
+      "name": "Pinging",
+      "parent": 7,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 1,
+      "invokes": 0,
+      "depth": 2
+    },
+    {
+      "id": 9,
+      "name": "AwaitingPong",
+      "parent": 7,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 1,
+      "invokes": 0,
+      "depth": 2
+    },
+    {
+      "id": 10,
+      "name": "Dead",
+      "parent": 7,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 2
+    }
+  ],
+  "edges": [
+    {
+      "from": 0,
+      "to": { "type": "state", "id": 1 },
+      "kind": "normal",
+      "event": "Event::Connect"
+    },
+    {
+      "from": 1,
+      "to": { "type": "state", "id": 3 },
+      "kind": "normal",
+      "event": "Event::Connected"
+    },
+    {
+      "from": 1,
+      "to": { "type": "state", "id": 0 },
+      "kind": "timer",
+      "event": "Event::ConnectTimeout"
+    },
+    {
+      "from": 1,
+      "to": { "type": "state", "id": 2 },
+      "kind": "timer",
+      "event": "Event::ConnectTimeout"
+    },
+    {
+      "from": 1,
+      "to": { "type": "state", "id": 0 },
+      "kind": "normal",
+      "event": "Event::Disconnect"
+    },
+    {
+      "from": 2,
+      "to": { "type": "state", "id": 1 },
+      "kind": "timer",
+      "event": "Event::Retry"
+    },
+    {
+      "from": 2,
+      "to": { "type": "state", "id": 0 },
+      "kind": "normal",
+      "event": "Event::Disconnect"
+    },
+    {
+      "from": 3,
+      "to": { "type": "state", "id": 0 },
+      "kind": "normal",
+      "event": "Event::Disconnect"
+    },
+    {
+      "from": 5,
+      "to": { "type": "state", "id": 6 },
+      "kind": "normal",
+      "event": "Event::Send"
+    },
+    {
+      "from": 6,
+      "to": { "type": "state", "id": 5 },
+      "kind": "normal",
+      "event": "Event::FrameSent"
+    },
+    {
+      "from": 8,
+      "to": { "type": "state", "id": 9 },
+      "kind": "timer",
+      "event": "Event::PingDue"
+    },
+    {
+      "from": 9,
+      "to": { "type": "state", "id": 8 },
+      "kind": "normal",
+      "event": "Event::Pong"
+    },
+    {
+      "from": 9,
+      "to": { "type": "state", "id": 10 },
+      "kind": "timer",
+      "event": "Event::PongTimeout"
+    },
+    {
+      "from": 10,
+      "to": { "type": "state", "id": 2 },
+      "kind": "normal",
+      "event": "Event::KeepaliveDead"
+    }
+  ]
+}

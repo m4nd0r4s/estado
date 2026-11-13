@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" name="Character" initial="Alive">
+  <parallel id="Alive">
+    <state id="movement" initial="Standing">
+      <state id="Standing">
+        <transition event="Event.Move" target="Walking" type="external"/>
+        <transition event="Event.Jump" target="Jumping" type="external"/>
+        <transition event="Event.Crouch" target="Crouching" type="external"/>
+      </state>
+      <state id="Walking">
+        <transition event="Event.Stop" target="Standing" type="external"/>
+        <transition event="Event.Jump" target="Jumping" type="external"/>
+        <transition event="Event.Crouch" target="Crouching" type="external"/>
+      </state>
+      <state id="Jumping">
+        <transition event="Event.Land" target="Standing" type="external"/>
+      </state>
+      <state id="Crouching">
+        <transition event="Event.Stand" target="Standing" type="external"/>
+      </state>
+    </state>
+    <state id="weapon" initial="Ready">
+      <state id="Ready">
+        <transition event="Event.Fire" target="Firing" type="external"/>
+        <transition event="Event.ReloadRequest" target="Reloading" type="external"/>
+      </state>
+      <state id="Firing">
+        <transition event="Event.CooldownElapsed" target="Empty" type="external"/>
+        <transition event="Event.CooldownElapsed" target="Ready" type="external"/>
+      </state>
+      <state id="Reloading">
+        <transition event="Event.ReloadDone" target="Ready" type="external"/>
+      </state>
+      <state id="Empty">
+        <transition event="Event.ReloadRequest" target="Reloading" type="external"/>
+      </state>
+    </state>
+    <state id="anim" initial="Idle">
+      <state id="Idle">
+        <transition event="Anim.Run" target="Run" type="external"/>
+        <transition event="Anim.Jump" target="Jump" type="external"/>
+        <transition event="Anim.Shoot" target="Shoot" type="external"/>
+      </state>
+      <state id="Run">
+        <transition event="Anim.Idle" target="Idle" type="external"/>
+        <transition event="Anim.Jump" target="Jump" type="external"/>
+        <transition event="Anim.Shoot" target="Shoot" type="external"/>
+      </state>
+      <state id="Jump">
+        <transition event="Anim.Idle" target="Idle" type="external"/>
+        <transition event="Anim.Run" target="Run" type="external"/>
+        <transition event="Anim.Shoot" target="Shoot" type="external"/>
+      </state>
+      <state id="Shoot">
+        <transition event="Anim.Idle" target="Idle" type="external"/>
+        <transition event="Anim.Run" target="Run" type="external"/>
+        <transition event="Anim.Jump" target="Jump" type="external"/>
+      </state>
+    </state>
+    <transition event="Event.Damage" target="Dead" type="external"/>
+  </parallel>
+  <state id="Dead">
+    <transition event="Event.Respawn" target="Alive" type="external"/>
+  </state>
+</scxml>

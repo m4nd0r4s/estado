@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" name="HttpParser" initial="RequestLine">
+  <state id="RequestLine" initial="Method">
+    <state id="Method">
+      <transition target="Error" type="external"/>
+      <transition target="Target" type="external"/>
+    </state>
+    <state id="Target">
+      <transition target="Version" type="external"/>
+      <transition target="Error" type="external"/>
+    </state>
+    <state id="Version">
+      <transition event="VersionStep.Complete" target="Headers" type="external"/>
+      <transition event="VersionStep.Unsupported" target="Error" type="external"/>
+    </state>
+    <transition target="Error" type="external"/>
+  </state>
+  <state id="Headers" initial="LineStart">
+    <state id="LineStart">
+      <transition target="BlockLf" type="external"/>
+      <transition target="Name" type="external"/>
+    </state>
+    <state id="Name">
+      <transition target="Value" type="external"/>
+    </state>
+    <state id="Value">
+      <transition target="Error" type="external"/>
+      <transition target="ValueLf" type="external"/>
+    </state>
+    <state id="ValueLf">
+      <transition target="LineStart" type="external"/>
+    </state>
+    <state id="BlockLf">
+      <transition target="RequestLine" type="external"/>
+      <transition target="Body" type="external"/>
+    </state>
+    <transition target="Error" type="external"/>
+  </state>
+  <state id="Body">
+    <transition target="RequestLine" type="external"/>
+  </state>
+  <final id="Error"/>
+</scxml>

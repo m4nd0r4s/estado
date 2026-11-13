@@ -1,0 +1,47 @@
+digraph "Conn" {
+    compound=true;
+    label="Conn";
+    labelloc=t;
+    node [shape=box, style=rounded];
+    i_root [shape=circle, style=filled, fillcolor=black, label="", width=0.2, fixedsize=true];
+    i_root -> s0;
+    s0 [label="Disconnected"];
+    s1 [label="Connecting"];
+    s2 [label="Backoff"];
+    subgraph cluster_s3 {
+        label="Connected";
+        style=dashed;
+        a3 [shape=point, style=invis, width=0, label=""];
+        subgraph cluster_s4 {
+            label="link";
+            style=dotted;
+            i4 [shape=circle, style=filled, fillcolor=black, label="", width=0.2, fixedsize=true];
+            i4 -> s5;
+            s5 [label="Idle"];
+            s6 [label="Sending"];
+        }
+        subgraph cluster_s7 {
+            label="keepalive";
+            style=dotted;
+            i7 [shape=circle, style=filled, fillcolor=black, label="", width=0.2, fixedsize=true];
+            i7 -> s8;
+            s8 [label="Pinging"];
+            s9 [label="AwaitingPong"];
+            s10 [label="Dead"];
+        }
+    }
+    s0 -> s1 [label="Event::Connect"];
+    s1 -> a3 [label="Event::Connected", lhead=cluster_s3];
+    s1 -> s0 [label="Event::ConnectTimeout [timer]"];
+    s1 -> s2 [label="Event::ConnectTimeout [timer]"];
+    s1 -> s0 [label="Event::Disconnect"];
+    s2 -> s1 [label="Event::Retry [timer]"];
+    s2 -> s0 [label="Event::Disconnect"];
+    a3 -> s0 [label="Event::Disconnect", ltail=cluster_s3];
+    s5 -> s6 [label="Event::Send"];
+    s6 -> s5 [label="Event::FrameSent"];
+    s8 -> s9 [label="Event::PingDue [timer]"];
+    s9 -> s8 [label="Event::Pong"];
+    s9 -> s10 [label="Event::PongTimeout [timer]"];
+    s10 -> s2 [label="Event::KeepaliveDead"];
+}

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" name="Conn" initial="Disconnected">
+  <state id="Disconnected">
+    <transition event="Event.Connect" target="Connecting" type="external"/>
+  </state>
+  <state id="Connecting">
+    <transition event="Event.Connected" target="Connected" type="external"/>
+    <transition event="Event.ConnectTimeout" target="Disconnected" type="external"/>
+    <transition event="Event.ConnectTimeout" target="Backoff" type="external"/>
+    <transition event="Event.Disconnect" target="Disconnected" type="external"/>
+  </state>
+  <state id="Backoff">
+    <transition event="Event.Retry" target="Connecting" type="external"/>
+    <transition event="Event.Disconnect" target="Disconnected" type="external"/>
+  </state>
+  <parallel id="Connected">
+    <state id="link" initial="Idle">
+      <state id="Idle">
+        <transition event="Event.Send" target="Sending" type="external"/>
+      </state>
+      <state id="Sending">
+        <transition event="Event.FrameSent" target="Idle" type="external"/>
+      </state>
+    </state>
+    <state id="keepalive" initial="Pinging">
+      <state id="Pinging">
+        <transition event="Event.PingDue" target="AwaitingPong" type="external"/>
+      </state>
+      <state id="AwaitingPong">
+        <transition event="Event.Pong" target="Pinging" type="external"/>
+        <transition event="Event.PongTimeout" target="Dead" type="external"/>
+      </state>
+      <state id="Dead">
+        <transition event="Event.KeepaliveDead" target="Backoff" type="external"/>
+      </state>
+    </state>
+    <transition event="Event.Disconnect" target="Disconnected" type="external"/>
+  </parallel>
+</scxml>

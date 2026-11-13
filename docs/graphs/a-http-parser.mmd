@@ -1,0 +1,37 @@
+stateDiagram-v2
+    %% machine HttpParser
+    state RequestLine {
+        Method
+        Target
+        Version
+        [*] --> Method
+        Method --> Target
+        Target --> Version
+    }
+    state Headers {
+        LineStart
+        Name
+        Value
+        ValueLf
+        BlockLf
+        [*] --> LineStart
+        LineStart --> BlockLf
+        LineStart --> Name
+        Name --> Value
+        Value --> ValueLf
+        ValueLf --> LineStart
+    }
+    Body
+    Error
+    [*] --> RequestLine
+    Error --> [*]
+    Method --> Error
+    Target --> Error
+    Version --> Headers : VersionStep::Complete
+    Version --> Error : VersionStep::Unsupported
+    RequestLine --> Error
+    Value --> Error
+    BlockLf --> RequestLine
+    BlockLf --> Body
+    Headers --> Error
+    Body --> RequestLine

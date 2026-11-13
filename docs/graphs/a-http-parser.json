@@ -1,0 +1,242 @@
+{
+  "version": 1,
+  "machine": "HttpParser",
+  "states": [
+    {
+      "id": 0,
+      "name": "RequestLine",
+      "parent": null,
+      "kind": "compound",
+      "initial": 1,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 0
+    },
+    {
+      "id": 1,
+      "name": "Method",
+      "parent": 0,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 1
+    },
+    {
+      "id": 2,
+      "name": "Target",
+      "parent": 0,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 1
+    },
+    {
+      "id": 3,
+      "name": "Version",
+      "parent": 0,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 1
+    },
+    {
+      "id": 4,
+      "name": "Headers",
+      "parent": null,
+      "kind": "compound",
+      "initial": 5,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 0
+    },
+    {
+      "id": 5,
+      "name": "LineStart",
+      "parent": 4,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 1
+    },
+    {
+      "id": 6,
+      "name": "Name",
+      "parent": 4,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 1
+    },
+    {
+      "id": 7,
+      "name": "Value",
+      "parent": 4,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 1
+    },
+    {
+      "id": 8,
+      "name": "ValueLf",
+      "parent": 4,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 1
+    },
+    {
+      "id": 9,
+      "name": "BlockLf",
+      "parent": 4,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 1
+    },
+    {
+      "id": 10,
+      "name": "Body",
+      "parent": null,
+      "kind": "atomic",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 0
+    },
+    {
+      "id": 11,
+      "name": "Error",
+      "parent": null,
+      "kind": "final",
+      "initial": null,
+      "history": "none",
+      "timers": 0,
+      "invokes": 0,
+      "depth": 0
+    }
+  ],
+  "edges": [
+    {
+      "from": 1,
+      "to": { "type": "state", "id": 11 },
+      "kind": "normal",
+      "event": null
+    },
+    {
+      "from": 1,
+      "to": { "type": "state", "id": 2 },
+      "kind": "normal",
+      "event": null
+    },
+    {
+      "from": 2,
+      "to": { "type": "state", "id": 3 },
+      "kind": "normal",
+      "event": null
+    },
+    {
+      "from": 2,
+      "to": { "type": "state", "id": 11 },
+      "kind": "normal",
+      "event": null
+    },
+    {
+      "from": 3,
+      "to": { "type": "state", "id": 4 },
+      "kind": "normal",
+      "event": "VersionStep::Complete"
+    },
+    {
+      "from": 3,
+      "to": { "type": "state", "id": 11 },
+      "kind": "normal",
+      "event": "VersionStep::Unsupported"
+    },
+    {
+      "from": 0,
+      "to": { "type": "state", "id": 11 },
+      "kind": "normal",
+      "event": null
+    },
+    {
+      "from": 5,
+      "to": { "type": "state", "id": 9 },
+      "kind": "normal",
+      "event": null
+    },
+    {
+      "from": 5,
+      "to": { "type": "state", "id": 6 },
+      "kind": "normal",
+      "event": null
+    },
+    {
+      "from": 6,
+      "to": { "type": "state", "id": 7 },
+      "kind": "normal",
+      "event": null
+    },
+    {
+      "from": 7,
+      "to": { "type": "state", "id": 11 },
+      "kind": "normal",
+      "event": null
+    },
+    {
+      "from": 7,
+      "to": { "type": "state", "id": 8 },
+      "kind": "normal",
+      "event": null
+    },
+    {
+      "from": 8,
+      "to": { "type": "state", "id": 5 },
+      "kind": "normal",
+      "event": null
+    },
+    {
+      "from": 9,
+      "to": { "type": "state", "id": 0 },
+      "kind": "normal",
+      "event": null
+    },
+    {
+      "from": 9,
+      "to": { "type": "state", "id": 10 },
+      "kind": "normal",
+      "event": null
+    },
+    {
+      "from": 4,
+      "to": { "type": "state", "id": 11 },
+      "kind": "normal",
+      "event": null
+    },
+    {
+      "from": 10,
+      "to": { "type": "state", "id": 0 },
+      "kind": "normal",
+      "event": null
+    }
+  ]
+}

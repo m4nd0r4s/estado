@@ -1,0 +1,72 @@
+digraph "Character" {
+    compound=true;
+    label="Character";
+    labelloc=t;
+    node [shape=box, style=rounded];
+    i_root [shape=circle, style=filled, fillcolor=black, label="", width=0.2, fixedsize=true];
+    i_root -> s0;
+    subgraph cluster_s0 {
+        label="Alive";
+        style=dashed;
+        a0 [shape=point, style=invis, width=0, label=""];
+        subgraph cluster_s1 {
+            label="movement";
+            style=dotted;
+            i1 [shape=circle, style=filled, fillcolor=black, label="", width=0.2, fixedsize=true];
+            i1 -> s2;
+            s2 [label="Standing"];
+            s3 [label="Walking"];
+            s4 [label="Jumping"];
+            s5 [label="Crouching"];
+        }
+        subgraph cluster_s6 {
+            label="weapon";
+            style=dotted;
+            i6 [shape=circle, style=filled, fillcolor=black, label="", width=0.2, fixedsize=true];
+            i6 -> s7;
+            s7 [label="Ready"];
+            s8 [label="Firing"];
+            s9 [label="Reloading"];
+            s10 [label="Empty"];
+        }
+        subgraph cluster_s11 {
+            label="anim";
+            style=dotted;
+            i11 [shape=circle, style=filled, fillcolor=black, label="", width=0.2, fixedsize=true];
+            i11 -> s12;
+            s12 [label="Idle"];
+            s13 [label="Run"];
+            s14 [label="Jump"];
+            s15 [label="Shoot"];
+        }
+    }
+    s16 [label="Dead"];
+    a0 -> s16 [label="Event::Damage", ltail=cluster_s0];
+    s16 -> a0 [label="Event::Respawn", lhead=cluster_s0];
+    s2 -> s3 [label="Event::Move"];
+    s2 -> s4 [label="Event::Jump"];
+    s2 -> s5 [label="Event::Crouch"];
+    s3 -> s2 [label="Event::Stop"];
+    s3 -> s4 [label="Event::Jump"];
+    s3 -> s5 [label="Event::Crouch"];
+    s4 -> s2 [label="Event::Land [timer]"];
+    s5 -> s2 [label="Event::Stand"];
+    s7 -> s8 [label="Event::Fire"];
+    s7 -> s9 [label="Event::ReloadRequest"];
+    s8 -> s10 [label="Event::CooldownElapsed [timer]"];
+    s8 -> s7 [label="Event::CooldownElapsed [timer]"];
+    s9 -> s7 [label="Event::ReloadDone [timer]"];
+    s10 -> s9 [label="Event::ReloadRequest"];
+    s12 -> s13 [label="Anim::Run"];
+    s12 -> s14 [label="Anim::Jump"];
+    s12 -> s15 [label="Anim::Shoot"];
+    s13 -> s12 [label="Anim::Idle"];
+    s13 -> s14 [label="Anim::Jump"];
+    s13 -> s15 [label="Anim::Shoot"];
+    s14 -> s12 [label="Anim::Idle"];
+    s14 -> s13 [label="Anim::Run"];
+    s14 -> s15 [label="Anim::Shoot"];
+    s15 -> s12 [label="Anim::Idle"];
+    s15 -> s13 [label="Anim::Run"];
+    s15 -> s14 [label="Anim::Jump"];
+}
