@@ -77,12 +77,27 @@ impl<'step, M: Spec, S: Sink<M::Effect>> Cx<'step, M, S> {
     /// Reflects the configuration at the start of the current microstep,
     /// updated after each region-internal transition of a parallel state
     /// (see [`refresh_active`](Self::refresh_active)).
-    /// Requires `Spec::TRACKS_ACTIVE`; without it, always `false`.
+    /// Requires `Spec::TRACKS_ACTIVE`.
+    ///
+    /// # Panics
+    ///
+    /// When the machine does not track the active configuration. Answering
+    /// `false` instead would be a silent wrong answer, so the call fails
+    /// loudly the first time it runs. With `#[machine]` the macro turns
+    /// tracking on when it sees the call in the module; for a call from a
+    /// helper outside the module, write `tracks_active` in the machine
+    /// options (ADR 0015).
     #[inline]
+    #[track_caller]
     pub fn in_state(&self, state: StateId) -> bool {
-        self.active
-            .as_deref()
-            .is_some_and(|path| path.contains(state))
+        match self.active.as_deref() {
+            Some(path) => path.contains(state),
+            None => panic!(
+                "`Cx::in_state` needs the active configuration, which this machine does not track: \
+                 add `tracks_active` to its `#[machine(..)]` options \
+                 (or set `Spec::TRACKS_ACTIVE` in a hand-written `Spec`)"
+            ),
+        }
     }
 
     /// Replaces the configuration read by [`in_state`](Self::in_state).

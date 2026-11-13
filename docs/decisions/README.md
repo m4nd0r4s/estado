@@ -32,3 +32,4 @@ Spec: affected section(s)
 | [0012](0012-timers-regions-and-always-in-generated-code.md) | Timers, invokes, regions, completion and `#[always]` in generated code |
 | [0013](0013-decisions-from-the-m3-reviews.md) | Decisions taken from the M3 code reviews |
 | [0014](0014-effect-overflow-poisons.md) | An effect overflow poisons the machine |
+| [0015](0015-in-state-without-tracking-panics.md) | `cx.in_state` on an untracked machine panics |

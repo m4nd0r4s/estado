@@ -58,7 +58,7 @@ The options reach the `Spec` implementation as associated constants: `Spec::UNHA
 
 The macro generates the raise and defer queues only when it sees `cx.raise(..)` or `defer!()` in the module, or when you write `raise_cap` or `defer_cap`. It generates the active-configuration snapshot only when it sees `cx.in_state(..)` or you write `tracks_active`. A machine that needs none of these stays zero-sized beyond its state.
 
-The scan looks for method calls and path calls (`cx.raise(..)`, `Cx::raise(cx, ..)`, `Cx::<..>::in_state(..)`). A helper function outside the module is invisible to it. If a helper outside the module calls `raise` or `in_state`, switch the feature on by hand with `raise_cap = N` or `tracks_active`.
+The scan looks for method calls and path calls (`cx.raise(..)`, `Cx::raise(cx, ..)`, `Cx::<..>::in_state(..)`). A helper function outside the module is invisible to it. If a helper outside the module calls `raise` or `in_state`, switch the feature on by hand with `raise_cap = N` or `tracks_active`. Forgetting it is loud: the first `raise` fails the step with `RaiseOverflow`, and `cx.in_state` panics with a message that names `tracks_active`.
 
 ```rust
 use estado::prelude::*;

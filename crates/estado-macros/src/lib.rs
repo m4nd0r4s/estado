@@ -30,7 +30,9 @@ use proc_macro::TokenStream;
 /// follows a `.` or a `::`. A helper function outside the module is invisible
 /// to that scan: switch the feature on by hand with
 /// `#[machine(tracks_active)]` (for `cx.in_state`) and with an explicit
-/// `raise_cap = N` or `defer_cap = N` (for the queues).
+/// `raise_cap = N` or `defer_cap = N` (for the queues). A `cx.in_state(..)`
+/// the scan missed panics at run time and names `tracks_active`; it never
+/// returns a wrong `false`.
 ///
 /// # Where the generated code finds `estado-core`
 ///

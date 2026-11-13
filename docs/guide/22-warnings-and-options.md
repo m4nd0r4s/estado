@@ -214,7 +214,7 @@ For a helper outside the module, switch the feature on by hand:
 - `raise_cap = N` or `defer_cap = N` always generates the queues, even when you write the default value.
 - `tracks_active` turns `cx.in_state` on.
 
-Without that, the first `raise` in the helper overflows an empty queue and poisons the machine, and `in_state` answers `false` for ever.
+Without that, the first `raise` in the helper overflows an empty queue and poisons the machine, and the first `in_state` panics (and so poisons the machine) with a message that names `tracks_active`. Neither answers wrongly in silence.
 
 ```rust
 use estado::prelude::*;

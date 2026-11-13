@@ -55,7 +55,7 @@ The macro enables the queue when it sees `cx.raise(..)` in the module. For a cal
 
 `in_state(Root::STATE_ID)` tells a handler whether a state is active, including states in the sibling regions of a parallel state. It reads the configuration at the start of the microstep, and a later region sees the transitions that earlier regions of the same event already made.
 
-- It needs the snapshot that `#[machine]` keeps only when it sees `cx.in_state(..)` in the module, or when you write `tracks_active`. Without the snapshot it returns `false` for every state.
+- It needs the snapshot that `#[machine]` keeps only when it sees `cx.in_state(..)` in the module, or when you write `tracks_active`. Without the snapshot `in_state` panics, with a message that names `tracks_active`; it never answers `false` for a state that is active. The panic poisons the machine like any other panic in a handler, so the first test that reaches the call finds the missing option.
 - It is available in `#[always]` handlers as well.
 
 ## State ids
