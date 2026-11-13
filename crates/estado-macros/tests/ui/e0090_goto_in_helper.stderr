@@ -1,0 +1,13 @@
+error: estado::E0090: `goto!` in a helper function is not supported yet by this version of `estado`
+         = help: a transition is rewritten against the state of its handler, and a helper has none: put the macro in the `#[on(..)]` handler and return data (an enum or a `bool`) from the helper
+  --> tests/ui/e0090_goto_in_helper.rs:27:13
+   |
+27 |             goto!(On)
+   |             ^^^^^^^^^
+
+error: estado::E0090: `stay!` in a helper function is not supported yet by this version of `estado`
+         = help: a transition is rewritten against the state of its handler, and a helper has none: put the macro in the `#[on(..)]` handler and return data (an enum or a `bool`) from the helper
+  --> tests/ui/e0090_goto_in_helper.rs:31:13
+   |
+31 |             stay!()
+   |             ^^^^^^^

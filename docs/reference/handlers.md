@@ -136,7 +136,7 @@ fn main() {
 
 - A handler is an associated function without a `self` receiver. It must not be `async` (`E0060`).
 - A role attribute takes exactly one state name: `#[on(Playing)]`. A function can have only one role (`E0005`). A state has at most one function per role (`E0005`). An unknown state name is `E0004`.
-- A function without a role attribute is a plain helper. The macro does not touch it. A helper cannot use the transition macros (`E0040`); return a value and let a handler call `goto!`.
+- A function without a role attribute is a plain helper. The macro does not rewrite it. A helper cannot use the transition macros: they are rewritten against the state of their handler, so `goto!` in a helper is [`E0090`](../errors/E0090.md) (not supported yet). Return a value and let a handler call `goto!`.
 - All parameters are optional and recognized by type, in the order of the table below. An unknown, repeated or misplaced parameter is `E0006`.
 - `cx` is always `&mut Cx<Self>`. A shared `&Cx<Self>` is `E0006`.
 - The macro adds the effect sink as a hidden generic parameter and completes `Cx<Self>`. You never write it.

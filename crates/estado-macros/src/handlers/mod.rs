@@ -45,7 +45,7 @@ use event_coverage::event_coverage;
 use parameters::{ParameterEnvironment, ParameterList, classify_parameters};
 use roles::{FunctionRole, RoleAttribute, take_role};
 use signature::{EdgeType, rewrite_signature};
-use unsupported_macros::reject_unsupported_macros;
+use unsupported_macros::{reject_transitions_in_helper, reject_unsupported_macros};
 
 /// Analyses every handler of `model`: fills `analysed_handlers` and
 /// `rewritten_handlers`, and returns the diagnostics. `model.handlers` keeps
@@ -82,7 +82,11 @@ pub fn analyse(model: &mut MachineModel) -> Vec<Diagnostic> {
             let role = take_role(degraded, &mut diagnostics);
             let _ = take_role(full, &mut Vec::new());
             let handler = match role {
-                FunctionRole::Helper => continue,
+                FunctionRole::Helper => {
+                    reject_transitions_in_helper(degraded, &mut diagnostics);
+                    reject_transitions_in_helper(full, &mut Vec::new());
+                    continue;
+                }
                 FunctionRole::Invalid => {
                     neutralise(model, degraded);
                     *full = degraded.clone();

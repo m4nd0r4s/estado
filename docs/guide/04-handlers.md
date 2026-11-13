@@ -138,7 +138,7 @@ Handlers are plain associated functions. Helpers that are not handlers can live 
 | `reenter!()` | Exit and enter the handler's own state again. See [Transitions](./05-transitions.md). |
 | `defer!()` | Keep the event and try it again later. See [Defer and raise](./18-defer-and-raise.md). |
 
-These macros only work inside a `#[handlers]` function. Anywhere else they report [E0040](../errors/E0040.md).
+These macros only work inside a `#[handlers]` function. Outside a handler they report [E0040](../errors/E0040.md). In a plain helper function of a `#[handlers]` impl (one without a role attribute) they report [E0090](../errors/E0090.md), because a helper has no state to rewrite them against: return data from the helper and call `goto!` in the handler.
 
 A handler returns `Next<Self>`. A handler that returns `Result<Next<Self>, E>` is planned for use with `#[on_error]`, which is not supported yet, so it reports [E0061](../errors/E0061.md). Return `Next<Self>` and turn the error into a `goto!` in the body.
 
