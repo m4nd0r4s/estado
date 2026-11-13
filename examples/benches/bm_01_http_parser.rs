@@ -6,11 +6,13 @@
 //! is the machine of `a_http_parser`, fed with `send_batch`. The bytes come
 //! from `black_box`, so the optimizer cannot fold the parse away.
 //!
-//! Status (M2, Apple M-series, release): the target of 5% is not met by the
-//! hand-written machine of `a_http_parser`. The baseline takes about 1.0 ms
-//! per MB, that machine about 1.6 ms with `send_into` per byte and 1.75 ms
-//! with `send_batch`. See the report of bead 3.9 for the breakdown;
-//! `estado_send_into` is kept to show what `send_batch` adds on top.
+//! Status (Apple M-series, release): the target of 5% is not met. The
+//! baseline takes about 1.0 ms per MB, the hand-written machine of
+//! `a_http_parser` about 1.6 ms with `send_into` per byte and with
+//! `send_batch`. See ADR 0017 and spec errata 14 for the breakdown and the
+//! revised target; `estado_send_into` is kept to show what `send_batch` adds
+//! on top. The `send_batch` report goes through `black_box` like the
+//! context: a caller reads it, so it is work the machine must do.
 //!
 //! M3 adds the `estado_macro_*` functions: the same parser written with
 //! `#[machine]` (`a_http_parser_macro`), the machine ADR 0009 asks to
@@ -38,7 +40,7 @@ fn run_baseline(bytes: &[u8]) -> ParserCtx {
 fn run_estado(bytes: &[u8]) -> ParserCtx {
     let mut machine = Machine::<HttpParser>::new(ParserCtx::default());
     // The result is checked once by `assert_sides_agree`, not per run.
-    let _ = machine.send_batch(black_box(bytes).iter().copied(), &mut Discard);
+    let _ = black_box(machine.send_batch(black_box(bytes).iter().copied(), &mut Discard));
     black_box(*machine.ctx())
 }
 
@@ -54,7 +56,7 @@ fn run_estado_send_into(bytes: &[u8]) -> ParserCtx {
 /// The machine written with `#[machine]`, fed with `send_batch`.
 fn run_macro(bytes: &[u8]) -> ParserCtx {
     let mut machine = Machine::<MacroParser>::new(ParserCtx::default());
-    let _ = machine.send_batch(black_box(bytes).iter().copied(), &mut Discard);
+    let _ = black_box(machine.send_batch(black_box(bytes).iter().copied(), &mut Discard));
     black_box(*machine.ctx())
 }
 
