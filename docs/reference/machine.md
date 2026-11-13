@@ -265,7 +265,7 @@ pub enum IgnoreReason {
 
 `StatePath` is the active configuration, stored inline (no allocation) with at most `MAX_ACTIVE_STATES` (32) states, in pre-order: parents before children, regions in declaration order.
 
-The limit is 32 active states at once, counting every level and every region. Nothing checks it at compile time today. A machine that activates more than 32 states at once panics in `StatePath::push` while `send` runs. This is a known issue: it is planned to become a compile error. Until then, keep the number of simultaneously active states (the depth of the tree plus the states of all regions) at 32 or below.
+The limit is 32 active states at once, counting every level and every region (the root enum is not counted). The macro checks it at compile time: a machine whose largest active configuration is bigger than 32 is rejected with [`E0018`](../errors/E0018.md). A parallel state with 16 regions of one state each is already 33 (the parallel state, 16 regions and 16 states). Only a graph built by hand, without `#[machine]`, can reach the limit at run time, and then `StatePath::push` panics.
 
 ```rust,ignore
 impl StatePath {

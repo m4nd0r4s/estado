@@ -22,6 +22,7 @@ Every diagnostic reads `estado::<code>: <message>`, with a `help:` line when the
 | E0015 | Substates or region type is not a `#[state]` enum | [E0015](E0015.md) |
 | E0016 | Invalid `#[machine(..)]` option, or unknown code in `allow(..)` | [E0016](E0016.md) |
 | E0017 | Malformed state attribute, or a marker on the wrong item | [E0017](E0017.md) |
+| E0018 | More than 32 states can be active at once | [E0018](E0018.md) |
 | E0020 | `goto!` or `#[initial]` without the data a state needs | [E0020](E0020.md) |
 | E0021 | Transition between sibling regions | [E0021](E0021.md) |
 | E0022 | A `#[terminal]` state transitions out | [E0022](E0022.md) |

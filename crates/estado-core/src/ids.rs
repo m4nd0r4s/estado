@@ -69,9 +69,15 @@ impl StatePath {
     ///
     /// # Panics
     ///
-    /// If more than [`MAX_ACTIVE_STATES`] states are pushed; the macro rejects
-    /// such machines at compile time.
+    /// If the path already holds [`MAX_ACTIVE_STATES`] states. A machine built
+    /// with `#[machine]` never gets there: the macro rejects, at compile time
+    /// (`E0018`), a machine whose active configuration could outgrow the path.
+    /// A graph built by hand has no such check.
     pub fn push(&mut self, state: StateId) {
+        assert!(
+            usize::from(self.length) < MAX_ACTIVE_STATES,
+            "more than MAX_ACTIVE_STATES ({MAX_ACTIVE_STATES}) states are active at once"
+        );
         self.states[usize::from(self.length)] = state;
         self.length += 1;
     }
@@ -127,5 +133,42 @@ impl fmt::Display for StatePath {
             previous_kind = Some(info.kind);
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::graph::StateInfo;
+
+    static STATES: [StateInfo; 1] = [StateInfo::new(
+        StateId(0),
+        "Only",
+        None,
+        StateKind::Atomic,
+        0,
+    )];
+    static GRAPH: Graph = Graph {
+        machine: "Hand",
+        states: &STATES,
+        edges: &[],
+    };
+
+    #[test]
+    fn a_path_holds_exactly_the_maximum() {
+        let mut path = StatePath::new(&GRAPH);
+        for _ in 0..MAX_ACTIVE_STATES {
+            path.push(StateId(0));
+        }
+        assert_eq!(path.states().len(), MAX_ACTIVE_STATES);
+    }
+
+    #[test]
+    #[should_panic(expected = "more than MAX_ACTIVE_STATES (32) states are active at once")]
+    fn pushing_past_the_maximum_panics_with_a_clear_message() {
+        let mut path = StatePath::new(&GRAPH);
+        for _ in 0..=MAX_ACTIVE_STATES {
+            path.push(StateId(0));
+        }
     }
 }

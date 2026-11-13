@@ -1,0 +1,6 @@
+error: estado::E0018: `Wide` can have 33 states active at once, regions included; the maximum is 32
+         = help: use fewer regions, flatten the hierarchy, or move a branch into a child machine
+  --> tests/ui/e0018_too_many_active_states.rs:10:9
+   |
+10 |         Wide(Wide),
+   |         ^^^^
