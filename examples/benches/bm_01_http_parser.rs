@@ -9,7 +9,7 @@
 //! Status (Apple M-series, release): the target of 5% is not met. The
 //! baseline takes about 1.0 ms per MB, the hand-written machine of
 //! `a_http_parser` about 1.6 ms with `send_into` per byte and with
-//! `send_batch`. See ADR 0017 and spec errata 14 for the breakdown and the
+//! `send_batch`. See ADR 0017 and spec errata 13 and 18 for the breakdown and the
 //! revised target; `estado_send_into` is kept to show what `send_batch` adds
 //! on top. The `send_batch` report goes through `black_box` like the
 //! context: a caller reads it, so it is work the machine must do.
