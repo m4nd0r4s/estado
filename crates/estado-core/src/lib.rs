@@ -22,6 +22,7 @@ mod graph;
 mod ids;
 mod machine;
 mod next;
+mod pending;
 mod queue;
 mod report;
 mod runtime;
@@ -37,6 +38,7 @@ pub use graph::{EdgeInfo, EdgeKind, EdgeTarget, Graph, HistoryKind, StateInfo, S
 pub use ids::{MAX_ACTIVE_STATES, StateId, StatePath};
 pub use machine::Machine;
 pub use next::{Edge, Next, NoEdge};
+pub use pending::PendingFlags;
 pub use queue::{InlineQueue, Queues};
 pub use report::{IgnoreReason, Outcome, Report, Step};
 pub use runtime::{EventQueues, NoRuntime, Runtime};

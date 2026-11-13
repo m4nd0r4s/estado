@@ -14,7 +14,7 @@ use syn::Type;
 
 use super::context::Generation;
 use super::naming::{children_binding, payload_binding};
-use super::runtime::done_field;
+use super::runtime::take_done;
 use super::walk::{Binding, FieldsAccess, call_handler, state_function, variant_pattern};
 use crate::model::{HandlerRole, Payload, StateId, StateKind, StateTree};
 
@@ -164,7 +164,7 @@ pub fn serve_completions(generation: &Generation<'_>) -> TokenStream {
     completing_states(generation)
         .into_iter()
         .map(|node| {
-            let flag = done_field(generation, node);
+            let taken = take_done(generation, node);
             let served = if generation.handler(HandlerRole::OnDone, node).is_some() {
                 let function = complete_function(generation, node);
                 quote! { return #function(slot, cx); }
@@ -174,7 +174,7 @@ pub fn serve_completions(generation: &Generation<'_>) -> TokenStream {
                 quote! { return __estado_core::Outcome::Stayed; }
             };
             quote! {
-                if ::core::mem::take(&mut cx.runtime_mut().#flag) {
+                if #taken {
                     #served
                 }
             }

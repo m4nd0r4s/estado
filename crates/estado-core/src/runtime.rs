@@ -36,7 +36,9 @@ pub trait Runtime {
     /// The queues.
     fn queues(&mut self) -> &mut Self::Queues;
 
-    /// Whether an `#[always]` evaluation is pending; clears the flag.
+    /// Whether an `#[always]` or completion evaluation is pending. The
+    /// evaluation clears the flag it serves. Called on every drain iteration,
+    /// so it should be O(1) (see [`PendingFlags`](crate::PendingFlags)).
     fn take_always_pending(&mut self) -> bool {
         false
     }

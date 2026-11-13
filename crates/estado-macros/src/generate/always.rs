@@ -7,7 +7,7 @@ use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 
 use super::context::Generation;
-use super::runtime::always_field;
+use super::runtime::take_always;
 use super::walk::{FieldsAccess, call_handler, state_function};
 use crate::model::{HandlerRole, StateId};
 use crate::naming::snake_case_name;
@@ -53,10 +53,10 @@ pub fn always_items(generation: &Generation<'_>) -> TokenStream {
         .map(|node| always_state_function(generation, node));
     let completions = super::completion::serve_completions(generation);
     let due = always_states(generation).into_iter().map(|node| {
-        let field = always_field(generation, node);
+        let taken = take_always(generation, node);
         let function = always_function(generation, node);
         quote! {
-            if ::core::mem::take(&mut cx.runtime_mut().#field) {
+            if #taken {
                 return #function(slot, cx);
             }
         }

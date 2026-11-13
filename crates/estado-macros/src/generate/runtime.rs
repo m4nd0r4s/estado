@@ -5,8 +5,7 @@
 //! | `queues` | a handler calls `cx.raise` or `defer!()` |
 //! | `<state>_history` | the state has `#[history]` (`Option<u8>`) or `#[history(deep, keep)]` (`Option<Substates>`) |
 //! | `<state>_epoch` | the state has `#[after]` or `#[invoke]` |
-//! | `<state>_done_pending` | the state can complete: a compound with a `#[terminal]` substate, a parallel state with one in a region (ADR 0013 item 4) |
-//! | `<state>_always_pending` | the state has an `#[always]` handler |
+//! | `pending` | a state can complete (a compound with a `#[terminal]` substate, a parallel state with one in a region, ADR 0013 item 4) or has an `#[always]` handler: one bit per such state, completions first |
 //!
 //! With none of them the runtime is `NoRuntime<Event>` and `Machine` keeps
 //! its AC-15 size.
@@ -90,20 +89,63 @@ pub fn epoch_field(generation: &Generation<'_>, node: StateId) -> Ident {
     )
 }
 
-/// `awaiting_always_pending`: set while the `#[always]` of the state is due.
-pub fn always_field(generation: &Generation<'_>, node: StateId) -> Ident {
-    format_ident!(
-        "{}_always_pending",
-        snake_case_name(&generation.tree.node(node).name)
-    )
+/// The bit of the `pending` flags of the state whose `#[always]` is due.
+/// The completions take the first bits, the `#[always]` states follow.
+fn always_bit(generation: &Generation<'_>, node: StateId) -> usize {
+    let plan = runtime_plan(generation);
+    let position = plan
+        .always_states
+        .iter()
+        .position(|&state| state == node)
+        .expect("a state with an `#[always]` handler");
+    plan.completions.len() + position
 }
 
-/// `upload_done_pending`: set while the completion of the state is due.
-pub fn done_field(generation: &Generation<'_>, node: StateId) -> Ident {
-    format_ident!(
-        "{}_done_pending",
-        snake_case_name(&generation.tree.node(node).name)
-    )
+/// The bit of the `pending` flags of the state whose completion is due.
+fn done_bit(generation: &Generation<'_>, node: StateId) -> usize {
+    runtime_plan(generation)
+        .completions
+        .iter()
+        .position(|&state| state == node)
+        .expect("a state that can complete")
+}
+
+/// `cx.runtime_mut().pending.set(1);`: the `#[always]` of the state is due.
+pub fn set_always(generation: &Generation<'_>, node: StateId) -> TokenStream {
+    let bit = always_bit(generation, node);
+    quote! { cx.runtime_mut().pending.set(#bit); }
+}
+
+/// The `#[always]` of the state is no longer due.
+pub fn clear_always(generation: &Generation<'_>, node: StateId) -> TokenStream {
+    let bit = always_bit(generation, node);
+    quote! { cx.runtime_mut().pending.clear(#bit); }
+}
+
+/// An expression that clears the `#[always]` flag of the state and tells
+/// whether it was due.
+pub fn take_always(generation: &Generation<'_>, node: StateId) -> TokenStream {
+    let bit = always_bit(generation, node);
+    quote! { cx.runtime_mut().pending.take(#bit) }
+}
+
+/// The completion of the state is due.
+pub fn set_done(generation: &Generation<'_>, node: StateId) -> TokenStream {
+    let bit = done_bit(generation, node);
+    quote! { cx.runtime_mut().pending.set(#bit); }
+}
+
+/// The completion of the state is no longer due.
+pub fn clear_done(generation: &Generation<'_>, node: StateId) -> TokenStream {
+    let bit = done_bit(generation, node);
+    quote! { cx.runtime_mut().pending.clear(#bit); }
+}
+
+/// An expression that clears the completion flag of the state and tells
+/// whether it was due.
+pub fn take_done(generation: &Generation<'_>, node: StateId) -> TokenStream {
+    let bit = done_bit(generation, node);
+    quote! { cx.runtime_mut().pending.take(#bit) }
 }
 
 /// The `Runtime` type: `NoRuntime<Event>` when nothing needs auxiliary state.
@@ -179,26 +221,22 @@ pub fn runtime_items(generation: &Generation<'_>) -> TokenStream {
         fields.push(quote! { #[doc = #documentation] #field: u32 });
         initial.push(quote! { #field: 0 });
     }
-    let mut pending = Vec::new();
-    for &node in &plan.completions {
-        let field = done_field(generation, node);
-        let documentation = format!("The completion of `{}` is due.", tree.node(node).name);
-        fields.push(quote! { #[doc = #documentation] #field: bool });
-        initial.push(quote! { #field: false });
-        pending.push(quote! { self.#field });
-    }
-    for &node in &plan.always_states {
-        let field = always_field(generation, node);
-        let documentation = format!("The `#[always]` of `{}` is due.", tree.node(node).name);
-        fields.push(quote! { #[doc = #documentation] #field: bool });
-        initial.push(quote! { #field: false });
-        pending.push(quote! { self.#field });
-    }
-    // The run clears the flag it serves; this only reports whether one is set.
-    let take_always = (!pending.is_empty()).then(|| {
+    // One bit per completion and per `#[always]`, packed into as many words
+    // as needed, so that the check of the drain loop does not grow with the
+    // number of states and no machine hits a limit.
+    let pending_bits = plan.completions.len() + plan.always_states.len();
+    let take_always = (pending_bits > 0).then(|| {
+        let words = pending_bits.div_ceil(64);
+        fields.push(quote! {
+            #[doc = "One bit per completion and per `#[always]` that is due."]
+            pending: __estado_core::PendingFlags<#words>
+        });
+        initial.push(quote! { pending: __estado_core::PendingFlags::NEW });
+        // The run clears the flag it serves; this only reports whether one is set.
         quote! {
+            #[inline(always)]
             fn take_always_pending(&mut self) -> bool {
-                #(#pending)||*
+                self.pending.any()
             }
         }
     });

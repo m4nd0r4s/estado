@@ -9,7 +9,7 @@ use quote::quote;
 use super::completion::{completed_by, completing_states};
 use super::context::Generation;
 use super::naming::{children_binding, enter_function, exit_function, fields_binding, fields_type};
-use super::runtime::done_field;
+use super::runtime::{clear_done, set_done};
 use super::walk::{Binding, FieldsAccess, handler_arguments, split_payload, variant_pattern};
 use crate::model::{HandlerRole, StateId, StateKind};
 
@@ -106,10 +106,7 @@ fn arm(
     let completion = (direction == Direction::Enter && state.is_final)
         .then(|| completed_by(tree, child))
         .flatten()
-        .map(|completed| {
-            let flag = done_field(generation, completed);
-            quote! { cx.runtime_mut().#flag = true; }
-        });
+        .map(|completed| set_done(generation, completed));
     if !is_composite {
         let binding = if own_call.is_some() {
             Binding::Everything
@@ -126,10 +123,7 @@ fn arm(
     // A completion that was not served yet dies with its state.
     let clear_completion = (direction == Direction::Exit
         && completing_states(generation).contains(&child))
-    .then(|| {
-        let flag = done_field(generation, child);
-        quote! { cx.runtime_mut().#flag = false; }
-    });
+    .then(|| clear_done(generation, child));
     let inherited: Vec<_> = ancestors
         .iter()
         .map(|&ancestor| fields_binding(tree, ancestor))

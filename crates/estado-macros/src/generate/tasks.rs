@@ -25,7 +25,7 @@ use super::context::Generation;
 use super::naming::{
     children_function, hygienic_local, payload_binding, ref_view_type, state_constant,
 };
-use super::runtime::{always_field, epoch_field};
+use super::runtime::{clear_always, epoch_field, set_always};
 use super::walk::{Binding, struct_field_pairs, tuple_field_bindings, variant_pattern};
 use crate::model::{HandlerRole, Payload, StateId, StateKind};
 
@@ -175,8 +175,7 @@ fn start_statements(generation: &Generation<'_>, node: StateId) -> TokenStream {
         }
     }
     if generation.handler(HandlerRole::Always, node).is_some() {
-        let field = always_field(generation, node);
-        statements.extend(quote! { cx.runtime_mut().#field = true; });
+        statements.extend(set_always(generation, node));
     }
     statements
 }
@@ -206,8 +205,7 @@ fn cancel_statements(generation: &Generation<'_>, node: StateId) -> TokenStream 
         }
     }
     if generation.handler(HandlerRole::Always, node).is_some() {
-        let field = always_field(generation, node);
-        statements.extend(quote! { cx.runtime_mut().#field = false; });
+        statements.extend(clear_always(generation, node));
     }
     statements
 }

@@ -28,7 +28,7 @@ Each hand-written example is split into several files, roughly one per kind of g
 | `Sink`, `Overflow`, `Discard`, `FnSink`, `InlineEffects`, `IntoEffects` | Where effects go. |
 | `Driver`, `DriverSink`, `drive` | The runtime interface. |
 | `Step`, `Report`, `IgnoreReason`, `SendError` | Results and errors of `send`. |
-| `Runtime`, `EventQueues`, `NoRuntime`, `Queues`, `InlineQueue` | Auxiliary state: queues, epochs, history. |
+| `Runtime`, `EventQueues`, `NoRuntime`, `Queues`, `InlineQueue`, `PendingFlags` | Auxiliary state: queues, epochs, history, and the bit set of pending completions and `#[always]` handlers. |
 | `UnhandledPolicy`, `DeferOverflowPolicy` | The policies a `Spec` declares. |
 | `StateId`, `StatePath`, `MAX_ACTIVE_STATES` | Identifiers and the active configuration. |
 | `Graph`, `StateInfo`, `StateKind`, `HistoryKind`, `EdgeInfo`, `EdgeKind`, `EdgeTarget` | The static graph. |
