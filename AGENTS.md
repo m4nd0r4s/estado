@@ -138,7 +138,7 @@ cargo +nightly miri test -p estado-core                    # AC-18
 
 ## Architecture Overview
 
-Cargo workspace: published crates in `crates/<name>`, test-only crates in `checks/<name>`, reference scenarios in `examples/`, tools in `tools/`. `estado-core` is the only required crate and builds as `no_std` without `alloc`. The normative spec is `docs/spec.md`; section 5 (semantics) is the source of truth. Work follows the milestones of spec section 12 (M0-M6), tracked in Beads: epic `estado-99i`, milestones `estado-99i.1`..`estado-99i.7`.
+Cargo workspace: published crates in `crates/<name>`, test-only crates in `checks/<name>`, reference scenarios in `examples/`, tools in `tools/`, the website (SvelteKit) in `site/`. User docs live in `docs/guide/` and `docs/reference/`; their Rust samples are doctests of the `estado` crate, so a doc change must pass `cargo test --doc -p estado`. `estado-core` is the only required crate and builds as `no_std` without `alloc`. The normative spec is `docs/spec.md`; section 5 (semantics) is the source of truth. Work follows the milestones of spec section 12 (M0-M6), tracked in Beads: epic `estado-99i`, milestones `estado-99i.1`..`estado-99i.7`.
 
 ## Conventions & Patterns
 
