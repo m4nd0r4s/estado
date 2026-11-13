@@ -22,7 +22,7 @@
 use core::hint::black_box;
 
 use criterion::{Criterion, Throughput, criterion_group, criterion_main};
-use estado_core::{Cx, Discard, Machine, Runtime, Slot, Spec};
+use estado_core::{Cx, Discard, IgnoreReason, Machine, Report, Runtime, Slot, Spec};
 use estado_examples::a_http_parser::baseline::BaselineParser;
 use estado_examples::a_http_parser::corpus::{Corpus, build_requests};
 use estado_examples::a_http_parser::{HttpParser, ParserCtx};
@@ -44,12 +44,49 @@ fn run_estado(bytes: &[u8]) -> ParserCtx {
     black_box(*machine.ctx())
 }
 
-/// Same, one `send_into` per byte: shows what `send_batch` adds on top.
+/// What a caller of `send_into` per byte reads from the reports: the same
+/// totals `send_batch` returns (counters summed, the flags of the last one).
+/// Without it the optimizer deletes the report arithmetic of `send_into`
+/// and the comparison with `send_batch`, which must return it, is unfair.
+#[derive(Default)]
+struct Totals {
+    handled: bool,
+    ignored: Option<IgnoreReason>,
+    transitions: u64,
+    microsteps: u64,
+    unhandled_internal: u64,
+}
+
+impl Totals {
+    #[inline(always)]
+    fn add(&mut self, report: Report) {
+        self.handled = report.handled;
+        self.ignored = report.ignored;
+        self.transitions += u64::from(report.transitions);
+        self.microsteps += u64::from(report.microsteps);
+        self.unhandled_internal += u64::from(report.unhandled_internal);
+    }
+}
+
+/// One `send_into` per byte, reading every report into `Totals`: shows what
+/// `send_batch` adds on top.
+fn send_each<M: Spec<Event = u8, Effect = ()>>(machine: &mut Machine<M>, bytes: &[u8]) -> Totals {
+    let mut totals = Totals::default();
+    for &byte in black_box(bytes) {
+        match machine.send_into(byte, &mut Discard) {
+            Ok(report) => totals.add(report),
+            Err(error) => {
+                black_box(error);
+                break;
+            }
+        }
+    }
+    totals
+}
+
 fn run_estado_send_into(bytes: &[u8]) -> ParserCtx {
     let mut machine = Machine::<HttpParser>::new(ParserCtx::default());
-    for &byte in black_box(bytes) {
-        let _ = machine.send_into(byte, &mut Discard);
-    }
+    black_box(send_each(&mut machine, bytes).microsteps);
     black_box(*machine.ctx())
 }
 
@@ -63,9 +100,7 @@ fn run_macro(bytes: &[u8]) -> ParserCtx {
 /// Same, one `send_into` per byte.
 fn run_macro_send_into(bytes: &[u8]) -> ParserCtx {
     let mut machine = Machine::<MacroParser>::new(ParserCtx::default());
-    for &byte in black_box(bytes) {
-        let _ = machine.send_into(byte, &mut Discard);
-    }
+    black_box(send_each(&mut machine, bytes).microsteps);
     black_box(*machine.ctx())
 }
 
