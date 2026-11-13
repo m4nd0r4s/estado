@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/m4nd0r4s/estado/blob/main/docs/graph.schema.json",
+  "title": "estado machine graph",
+  "description": "The static graph of an estado machine, as written by estado_graph::to_json (spec 8.1 and 8.2).",
+  "type": "object",
+  "required": ["version", "machine", "states", "edges"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "description": "Version of this format.",
+      "const": 1
+    },
+    "machine": {
+      "description": "Name of the machine: its root enum.",
+      "type": "string"
+    },
+    "states": {
+      "description": "Every state, in declaration order. The index of a state in this array is its id.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/state" }
+    },
+    "edges": {
+      "description": "Every edge declared by a handler, in declaration order.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/edge" }
+    }
+  },
+  "$defs": {
+    "stateId": {
+      "description": "An index into the states array.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "optionalStateId": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "state": {
+      "type": "object",
+      "required": ["id", "name", "parent", "kind", "initial", "history", "timers", "invokes", "depth"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/stateId" },
+        "name": {
+          "description": "Name of the state, unique in the machine.",
+          "type": "string"
+        },
+        "parent": {
+          "description": "The enclosing state or region; null for a top-level state.",
+          "$ref": "#/$defs/optionalStateId"
+        },
+        "kind": {
+          "description": "Atomic: leaf. Compound: has substates. Parallel: has regions. Region: a region of a parallel state. Final: a terminal state. Choice: a choice pseudostate.",
+          "enum": ["atomic", "compound", "parallel", "region", "final", "choice"]
+        },
+        "initial": {
+          "description": "The initial substate of a compound state or region; null otherwise.",
+          "$ref": "#/$defs/optionalStateId"
+        },
+        "history": {
+          "description": "History kept by a compound state: none, the last direct substate (shallow) or the whole substate value (deep).",
+          "enum": ["none", "shallow", "deep"]
+        },
+        "timers": {
+          "description": "Number of #[after] timers of the state.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "invokes": {
+          "description": "Number of #[invoke] tasks of the state.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "depth": {
+          "description": "Nesting depth; 0 for a top-level state.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "required": ["from", "to", "kind", "event"],
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "description": "The state whose handler declares the edge.",
+          "$ref": "#/$defs/stateId"
+        },
+        "to": { "$ref": "#/$defs/target" },
+        "kind": {
+          "enum": ["normal", "external", "history", "error", "timer", "always", "done"]
+        },
+        "event": {
+          "description": "The event pattern of the match arm, when it could be extracted; null otherwise.",
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "target": {
+      "description": "Where an edge ends: a state, a choice pseudostate, or a target decided at runtime.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["type", "id"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "state" },
+            "id": { "$ref": "#/$defs/stateId" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "id"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "choice" },
+            "id": { "$ref": "#/$defs/stateId" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "dynamic" }
+          }
+        }
+      ]
+    }
+  }
+}

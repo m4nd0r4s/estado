@@ -12,3 +12,11 @@ workspace = true
 
 [dependencies]
 estado-core.workspace = true
+
+[features]
+default = ["std"]
+# Enables `assert_snapshot!` and the snapshot helpers, which read and write files.
+std = []
+
+[dev-dependencies]
+serde_json = "1"

@@ -1,0 +1,73 @@
+digraph "Kitchen \"Sink\"" {
+    compound=true;
+    label="Kitchen \"Sink\"";
+    labelloc=t;
+    node [shape=box, style=rounded];
+    dynamic [shape=plaintext, label="*"];
+    i_root [shape=circle, style=filled, fillcolor=black, label="", width=0.2, fixedsize=true];
+    i_root -> s0;
+    s0 [label="Idle"];
+    subgraph cluster_s1 {
+        label="Active";
+        h1 [shape=circle, label="H"];
+        a1 [shape=point, style=invis, width=0, label=""];
+        i1 [shape=circle, style=filled, fillcolor=black, label="", width=0.2, fixedsize=true];
+        i1 -> s2;
+        s2 [label="Playing"];
+        s3 [label="Paused"];
+        subgraph cluster_s4 {
+            label="Nested";
+            h4 [shape=circle, label="H*"];
+            a4 [shape=point, style=invis, width=0, label=""];
+            i4 [shape=circle, style=filled, fillcolor=black, label="", width=0.2, fixedsize=true];
+            i4 -> s5;
+            s5 [label="Inner"];
+        }
+    }
+    subgraph cluster_s6 {
+        label="Alive";
+        style=dashed;
+        a6 [shape=point, style=invis, width=0, label=""];
+        subgraph cluster_s7 {
+            label="left";
+            style=dotted;
+            i7 [shape=circle, style=filled, fillcolor=black, label="", width=0.2, fixedsize=true];
+            i7 -> s8;
+            s8 [label="LeftA"];
+            s9 [label="LeftB"];
+        }
+        subgraph cluster_s10 {
+            label="right";
+            style=dotted;
+            i10 [shape=circle, style=filled, fillcolor=black, label="", width=0.2, fixedsize=true];
+            i10 -> s11;
+            s11 [label="RightA"];
+        }
+    }
+    s12 [label="Pick", shape=diamond];
+    s13 [label="Done", peripheries=2];
+    s14 [label="Finished", peripheries=2];
+    s15 [label="end"];
+    s16 [label="Odd \"name\" & <tag>"];
+    s17 [label="end_15"];
+    s0 -> a1 [label="Event::Start | Event::Resume [external]", lhead=cluster_s1];
+    a1 -> s0 [label="Event::Stop | Event::Halt", ltail=cluster_s1];
+    s2 -> s3 [label="Event::Pause"];
+    s3 -> s2 [label="Event::Play"];
+    s2 -> s2 [label="Event::Tick [timer]"];
+    s2 -> a4 [label="Event::Dive", lhead=cluster_s4];
+    a1 -> s5 [label="Event::Zoom"];
+    s5 -> s0 [label="Event::Surface"];
+    s0 -> h1 [label="Event::Continue [history]"];
+    s0 -> h4 [label="Event::Deeper [history]"];
+    s8 -> s9 [label="Event::Left"];
+    s11 -> s0 [label="Event::Out"];
+    a6 -> s13 [label="[done]", ltail=cluster_s6];
+    s0 -> s12 [label="[always]"];
+    s12 -> s13 [label="Event::Yes"];
+    s12 -> s14 [label="Event::No"];
+    s12 -> dynamic [label="Event::Any", style=dashed];
+    s13 -> s0 [label="Event::Reset"];
+    s15 -> s16 [label="Event::Bad(\"x\") & <y>; \\ done [error]"];
+    s16 -> s17;
+}

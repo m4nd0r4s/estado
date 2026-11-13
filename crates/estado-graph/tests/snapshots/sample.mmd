@@ -1,0 +1,54 @@
+stateDiagram-v2
+    %% machine Kitchen "Sink"
+    state "*" as dynamic
+    Idle
+    state Active {
+        state "H" as Active_history
+        Playing
+        Paused
+        state Nested {
+            state "H*" as Nested_history
+            Inner
+            [*] --> Inner
+        }
+        [*] --> Playing
+        Playing --> Paused : Event::Pause
+        Paused --> Playing : Event::Play
+        Playing --> Playing : Event::Tick [timer]
+        Playing --> Nested : Event::Dive
+    }
+    state Alive {
+        %% region left
+        LeftA
+        LeftB
+        [*] --> LeftA
+        LeftA --> LeftB : Event::Left
+        --
+        %% region right
+        RightA
+        [*] --> RightA
+    }
+    state Pick <<choice>>
+    Done
+    Finished
+    state "end" as end_15
+    state "Odd #quot;name#quot; & <tag>" as Odd__name_____tag_
+    state "end_15" as end_15_17
+    [*] --> Idle
+    Done --> [*]
+    Finished --> [*]
+    Idle --> Active : Event::Start | Event::Resume [external]
+    Active --> Idle : Event::Stop | Event::Halt
+    Active --> Inner : Event::Zoom
+    Inner --> Idle : Event::Surface
+    Idle --> Active_history : Event::Continue [history]
+    Idle --> Nested_history : Event::Deeper [history]
+    RightA --> Idle : Event::Out
+    Alive --> Done : [done]
+    Idle --> Pick : [always]
+    Pick --> Done : Event::Yes
+    Pick --> Finished : Event::No
+    Pick --> dynamic : Event::Any
+    Done --> Idle : Event::Reset
+    end_15 --> Odd__name_____tag_ : Event::Bad("x") & <y>, \ done [error]
+    Odd__name_____tag_ --> end_15_17

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" name="Kitchen &quot;Sink&quot;" initial="Idle">
+  <state id="Idle">
+    <transition event="Event.Start Event.Resume" target="Active" type="external"/>
+    <transition event="Event.Continue" target="Active.history" type="external"/>
+    <transition event="Event.Deeper" target="Nested.history" type="external"/>
+    <transition target="Pick" type="external"/>
+  </state>
+  <state id="Active" initial="Playing">
+    <history id="Active.history" type="shallow">
+      <transition target="Playing"/>
+    </history>
+    <state id="Playing">
+      <transition event="Event.Pause" target="Paused" type="external"/>
+      <transition event="Event.Tick" target="Playing" type="external"/>
+      <transition event="Event.Dive" target="Nested" type="external"/>
+    </state>
+    <state id="Paused">
+      <transition event="Event.Play" target="Playing" type="external"/>
+    </state>
+    <state id="Nested" initial="Inner">
+      <history id="Nested.history" type="deep">
+        <transition target="Inner"/>
+      </history>
+      <state id="Inner">
+        <transition event="Event.Surface" target="Idle" type="external"/>
+      </state>
+    </state>
+    <transition event="Event.Stop Event.Halt" target="Idle" type="external"/>
+    <transition event="Event.Zoom" target="Inner" type="internal"/>
+  </state>
+  <parallel id="Alive">
+    <state id="left" initial="LeftA">
+      <state id="LeftA">
+        <transition event="Event.Left" target="LeftB" type="external"/>
+      </state>
+      <state id="LeftB"/>
+    </state>
+    <state id="right" initial="RightA">
+      <state id="RightA">
+        <transition event="Event.Out" target="Idle" type="external"/>
+      </state>
+    </state>
+    <transition event="done.state.Alive" target="Done" type="external"/>
+  </parallel>
+  <!-- choice pseudostate -->
+  <state id="Pick">
+    <transition event="Event.Yes" target="Done" type="external"/>
+    <transition event="Event.No" target="Finished" type="external"/>
+    <!-- dynamic target: decided at runtime -->
+    <transition event="Event.Any" type="external"/>
+  </state>
+  <!-- final state; it has transitions, so it is a state here -->
+  <state id="Done">
+    <transition event="Event.Reset" target="Idle" type="external"/>
+  </state>
+  <final id="Finished"/>
+  <state id="end">
+    <transition event="Event.Bad(&quot;x&quot;) &amp; &lt;y&gt;; \ done" target="Odd__name_____tag_" type="external"/>
+  </state>
+  <state id="Odd__name_____tag_">
+    <transition target="end_15" type="external"/>
+  </state>
+  <state id="end_15"/>
+</scxml>

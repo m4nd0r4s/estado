@@ -183,6 +183,7 @@ version = "0.0.0"
 dependencies = [
  "criterion",
  "estado-core",
+ "estado-graph",
  "estado-macros",
  "estado-test",
 ]
@@ -199,6 +200,7 @@ name = "estado-graph"
 version = "0.0.0"
 dependencies = [
  "estado-core",
+ "serde_json",
 ]
 
 [[package]]
