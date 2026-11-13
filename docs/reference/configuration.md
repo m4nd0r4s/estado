@@ -40,12 +40,12 @@ The features of `estado` forward to `estado-core`. Defaults: `std`.
 | --- | --- | --- |
 | `std` | yes | Implies `alloc`. Adds `impl std::error::Error for SendError<Event>` (when `Event: Debug`). |
 | `alloc` | via `std` | `InlineEffects` spills extra effects to the heap instead of failing with `Overflow`. `Vec<Effect<Command>>` becomes a `Sink`. |
-| `tracing` | no | Reserved. No effect yet. |
-| `inspect` | no | Reserved. No effect yet. |
-| `invariants` | no | Reserved. No effect yet. |
-| `serde` | no | Reserved. No effect yet. |
+| `tracing` | no | Reserved for the upcoming `estado-inspect` crate (trace recording). Nothing reads it yet. |
+| `inspect` | no | Reserved for the upcoming `estado-inspect` crate (live inspector). Nothing reads it yet. |
+| `invariants` | no | Reserved for `#[invariant]`, which is not supported yet ([`E0090`](../errors/E0090.md)). Nothing reads it yet. |
+| `serde` | no | Reserved for the upcoming `estado-serde` crate (snapshots). Nothing reads it yet. |
 
-Enabling a reserved feature is harmless. It will gain meaning when the crate that needs it lands.
+The four reserved features are declared so that `Cargo.toml` files written today keep working, but they change nothing in the code that is generated or compiled. Enabling one is harmless. Each gains meaning when the crate that needs it lands.
 
 ## no_std
 

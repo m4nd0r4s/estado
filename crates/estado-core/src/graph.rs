@@ -131,9 +131,12 @@ pub enum StateKind {
     Parallel,
     /// A region of a parallel state.
     Region,
-    /// A `#[final]` state.
+    /// A `#[terminal]` state (spec 5.10).
     Final,
     /// A `#[choice]` pseudostate.
+    ///
+    /// Reserved: `#[choice]` is not supported yet (E0090), so the macro
+    /// never emits this kind.
     Choice,
 }
 
@@ -167,8 +170,14 @@ pub enum EdgeTarget {
     /// A real state.
     State(StateId),
     /// A `#[choice]` pseudostate.
+    ///
+    /// Reserved: `#[choice]` is not supported yet (E0090), so the macro
+    /// never emits this target.
     Choice(StateId),
     /// `goto_dyn!`: decided at runtime.
+    ///
+    /// Reserved: `goto_dyn!` is not supported yet (E0090), so the macro
+    /// never emits this target.
     Dynamic,
 }
 
@@ -182,6 +191,9 @@ pub enum EdgeKind {
     /// `goto!(T, history)`.
     History,
     /// `Err` routed to `#[on_error]`.
+    ///
+    /// Reserved: `#[on_error]` is not supported yet (E0090), so the macro
+    /// never emits this kind.
     Error,
     /// Timer event.
     Timer,
