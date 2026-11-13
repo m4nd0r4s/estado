@@ -8,11 +8,13 @@
 //!
 //! Status (Apple M-series, release): the target of 5% is not met. The
 //! baseline takes about 1.0 ms per MB, the hand-written machine of
-//! `a_http_parser` about 1.6 ms with `send_into` per byte and with
-//! `send_batch`. See ADR 0017 and spec errata 13 and 18 for the breakdown and the
-//! revised target; `estado_send_into` is kept to show what `send_batch` adds
-//! on top. The `send_batch` report goes through `black_box` like the
-//! context: a caller reads it, so it is work the machine must do.
+//! `a_http_parser` about 1.65 ms with `send_batch` and 1.75 ms with
+//! `send_into` per byte. See ADR 0017 and spec errata 13 and 18 for the
+//! breakdown and the revised target. `send_batch` returns a report and
+//! `send_into` returns one per byte; both variants read what they return
+//! (`black_box` of the batch report, `Totals` folded over the per-byte
+//! reports), so the comparison between them is the work of the loop and not
+//! of what the optimizer may delete.
 //!
 //! M3 adds the `estado_macro_*` functions: the same parser written with
 //! `#[machine]` (`a_http_parser_macro`), the machine ADR 0009 asks to

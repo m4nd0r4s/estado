@@ -66,3 +66,60 @@ The loops are as small as they can be: the asm of `run_macro` has no calls excep
 - `docs/spec.md` 10.3 is not edited; errata 18 carries the revision (the spec is revised by its owner).
 - The bead estado-99i.3.16 stays open until a CI run gives the numbers after this change; local numbers are a proxy (aarch64 native and x86_64 under Rosetta 2), and the CI x86_64 figure decides.
 - The landing page figure (BM-01, 1.17x) is stale until that run.
+
+## Follow-up: the report arithmetic of `send_batch`
+
+Date: 2026-11-13. A CI x86_64 run after the decision above (run on 61586ea, quick mode) gave baseline 1.236 ms, hand-written `send_into` 1.313 (1.06x) and `send_batch` 1.742 (1.41x), macro `send_into` 1.336 (1.08x) and `send_batch` 2.010 (1.63x). The target of 1.25x was not met: `send_batch` cost about 0.7 ns per byte more than a loop of `send_into`, which should be impossible for a loop that does strictly less work. Two causes, one in the benchmark and one in the core.
+
+### 1. The two variants did not do the same work
+
+`run_estado_send_into` and `run_macro_send_into` threw every report away (`let _ = machine.send_into(..)`), so the optimizer deleted the report arithmetic from them, while `send_batch` returns a report that goes through `black_box`, so its arithmetic has to run. The comparison favoured `send_into`. What is right: both sides give a caller what that caller reads. A caller of `send_batch` reads the totals; a caller of `send_into` per byte that wants the same totals folds the reports and checks the error. The `send_into` variants now do exactly that (`send_each` in `bm_01_http_parser.rs`: counters summed into wide totals, `handled` and `ignored` of the last report, the error checked, the whole `Totals` through `black_box`). A loop that ignores the reports is not a scenario worth a variant: it measures a `Machine` whose report does not exist. The change makes `send_into` slower by 3-10% on aarch64 (macro 1.55 to 1.59-1.60 ms, hand-written 1.59 to 1.74 ms), so the ratios of `send_into` quoted before this follow-up are too low by that much.
+
+### 2. The loop built a `Report` per event and added it to the total
+
+The loop declared a `Report`, let the step fill it (`count`, `ignored`, the livelock bound), and then `BatchTotal::add` widened its fields into the running total. The asm on x86_64 shows what that is: every handler path computes its contribution in registers (`xor`, `mov $1`), joins, and a few `add`s fold it, in a loop where the state, the iterator and the totals already compete for registers. `microstep`, `drain` and `step_live` are now generic over a small private trait, `Tally` (`machine/tally.rs`). `Report` implements it as before, for `send_into`, `start` and the tasks; `BatchTotal` implements it with wide counters, so the batch loop counts in place (`incq` of the microsteps and, on a transition, of the transitions) and never builds a `Report`. The livelock bound is per event, so `BatchTotal::begin_event` records where the event's microsteps started and `microsteps_of_step` returns the difference; the error carries the same count as a single `send_into` (new test `the_livelock_bound_counts_one_event_not_the_batch`, next to the existing ones in `tests/send_batch.rs`, which pin the rest: sums, last flags, first error, panic, clamping). The guard stays per event, for the reason given above. The step code moved from `machine/mod.rs` to `machine/step.rs` in the same commit, which was at 591 lines; `mod.rs` is 427 now.
+
+Upper bound measured before writing it: with the arithmetic removed from the loop altogether (counting only `microsteps += 1`) the macro `send_batch` on x86_64 under Rosetta went from 3.29 to 2.55 ms, so the arithmetic was most of the gap, and the layout-independent part of it is what the change removes.
+
+### Measurements
+
+Release, 1 MB of requests, criterion `--quick`, **7 runs alternating between the two binaries** (old, new) so that system load hits both alike; the machine was busy (load average 14-18), so the table gives medians of 7 runs. Old is the tree with the fair `send_into` variants and the previous core; new is the tree of this follow-up. Both are quoted from the same bench source.
+
+Apple M-series (aarch64, native):
+
+| Measurement | Old | New |
+| --- | --- | --- |
+| baseline | 0.988 ms | 0.981 ms |
+| hand-written `send_batch` | 1.651 ms (1.67x) | 1.651 ms (1.68x) |
+| hand-written `send_into` (reports read) | 1.741 ms (1.76x) | 1.748 ms (1.78x) |
+| macro `send_batch` | 1.476 ms (1.49x) | 1.436 ms (1.46x) |
+| macro `send_into` (reports read) | 1.603 ms (1.62x) | 1.593 ms (1.62x) |
+| `microstep` direct, hand-written / macro | 1.232 / 1.248 ms | 1.291 / 1.267 ms |
+| BM-02, estado side | 1.903 ms | 1.915 ms |
+
+x86_64 under Rosetta 2:
+
+| Measurement | Old | New |
+| --- | --- | --- |
+| baseline | 2.639 ms | 2.417 ms |
+| hand-written `send_batch` | 2.413 ms | 2.271 ms |
+| hand-written `send_into` (reports read) | 2.461 ms | 2.479 ms |
+| macro `send_batch` | 3.297 ms | 2.613 ms |
+| macro `send_into` (reports read) | 2.984 ms | 2.979 ms |
+| BM-02, estado side | 2.537 ms | 2.546 ms |
+
+Reading:
+
+- `send_batch` is now faster than a loop of `send_into` that reads the same reports, on both architectures and for both machines (macro: 1.44 against 1.59 ms on aarch64, 2.61 against 2.98 ms under Rosetta). Before, the macro `send_batch` was 11% slower than the loop under Rosetta (3.30 against 2.98 ms) and 8% faster on aarch64.
+- The macro `send_batch` under Rosetta improves by 21%, on aarch64 by 3%; the hand-written one by 6% and 0%. `send_into` per byte and BM-02 do not move on either architecture, as asked.
+- Rosetta does not give the baseline or the other variants a stable absolute number between binaries: the baseline alone went from 2.0 to 2.7 ms across builds of identical source in the runs of this work, and the `send_into` loop of the hand-written machine from 2.3 to 2.9 ms. Only the ratios inside one binary mean something, and Rosetta has been optimistic about `send_batch` compared with CI (before this change it showed the macro `send_batch` at about 1.25x where CI showed 1.63x). The CI x86_64 run decides.
+
+### Tried and dropped
+
+- The earlier drops (guard removal, done-check removal, `#[inline(always)]` on `version_step`, the `Edge::apply` prologue) stay dropped.
+
+### Decision
+
+1. Keep the in-place counting (`Tally`, `BatchTotal` counting directly) and the split of `machine/step.rs`.
+2. Keep the fair `send_into` variants as the comparison to `send_batch`.
+3. The target stays at **1.25x of the hand-written parser on the CI x86_64 runner** for the macro `send_batch`. The CI ratio of the macro `send_into`, which does the same per-byte work as the new loop with a slot test more, was 1.08x before this follow-up and the fair loop is a little slower, so the new `send_batch` should land around 1.1x-1.2x. Tightening the target to 1.10x is worth proposing only after a CI run shows it; tightening on the strength of Rosetta numbers would repeat the mistake of the first revision. If that run shows the macro `send_batch` at or under 1.10x, errata 18 gets a line saying so and the bead can close.
