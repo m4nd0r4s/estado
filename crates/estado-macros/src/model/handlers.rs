@@ -51,6 +51,17 @@ pub enum GotoForm {
     /// `exiting` is `X`, the child of the LCA on the active path, whose value
     /// the constructor receives by value.
     Constructor { exiting: StateId },
+    /// A simple form whose value contains an `#[initial(with = f)]` call that
+    /// needs `cx` (errata 15): the handler only evaluates the data the user
+    /// wrote, the edge carries it as `part_types`, and `Edge::apply` builds
+    /// the value with `build` after the exits.
+    Deferred {
+        /// The types of the values the edge variant carries, in order.
+        part_types: Vec<syn::Type>,
+        /// The expression of the value of the child of the LCA, over the
+        /// `part_ident(i)` bindings and `cx`.
+        build: proc_macro2::TokenStream,
+    },
 }
 
 /// The flavour of a transition, for the graph and for entry resolution.

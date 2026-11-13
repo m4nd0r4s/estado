@@ -64,7 +64,29 @@ pub trait Spec: Sized {
     const TRACKS_ACTIVE: bool = false;
 
     /// The root initial value, before any entry runs.
+    ///
+    /// A machine whose root `#[initial(with = ..)]` function takes a [`Cx`]
+    /// has no value to give here without one: it implements
+    /// [`initial_in`](Self::initial_in) instead, and this function only
+    /// exists to satisfy the trait.
     fn initial() -> Self;
+
+    /// The root initial value, built with a context: [`Machine::start`]
+    /// calls this and not [`initial`](Self::initial).
+    ///
+    /// The default is `Self::initial()`. An initializer that emits effects,
+    /// raises events or reads the global context overrides it. It runs under
+    /// the same rules as every other piece of user code of a start: a panic
+    /// poisons the machine, and a full effect sink or raise queue is an error
+    /// that poisons it too. Its effects come before those of the entries.
+    /// `cx.in_state` answers `false` for every state, because no state is
+    /// active yet.
+    ///
+    /// [`Machine::start`]: crate::Machine::start
+    fn initial_in<S: Sink<Self::Effect>>(cx: &mut Cx<'_, Self, S>) -> Self {
+        let _ = cx;
+        Self::initial()
+    }
 
     /// Id of the active leaf (or of the parallel state).
     fn state_id(&self) -> StateId;

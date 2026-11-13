@@ -27,6 +27,7 @@ pub fn machine(attribute: TokenStream, item: TokenStream) -> TokenStream {
     let mut diagnostics = parsed.diagnostics;
     let mut items = parsed.fallback_items;
     if let Some(model) = parsed.model.as_mut() {
+        diagnostics.extend(analysis::resolve_initial_arguments(model));
         diagnostics.extend(analysis::validate(model));
         diagnostics.extend(handlers::analyse(model));
         items = machine_items(model, diagnostics.is_empty());

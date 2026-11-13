@@ -32,7 +32,7 @@ mod entries;
 mod graph;
 mod history;
 mod lookups;
-mod naming;
+pub(crate) mod naming;
 mod regions;
 mod runtime;
 mod spec;

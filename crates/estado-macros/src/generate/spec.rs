@@ -7,6 +7,7 @@ use super::context::Generation;
 use super::graph::{path_body, state_id_body};
 use super::naming::enter_function;
 use crate::construct::initial_value;
+use crate::construct_context::{initial_value_in, needs_context};
 use crate::model::{DeferOverflow, UnhandledPolicy};
 
 /// The `Spec` implementation. `initial()` is built from the `#[initial]`
@@ -30,16 +31,46 @@ pub fn spec_impl(generation: &Generation<'_>) -> TokenStream {
         DeferOverflow::DropOldest => quote! { DropOldest },
     };
     let tracks_active = generation.tracks_active();
-    let initial =
-        initial_value(generation.tree, 0).unwrap_or_else(|_| quote! { ::core::unreachable!() });
+    let sink_parameter = generation.sink_parameter();
+    let cx_type = generation.cx_type();
+    // An initializer that takes the `Cx` cannot run in `initial()`: the
+    // machine builds its root through `initial_in` (errata 15).
+    let (initial_function, initial_in_function) = if needs_context(generation.tree, 0) {
+        let initial = initial_value_in(generation.tree, 0, None)
+            .unwrap_or_else(|_| quote! { ::core::unreachable!() });
+        (
+            quote! {
+                fn initial() -> Self {
+                    ::core::panic!(
+                        "estado: the initial state of `{}` is built with a `Cx`; start the machine with `Machine::start` or `send`",
+                        <Self as __estado_core::Spec>::NAME
+                    )
+                }
+            },
+            quote! {
+                fn initial_in<#sink_parameter>(cx: &mut #cx_type) -> Self {
+                    #initial
+                }
+            },
+        )
+    } else {
+        let initial =
+            initial_value(generation.tree, 0).unwrap_or_else(|_| quote! { ::core::unreachable!() });
+        (
+            quote! {
+                fn initial() -> Self {
+                    #initial
+                }
+            },
+            TokenStream::new(),
+        )
+    };
     let enter_root = enter_function(generation.tree, 0);
     let start_root = super::tasks::start_call(
         generation,
         0,
         &proc_macro2::Ident::new("self", proc_macro2::Span::call_site()),
     );
-    let sink_parameter = generation.sink_parameter();
-    let cx_type = generation.cx_type();
     let path = path_body(generation);
     let state_id = state_id_body(generation);
     let runtime = super::runtime::runtime_type(generation);
@@ -74,9 +105,8 @@ pub fn spec_impl(generation: &Generation<'_>) -> TokenStream {
             const MAX_MICROSTEPS: u16 = #max_microsteps;
             const TRACKS_ACTIVE: bool = #tracks_active;
 
-            fn initial() -> Self {
-                #initial
-            }
+            #initial_function
+            #initial_in_function
 
             fn state_id(&self) -> __estado_core::StateId {
                 #state_id

@@ -8,6 +8,7 @@ use super::context::Generation;
 use super::naming::{bubble_function, enter_function, exit_function, reenter_function};
 use super::walk::{FieldsAccess, borrowed_walk, call_handler, fields_references};
 use crate::construct::initial_value;
+use crate::construct_context::{fields_view_of, initial_value_in, needs_context};
 use crate::model::{HandlerRole, StateId, StateKind, UnhandledPolicy};
 
 /// `__estado_core::UnhandledPolicy::Error` and its siblings.
@@ -257,8 +258,15 @@ fn reset_statements(
     let replacements = tree.children_owners(node).into_iter().map(|owner| {
         let owner_state = tree.node(owner);
         let field = owner_state.children_field.as_ref().expect("children field");
-        let initial =
-            initial_value(tree, owner).unwrap_or_else(|_| quote! { ::core::unreachable!() });
+        // An initializer that takes the `Cx` and the parent fields runs here,
+        // after the exits; the fields are borrowed from the struct being reset.
+        let initial = if needs_context(tree, owner) {
+            let fields = fields_view_of(tree, node, &quote! { #payload });
+            initial_value_in(tree, owner, Some(fields))
+        } else {
+            initial_value(tree, owner)
+        }
+        .unwrap_or_else(|_| quote! { ::core::unreachable!() });
         let retired = if owner_state.history == crate::model::HistoryKind::DeepKeep {
             let history = super::runtime::history_field(generation, owner);
             quote! { cx.runtime_mut().#history = ::core::option::Option::Some(old_substates); }

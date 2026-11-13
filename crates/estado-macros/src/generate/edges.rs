@@ -17,6 +17,7 @@ use super::walk::{
     struct_field_pairs, tuple_field_bindings, variant_pattern,
 };
 use crate::construct::exiting_type;
+use crate::construct_context::part_ident;
 use crate::model::{
     GotoForm, GotoOccurrence, HandlerModel, HistoryKind, Payload, StateId, TransitionKind,
 };
@@ -109,7 +110,7 @@ fn edge_enum(generation: &Generation<'_>, handler: &HandlerModel) -> TokenStream
     let variants = handler.gotos.iter().map(|goto| {
         let variant = &goto.variant;
         let target = &tree.node(goto.target).name;
-        match goto.form {
+        match &goto.form {
             GotoForm::Value => {
                 let value = children_type(generation, goto.lca);
                 let documentation =
@@ -121,6 +122,13 @@ fn edge_enum(generation: &Generation<'_>, handler: &HandlerModel) -> TokenStream
                 let documentation =
                     format!("`goto!({target}, |old| ..)`: carries the constructor.");
                 quote! { #[doc = #documentation] #variant(#parameter) }
+            }
+            GotoForm::Deferred { part_types, .. } => {
+                let documentation = format!(
+                    "`goto!({target})`: carries the data of the value, which `apply` builds \
+                     because an `#[initial(with = ..)]` function needs the `Cx`."
+                );
+                quote! { #[doc = #documentation] #variant(#(#part_types),*) }
             }
         }
     });
@@ -223,13 +231,22 @@ fn apply_arm(
     let cancel = cancel_call(generation, goto.lca, children);
     let start = start_call(generation, goto.lca, children);
 
-    match goto.form {
-        GotoForm::Value => {
+    match &goto.form {
+        GotoForm::Value | GotoForm::Deferred { .. } => {
+            // A deferred value is built here, after the exits, from the data
+            // the edge carries; a plain one arrives built.
+            let (arguments, build) = match &goto.form {
+                GotoForm::Deferred { part_types, build } => {
+                    let parts = (0..part_types.len()).map(part_ident);
+                    (quote! { #(#parts),* }, quote! { let value = #build; })
+                }
+                _ => (quote! { value }, TokenStream::new()),
+            };
             let write = if super::history::has_deep_below(generation, goto.lca) {
                 let retire = super::history::retire_function(children_type(generation, goto.lca));
-                quote! { #retire(::core::mem::replace(#children, value), cx); }
+                quote! { #build #retire(::core::mem::replace(#children, value), cx); }
             } else {
-                quote! { *#children = value; }
+                quote! { #build *#children = value; }
             };
             let restore = (goto.kind == TransitionKind::History)
                 .then(|| history_override(generation, goto.target));
@@ -245,7 +262,7 @@ fn apply_arm(
                 )
             };
             quote! {
-                Self::#variant(value) => {
+                Self::#variant(#arguments) => {
                     #before
                     #leave
                     #restore
@@ -255,6 +272,7 @@ fn apply_arm(
             }
         }
         GotoForm::Constructor { exiting } => {
+            let exiting = *exiting;
             let old_children = format_ident!("old_children");
             let pattern = owned_pattern(generation, goto.lca, &old_children);
             let take = if goto.lca == 0 {

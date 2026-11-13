@@ -57,6 +57,7 @@ fn blank_node(
         initial: None,
         is_initial: false,
         initial_with: None,
+        initial_arguments: Vec::new(),
         history: HistoryKind::None,
         is_final: false,
         timers: Vec::new(),

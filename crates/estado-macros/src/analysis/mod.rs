@@ -2,9 +2,12 @@
 //! the whole tree. Each returns diagnostics; none aborts the expansion.
 
 mod configuration;
+mod initials;
 mod levels;
 mod names;
 mod options;
+
+pub use initials::resolve_initial_arguments;
 
 use crate::model::{Diagnostic, MachineModel};
 

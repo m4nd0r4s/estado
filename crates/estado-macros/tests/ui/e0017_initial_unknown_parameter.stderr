@@ -1,0 +1,6 @@
+error: estado::E0017: `start` takes a parameter that `#[initial(with = ..)]` cannot give
+         = help: an initializer takes `&mut Cx<..>` and `ActiveFields<'_>`, in any order, or nothing
+  --> tests/ui/e0017_initial_unknown_parameter.rs:33:22
+   |
+33 |     fn start(volume: u8) -> Mode {
+   |                      ^^

@@ -233,10 +233,15 @@ impl BodyRewriter<'_, '_> {
         let argument: TokenStream = match &resolved.payload {
             ResolvedPayload::Value(value) => quote! { #value },
             ResolvedPayload::Constructor { closure, .. } => quote! { #closure },
+            ResolvedPayload::Deferred { arguments, .. } => quote! { #(#arguments),* },
         };
         let form = match resolved.payload {
             ResolvedPayload::Value(_) => GotoForm::Value,
             ResolvedPayload::Constructor { exiting, .. } => GotoForm::Constructor { exiting },
+            ResolvedPayload::Deferred { types, build, .. } => GotoForm::Deferred {
+                part_types: types,
+                build,
+            },
         };
         self.report.gotos.push(GotoOccurrence {
             variant: variant.clone(),

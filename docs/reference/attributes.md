@@ -175,14 +175,24 @@ fn main() {
 | Argument | Meaning |
 | --- | --- |
 | none | Enter this variant when its level is entered without an explicit target. |
-| `with = path` | `path` is a function `fn() -> Enum` that builds the whole value of the variant, nested substates included. |
+| `with = path` | `path` is a function that builds the whole value of the variant, nested substates included, and returns the enum the variant belongs to. It takes no arguments, or any of the parameters in the table below. |
+
+**Parameters of the function.** The macro recognises them by type and reads the signature from the machine module: a free function (`with = f`) or a function of the root's `#[handlers]` impl (`with = Self::f` or `with = Root::f`). A path to anything else is called without arguments.
+
+| Parameter | Meaning |
+| --- | --- |
+| none | Called where the value is built, before the transition runs. It cannot read the context or emit effects. |
+| `&mut Cx<'_, Root, S>` | The context. The function runs when the state is entered, after the exits of the transition and before the entries: it can read and write the global context, emit effects and raise events. Write it generic over the sink: `fn f<S: Sink<Effect>>(cx: &mut Cx<'_, Root, S>)`. |
+| `<Parent>Fields<'_>` | `&mut` references to the shared fields of the state that owns this level: the compound state whose `#[substates]` it is, or the parallel state of a `#[region]`. For `Active { volume, #[substates] mode }` the type is `ActiveFields<'_>`. The root enum has no parent, so it cannot take it ([`E0017`](../errors/E0017.md)). |
+
+A function with at least one of the last two runs at every entry through the initial: a `goto!` that does not name the substate (the fields are the ones the `goto!` gave), `reenter!()` and a local `goto!` to an ancestor (the live fields of the ancestor), and, on the root enum, `Machine::start`. There it takes at most the `Cx`, runs before the first entries, and sees no active state in `cx.in_state`. A panic in it, or an effect the sink refuses, poisons the machine. `goto!(State, history)` into a state whose initial takes parameters is [`E0090`](../errors/E0090.md).
 
 **Rules**
 
 - Exactly one per enum ([`E0010`](../errors/E0010.md)).
 - It goes on the variant, never on the struct ([`E0017`](../errors/E0017.md)).
 - A state that has fields and is entered through `#[initial]` needs `with = ..`, because no `goto!` supplies its data ([`E0020`](../errors/E0020.md)). The same applies to the initial chain of the root, which `Machine::start` builds.
-- `with = path` is the only accepted argument ([`E0017`](../errors/E0017.md) for anything else).
+- `with = path` is the only accepted argument ([`E0017`](../errors/E0017.md) for anything else), and so is a parameter of the function that is neither a `&mut Cx` nor the `*Fields` of the parent.
 
 ```rust
 use estado::prelude::*;

@@ -16,6 +16,7 @@ mod event_coverage;
 mod event_coverage_tests;
 mod goto_resolve;
 mod goto_syntax;
+mod goto_value;
 mod parallel_geometry;
 mod parameters;
 mod roles;

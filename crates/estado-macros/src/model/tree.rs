@@ -52,6 +52,9 @@ pub struct StateNode {
     pub is_initial: bool,
     /// `#[initial(with = path)]` constructor of this state, when it has data.
     pub initial_with: Option<syn::Path>,
+    /// The parameters of the `initial_with` function, in order. Empty for the
+    /// zero-argument form, and for a function the macro cannot see.
+    pub initial_arguments: Vec<InitialArgument>,
     /// `#[history]` / `#[history(deep, keep)]` on a compound.
     pub history: HistoryKind,
     /// `#[final]`.
@@ -62,6 +65,17 @@ pub struct StateNode {
     pub invokes: Vec<InvokeSpec>,
     /// `#[unhandled(..)]` override (spec 5.1 item 4).
     pub unhandled: Option<UnhandledPolicy>,
+}
+
+/// One parameter of an `#[initial(with = f)]` function, recognised by its
+/// type (errata 15).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum InitialArgument {
+    /// `&mut Cx<..>`.
+    Context,
+    /// `<Parent>Fields<'_>`: the shared fields of the compound or parallel
+    /// state whose substates or region the initial belongs to.
+    ParentFields,
 }
 
 /// Kind of a node (spec 3.1).
@@ -169,6 +183,17 @@ impl StateTree {
             .copied()
             .find(|node| second_chain.contains(node))
             .unwrap_or(0)
+    }
+
+    /// The compound or parallel state whose `*Fields` an `#[initial(with = ..)]`
+    /// function of `node` receives: the state whose substates `node` is one
+    /// of, or the parallel state of its region. `None` at the root level.
+    pub fn fields_owner(&self, node: StateId) -> Option<StateId> {
+        let parent = self.node(node).parent.filter(|&parent| parent != 0)?;
+        match self.node(parent).kind {
+            StateKind::Region => self.node(parent).parent,
+            _ => Some(parent),
+        }
     }
 
     /// Whether `ancestor` is `node` or one of its ancestors.

@@ -64,6 +64,7 @@ pub trait Spec: Sized {
     ) -> Outcome;
 
     // Provided, with defaults:
+    fn initial_in<S: Sink<Self::Effect>>(cx: &mut Cx<'_, Self, S>) -> Self;
     fn run_always<S: Sink<Self::Effect>>(slot: &mut Slot<Self>, cx: &mut Cx<'_, Self, S>) -> Outcome;
     fn is_done(&self) -> bool;
     fn into_output(self) -> Result<Self::Output, Self>;
@@ -121,6 +122,7 @@ To change the state, take it out of the slot and put the new one back: `slot.tak
 
 | Method | Default | Override to |
 | --- | --- | --- |
+| `initial_in(cx)` | `Self::initial()` | Build the root value with a context: `Machine::start` calls it and not `initial()`. Override it when the initial value emits effects, raises events or reads the global context. It runs inside the start: a panic poisons the machine, a refused effect is `EffectOverflow`, its effects come before those of the entries, and `cx.in_state` is `false` for every state. `initial()` is still required; it may be `unreachable!()` when `initial_in` is overridden. |
 | `run_always(slot, cx)` | `Outcome::Stayed` | Evaluate pending `#[always]` handlers. `Machine` calls it when the runtime's `take_always_pending()` returns `true`. |
 | `is_done(&self)` | `false` | Report that the root is in a final state. |
 | `into_output(self)` | `Err(self)` | Move the output out of a final state. |

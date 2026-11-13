@@ -443,7 +443,21 @@ fn start_in<M: Spec, S: Sink<M::Effect>>(
     runtime: &mut M::Runtime,
     sink: &mut S,
 ) -> Result<(), SendError<M::Event>> {
-    slot.put(M::initial());
+    // The root initializer is user code and may emit effects: it runs inside
+    // the start, under the guard of its caller, before the entries. No state is
+    // active yet, so `in_state` sees an empty configuration.
+    let mut nothing_active = if M::TRACKS_ACTIVE {
+        Some(StatePath::new(M::GRAPH))
+    } else {
+        None
+    };
+    let initial = {
+        let mut cx = Cx::<M, S>::new(ctx, runtime, sink, nothing_active.as_mut());
+        let initial = M::initial_in(&mut cx);
+        check_fault(cx.fault())?;
+        initial
+    };
+    slot.put(initial);
     // Initial entries see the configuration being entered (ADR 0013 item 7).
     let mut snapshot = if M::TRACKS_ACTIVE {
         Some(slot.live_mut().path())

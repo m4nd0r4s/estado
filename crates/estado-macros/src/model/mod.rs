@@ -17,7 +17,8 @@ pub use handlers::{
 };
 pub use options::{DeferOverflow, MachineOptions, UnhandledPolicy, UnsupportedOption};
 pub use tree::{
-    AfterSpec, HistoryKind, InvokeSpec, Payload, StateId, StateKind, StateNode, StateTree, TypeDecl,
+    AfterSpec, HistoryKind, InitialArgument, InvokeSpec, Payload, StateId, StateKind, StateNode,
+    StateTree, TypeDecl,
 };
 
 use syn::{Attribute, Ident, Item, ItemImpl, Visibility};

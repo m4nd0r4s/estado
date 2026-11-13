@@ -96,10 +96,16 @@ Contradictions and errors in the spec. By rule 2 of section 0, section 5 wins. E
   - `E0090`: the feature is part of the planned macro language but not generated yet (`#[choice]`, nested parallel states, a handler on a region, nested deep histories, counts that do not fit the `u8` of an index, ..). It is the code of every "not supported yet", so that an unsupported case never compiles to something half working.
 - E0012 also reports a state whose name equals its own id constant (`IO`), and E0017 a `#[handlers]` block on a type other than the root and a role attribute on a non-function (ADR 0013 item 10; review finding 21).
 
-## 15. 6.1: `#[initial(with = path)]` takes no arguments
+## 15. 6.1: `#[initial(with = path)]` and its signature
 
-- **Problem.** 6.1 gives the initializer the signature `fn(&mut Cx, &ParentFields) -> Self`. A constructor that needs `cx` and the parent's fields can only run inside the transition, after the exits, when the parent value does not exist yet; the edge would have to carry a generated "parts" struct per `goto!`. A root-level initial has no `Cx` at all, since `Spec::initial()` runs before the machine starts.
-- **Resolution** (lead decision, ADR 0013 item 12 and its amendments). In v0, `with = path` names a function with no arguments that returns the state's value; it is called when the state is entered through its initial. The signature of the spec is left for a later version, as an additive change (a second attribute form), so machines written today keep compiling.
+- **Problem.** 6.1 gives the initializer the signature `fn(&mut Cx, &ParentFields) -> Self`. The value that contains the initial child is built in the decision phase, before the exits, where there is no `cx` and no parent value; a root-level initial has no `Cx` either, since `Spec::initial()` runs before the machine starts. Version 0 therefore took no arguments (ADR 0013 item 12).
+- **Resolution** (ADR 0013 item 12, ADR 0016). Both forms exist; the macro picks the form from the signature of the function. `with = path` names either a function with no parameters (the form of version 0, which builds the value where the `goto!` is written), or one whose parameters are `&mut Cx<..>` and `<Parent>Fields<'_>`, recognised by type, in any order, either one optional. Differences from the text of 6.1:
+  - `ParentFields` is the existing `<Parent>Fields<'_>` view of ADR 0007, passed by value: `&mut` references to the shared fields (not the `#[substates]` or `#[region]` fields) of the compound state whose substates the initial belongs to, or the parallel state of its region. The root has no parent, so it takes at most the `Cx`.
+  - The function returns the value of the enum the variant belongs to (`Self` of 6.1 read as the level), like the zero-argument form, so it builds the substates below the initial too. It does not return only the data of the variant.
+  - It runs when the state is entered, after the exits of the transition and before the entries, and may emit effects, raise events and read the context. At the root it runs inside `Machine::start` (new `Spec::initial_in`), under the same poison rules as an entry.
+  - The signature is read from the machine module (a free function or a function of the root's `#[handlers]` impl); a path to anything else is called without arguments.
+  - `goto!(S, history)` into a state whose initial takes parameters is `E0090`: the function would run even when a history is recorded and replaces its result.
+  - A `*Fields` parameter that the macro cannot match, or one at the root, is `E0017`.
 
 ## 16. 6.5: the `StateId` constants end in `_ID`
 

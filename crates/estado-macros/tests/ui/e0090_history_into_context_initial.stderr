@@ -1,0 +1,6 @@
+error: estado::E0090: `goto!(Active, history)` enters a state whose `#[initial(with = ..)]` function takes a `Cx` or the parent fields
+         = help: the initializer would run even when a history is recorded and replaces it; use a function without parameters there, or enter the state without `history`
+  --> tests/ui/e0090_history_into_context_initial.rs:40:13
+   |
+40 |             goto!(Active, history)
+   |             ^^^^^^^^^^^^^^^^^^^^^^

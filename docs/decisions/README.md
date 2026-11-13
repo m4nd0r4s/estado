@@ -33,3 +33,4 @@ Spec: affected section(s)
 | [0013](0013-decisions-from-the-m3-reviews.md) | Decisions taken from the M3 code reviews |
 | [0014](0014-effect-overflow-poisons.md) | An effect overflow, and a defer overflow after the first microstep, poison the machine |
 | [0015](0015-in-state-without-tracking-panics.md) | `cx.in_state` on an untracked machine panics |
+| [0016](0016-initial-with-context.md) | `#[initial(with = f)]` takes the `Cx` and the parent fields |

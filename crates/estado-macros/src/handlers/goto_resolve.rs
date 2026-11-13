@@ -2,13 +2,13 @@
 //! table 5.2, the value of the child of the LCA and the E0003, E0020 and
 //! E0043 diagnostics.
 
-use proc_macro2::{Span, TokenStream};
-use quote::quote;
+use proc_macro2::TokenStream;
 use syn::spanned::Spanned;
 use syn::{Expr, ExprClosure, Ident, Pat, PatType, Type};
 
 use super::goto_syntax::{GotoExtra, GotoSyntax, LevelSyntax, MALFORMED_TRANSITION};
-use crate::construct::{MissingData, SuppliedData, initial_value, variant_value};
+use super::goto_value::{build_value, deferred_payload, needs_context_path};
+use crate::construct::{MissingData, SuppliedData};
 use crate::model::{
     Diagnostic, Extent, HistoryKind, Payload, StateId, StateKind, StateTree, TransitionKind,
 };
@@ -18,6 +18,15 @@ use crate::suggest::did_you_mean;
 pub enum ResolvedPayload {
     /// The value of the child of the LCA (simple form).
     Value(Box<Expr>),
+    /// The data of the value, which `Edge::apply` builds with a `Cx` in scope
+    /// (an `#[initial(with = ..)]` function that takes `cx` or the parent
+    /// fields): the values to carry, their types, and the expression that
+    /// builds the value from them.
+    Deferred {
+        arguments: Vec<Expr>,
+        types: Vec<Type>,
+        build: TokenStream,
+    },
     /// The constructor closure, its parameter annotated with `Exiting![X]`
     /// resolved to a type.
     Constructor {
@@ -102,6 +111,9 @@ pub fn resolve_goto(
             }
             constructor_payload(tree, closure, exiting, exiting_type)?
         }
+        _ if needs_context_path(tree, lca, target) => {
+            deferred_payload(tree, lca, target, &chain, syntax.levels, kind, macro_span)?
+        }
         _ => ResolvedPayload::Value(Box::new(build_value(
             tree,
             lca,
@@ -119,7 +131,7 @@ pub fn resolve_goto(
     })
 }
 
-fn malformed(span: impl Into<Extent>, message: impl Into<String>) -> Diagnostic {
+pub(super) fn malformed(span: impl Into<Extent>, message: impl Into<String>) -> Diagnostic {
     Diagnostic::new(MALFORMED_TRANSITION, span, message)
 }
 
@@ -316,78 +328,6 @@ fn exiting_macro_state(ty: &Type) -> Option<Ident> {
         return None;
     }
     syn::parse2(type_macro.mac.tokens.clone()).ok()
-}
-
-/// The value of the child of the LCA, from the data of the path (E0020).
-fn build_value(
-    tree: &StateTree,
-    lca: StateId,
-    target: StateId,
-    chain: &[StateId],
-    levels: Vec<LevelSyntax>,
-    macro_span: Extent,
-) -> Result<Expr, Diagnostic> {
-    let target_name = tree.node(target).name.clone();
-    // The levels that are built: below the LCA, down to the target. When the
-    // target is the LCA itself (a local transition to an ancestor) nothing is
-    // built but the initial of its substates.
-    let mut entered: Vec<StateId> = tree
-        .ancestors(target)
-        .into_iter()
-        .take_while(|&node| node != lca)
-        .collect();
-    entered.reverse();
-    let mut supplied: Vec<(StateId, SuppliedData, Span)> = Vec::new();
-    for (&id, level) in chain.iter().zip(levels) {
-        let has_data = !matches!(level.data, SuppliedData::None);
-        if !entered.contains(&id) {
-            if has_data {
-                return Err(malformed(
-                    level.name.span(),
-                    format!(
-                        "`{}` does not exit or enter in this transition, so no data can be given for it",
-                        level.name
-                    ),
-                ));
-            }
-            continue;
-        }
-        supplied.push((id, level.data, level.name.span()));
-    }
-
-    let missing_to_error =
-        |missing: MissingData| missing_data_error(tree, &missing, &target_name, macro_span);
-    let mut below = if tree.node(target).kind == StateKind::Compound {
-        Some(initial_value(tree, target).map_err(missing_to_error)?)
-    } else {
-        None
-    };
-    if entered.is_empty() {
-        return parse_value(below.expect("a local transition to an ancestor enters its initial"));
-    }
-    // The region a path goes into, with the value of its state.
-    let mut chosen_regions: Vec<(StateId, TokenStream)> = Vec::new();
-    for &node in entered.iter().rev() {
-        if tree.node(node).kind == StateKind::Region {
-            let value = below.take().expect("a region holds the state below it");
-            chosen_regions.push((node, value));
-            continue;
-        }
-        let data = supplied
-            .iter()
-            .position(|(id, _, _)| *id == node)
-            .map(|index| supplied.remove(index).1)
-            .unwrap_or(SuppliedData::None);
-        let value = variant_value(tree, node, &data, below.take(), &chosen_regions, false)
-            .map_err(missing_to_error)?;
-        chosen_regions.clear();
-        below = Some(value);
-    }
-    parse_value(below.expect("at least one level"))
-}
-
-fn parse_value(tokens: TokenStream) -> Result<Expr, Diagnostic> {
-    syn::parse2(quote! { #tokens }).map_err(|error| malformed(error.span(), error.to_string()))
 }
 
 /// The E0020 diagnostic for data that a level needs and nobody supplied.
