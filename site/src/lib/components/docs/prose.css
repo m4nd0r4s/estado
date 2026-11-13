@@ -1,0 +1,117 @@
+/* Rendered Markdown. Scoped under .prose so the landing page is unaffected. */
+.prose {
+	min-width: 0;
+	font-size: 16px;
+	line-height: 1.7;
+}
+.prose h1 {
+	font: 800 clamp(30px, 4vw, 42px)/1.1 var(--display);
+	letter-spacing: -0.025em;
+	margin: 0 0 20px;
+	text-wrap: balance;
+}
+.prose h2,
+.prose h3,
+.prose h4 {
+	font-family: var(--display);
+	letter-spacing: -0.015em;
+	line-height: 1.25;
+	position: relative;
+	scroll-margin-top: 24px;
+}
+.prose h2 {
+	font-size: 26px;
+	font-weight: 700;
+	margin: 48px 0 14px;
+	padding-top: 20px;
+	border-top: 1px solid var(--rule);
+}
+.prose h3 {
+	font-size: 19px;
+	font-weight: 700;
+	margin: 32px 0 10px;
+}
+.prose h4 {
+	font-size: 16px;
+	margin: 24px 0 8px;
+}
+.prose .anchor {
+	position: absolute;
+	left: -0.9em;
+	color: var(--rule);
+	text-decoration: none;
+	opacity: 0;
+}
+.prose h2:hover .anchor,
+.prose h3:hover .anchor,
+.prose .anchor:focus-visible {
+	opacity: 1;
+	color: var(--rust);
+}
+.prose p,
+.prose ul,
+.prose ol {
+	margin: 0 0 16px;
+}
+.prose li + li {
+	margin-top: 4px;
+}
+.prose a {
+	color: var(--ink);
+	text-decoration-color: var(--rust);
+	text-underline-offset: 3px;
+}
+.prose a:hover {
+	color: var(--rust);
+}
+.prose :not(pre) > code {
+	background: var(--sheet);
+	border: 1px solid var(--rule);
+	border-radius: 4px;
+	padding: 1px 5px;
+	overflow-wrap: anywhere;
+}
+.prose pre {
+	margin: 0 0 20px;
+}
+.prose blockquote {
+	margin: 0 0 16px;
+	padding: 10px 16px;
+	border-left: 3px solid var(--rust);
+	background: var(--sheet);
+	color: var(--ink-soft);
+}
+.prose blockquote p:last-child {
+	margin-bottom: 0;
+}
+.prose .table-scroll {
+	overflow-x: auto;
+	margin: 0 0 20px;
+	border: 1px solid var(--rule);
+	border-radius: 8px;
+	background: var(--sheet);
+}
+.prose table {
+	border-collapse: collapse;
+	width: 100%;
+	font-size: 14px;
+}
+.prose th,
+.prose td {
+	text-align: left;
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--rule);
+	vertical-align: top;
+}
+.prose tr:last-child td {
+	border-bottom: 0;
+}
+.prose th {
+	font-weight: 600;
+	background: var(--paper);
+}
+.prose hr {
+	border: 0;
+	border-top: 1px solid var(--rule);
+	margin: 32px 0;
+}
