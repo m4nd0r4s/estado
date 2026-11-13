@@ -116,7 +116,9 @@ fn a_fatal_error_in_a_batch_poisons() {
     assert!(machine.is_poisoned());
 }
 
+// 65 545 events, each logging two strings: minutes under miri.
 #[test]
+#[cfg_attr(miri, ignore)]
 fn a_batch_counts_wide_and_clamps_once() {
     let mut machine = Machine::<Probe>::new(Log::default());
     let events = std::iter::repeat_n(Event::Note(0), usize::from(u16::MAX) + 10);
