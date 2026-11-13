@@ -86,7 +86,7 @@ fn send_each<M: Spec<Event = u8, Effect = ()>>(machine: &mut Machine<M>, bytes: 
 
 fn run_estado_send_into(bytes: &[u8]) -> ParserCtx {
     let mut machine = Machine::<HttpParser>::new(ParserCtx::default());
-    black_box(send_each(&mut machine, bytes).microsteps);
+    black_box(send_each(&mut machine, bytes));
     black_box(*machine.ctx())
 }
 
@@ -100,7 +100,7 @@ fn run_macro(bytes: &[u8]) -> ParserCtx {
 /// Same, one `send_into` per byte.
 fn run_macro_send_into(bytes: &[u8]) -> ParserCtx {
     let mut machine = Machine::<MacroParser>::new(ParserCtx::default());
-    black_box(send_each(&mut machine, bytes).microsteps);
+    black_box(send_each(&mut machine, bytes));
     black_box(*machine.ctx())
 }
 
