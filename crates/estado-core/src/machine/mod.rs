@@ -1,17 +1,20 @@
 //! `Machine<M>` and the run-to-completion `send` algorithm (spec 4.5, 5.4).
 
 mod batch;
+mod step;
+mod tally;
 mod tasks;
 
-use crate::context::{Cx, Fault};
+use crate::context::Cx;
 use crate::effect::Effect;
 use crate::error::SendError;
 use crate::ids::{StateId, StatePath};
-use crate::report::{IgnoreReason, Outcome, Report, Step};
-use crate::runtime::{EventQueues, Runtime};
+use crate::report::{IgnoreReason, Report, Step};
+use crate::runtime::Runtime;
 use crate::sink::{FnSink, Sink};
 use crate::slot::Slot;
-use crate::spec::{DeferOverflowPolicy, Spec, UnhandledPolicy};
+use crate::spec::Spec;
+use step::{check_fault, drain, step_live};
 
 /// A running instance of the machine `M`.
 ///
@@ -153,7 +156,7 @@ impl<M: Spec> Machine<M> {
             drop(guard);
             return Err(error);
         }
-        if let Err(error) = drain::<M, S>(
+        if let Err(error) = drain::<M, S, _>(
             guard.slot,
             &mut self.ctx,
             &mut self.runtime,
@@ -370,25 +373,6 @@ impl<M: Spec> Machine<M> {
     }
 }
 
-/// One event of a live slot, to completion: the done check, the microstep and
-/// the drain. The caller owns the poison guard and the error handling.
-#[inline(always)]
-fn step_live<M: Spec, S: Sink<M::Effect>>(
-    slot: &mut Slot<M>,
-    ctx: &mut M::Ctx,
-    runtime: &mut M::Runtime,
-    sink: &mut S,
-    event: M::Event,
-    report: &mut Report,
-) -> Result<(), SendError<M::Event>> {
-    if slot.live().is_some_and(M::is_done) {
-        report.ignored = Some(IgnoreReason::Unhandled);
-        return Ok(());
-    }
-    microstep(slot, ctx, runtime, sink, event, Source::External, report)?;
-    drain::<M, S>(slot, ctx, runtime, sink, report)
-}
-
 /// Ends a failed step: poisons for a fatal error, otherwise leaves the state.
 ///
 /// A fault found while a step runs (a full raise queue, a full effect sink, a
@@ -440,152 +424,4 @@ fn start_in<M: Spec, S: Sink<M::Effect>>(
     let mut cx = Cx::<M, S>::new(ctx, runtime, sink, snapshot.as_mut());
     slot.live_mut().enter_initial(&mut cx);
     check_fault(cx.fault())
-}
-
-fn check_fault<Event>(fault: Option<Fault>) -> Result<(), SendError<Event>> {
-    match fault {
-        None => Ok(()),
-        Some(Fault::EffectOverflow) => Err(SendError::EffectOverflow),
-        Some(Fault::RaiseOverflow) => Err(SendError::RaiseOverflow),
-    }
-}
-
-/// One microstep of `event`, then the policy for its outcome (spec 5.4).
-#[inline(always)]
-fn microstep<M: Spec, S: Sink<M::Effect>>(
-    slot: &mut Slot<M>,
-    ctx: &mut M::Ctx,
-    runtime: &mut M::Runtime,
-    sink: &mut S,
-    event: M::Event,
-    source: Source,
-    report: &mut Report,
-) -> Result<(), SendError<M::Event>> {
-    let mut snapshot = if M::TRACKS_ACTIVE {
-        Some(slot.live_mut().path())
-    } else {
-        None
-    };
-    let outcome = {
-        let mut cx = Cx::<M, S>::new(ctx, runtime, sink, snapshot.as_mut());
-        let outcome = M::microstep(slot, &mut cx, &event);
-        check_fault(cx.fault())?;
-        outcome
-    };
-    count(report, outcome, &source);
-    match outcome {
-        Outcome::Stayed => {}
-        Outcome::Transitioned { changed } => {
-            if changed {
-                runtime.queues().requeue_deferred();
-            }
-        }
-        Outcome::Deferred => defer::<M>(runtime, event)?,
-        Outcome::Unhandled(policy) => match (policy, source) {
-            (UnhandledPolicy::Panic, _) => panic!(
-                "estado: machine `{}` has no handler for the event in {}",
-                M::NAME,
-                slot.live_mut().path()
-            ),
-            (UnhandledPolicy::Error, Source::External) => return Err(SendError::Unhandled(event)),
-            (UnhandledPolicy::Ignore, Source::External) => {
-                report.ignored = Some(IgnoreReason::Unhandled)
-            }
-            (_, Source::Internal) => report.unhandled_internal += 1,
-        },
-    }
-    Ok(())
-}
-
-#[inline(always)]
-fn count(report: &mut Report, outcome: Outcome, source: &Source) {
-    report.microsteps += 1;
-    if let Outcome::Transitioned { .. } = outcome {
-        report.transitions += 1;
-    }
-    if matches!(source, Source::External) {
-        report.handled = !matches!(outcome, Outcome::Unhandled(_));
-    }
-}
-
-fn defer<M: Spec>(runtime: &mut M::Runtime, event: M::Event) -> Result<(), SendError<M::Event>> {
-    let queues = runtime.queues();
-    match queues.defer(event) {
-        Ok(()) => Ok(()),
-        Err(event) => match M::DEFER_OVERFLOW {
-            DeferOverflowPolicy::Error => Err(SendError::DeferOverflow(event)),
-            DeferOverflowPolicy::DropOldest => {
-                queues.drop_oldest_deferred();
-                queues.defer(event).map_err(SendError::DeferOverflow)
-            }
-        },
-    }
-}
-
-/// A `DeferOverflow` of a raised or requeued event comes after the microsteps
-/// that raised or requeued it, which already ran and sent their effects: the
-/// step is cut half-way, so it poisons like the other faults (ADR 0014,
-/// amendment). The same error of the external event does not pass through
-/// here: it refused the event before anything of the step ran.
-#[cold]
-fn poison_on_defer_overflow<M, Event>(
-    slot: &mut Slot<M>,
-    error: SendError<Event>,
-) -> SendError<Event> {
-    if matches!(error, SendError::DeferOverflow(_)) {
-        *slot = Slot::Poisoned;
-    }
-    error
-}
-
-/// Runs pending always > internal > requeued events until none is left.
-#[inline(always)]
-fn drain<M: Spec, S: Sink<M::Effect>>(
-    slot: &mut Slot<M>,
-    ctx: &mut M::Ctx,
-    runtime: &mut M::Runtime,
-    sink: &mut S,
-    report: &mut Report,
-) -> Result<(), SendError<M::Event>> {
-    loop {
-        if report.microsteps > M::MAX_MICROSTEPS {
-            return Err(SendError::Livelock {
-                microsteps: report.microsteps,
-                last: slot.live_mut().path(),
-            });
-        }
-        if runtime.take_always_pending() {
-            let outcome = {
-                // Same snapshot as an event microstep (spec 4.3, errata 11).
-                let mut snapshot = if M::TRACKS_ACTIVE {
-                    Some(slot.live_mut().path())
-                } else {
-                    None
-                };
-                let mut cx = Cx::<M, S>::new(ctx, runtime, sink, snapshot.as_mut());
-                let outcome = M::run_always(slot, &mut cx);
-                check_fault(cx.fault())?;
-                outcome
-            };
-            count(report, outcome, &Source::Internal);
-            if let Outcome::Transitioned { changed: true } = outcome {
-                runtime.queues().requeue_deferred();
-            }
-            continue;
-        }
-        let next = {
-            let queues = runtime.queues();
-            queues.pop_raised().or_else(|| queues.pop_requeued())
-        };
-        match next {
-            Some(event) => {
-                if let Err(error) =
-                    microstep(slot, ctx, runtime, sink, event, Source::Internal, report)
-                {
-                    return Err(poison_on_defer_overflow(slot, error));
-                }
-            }
-            None => return Ok(()),
-        }
-    }
 }

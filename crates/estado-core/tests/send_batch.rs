@@ -116,6 +116,28 @@ fn a_fatal_error_in_a_batch_poisons() {
     assert!(machine.is_poisoned());
 }
 
+#[test]
+fn the_livelock_bound_counts_one_event_not_the_batch() {
+    let mut single = Machine::<Probe>::new(Log::default());
+    single.start().unwrap();
+    let Err(SendError::Livelock { microsteps, .. }) = single.send_into(Event::Spin, &mut Discard)
+    else {
+        panic!("a single Spin must livelock");
+    };
+    let mut batched = Machine::<Probe>::new(Log::default());
+    batched.start().unwrap();
+    let events = std::iter::repeat_n(Event::Note(0), 100).chain([Event::Spin]);
+    let error = batched.send_batch(events, &mut Discard).unwrap_err();
+    let SendError::Livelock {
+        microsteps: batched_microsteps,
+        ..
+    } = error
+    else {
+        panic!("a batch ending in Spin must livelock");
+    };
+    assert_eq!(batched_microsteps, microsteps);
+}
+
 // 65 545 events, each logging two strings: minutes under miri.
 #[test]
 #[cfg_attr(miri, ignore)]
