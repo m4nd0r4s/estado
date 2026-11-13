@@ -26,7 +26,7 @@ pub fn on_ready<S: Sink<Command>>(
             Next::Goto(ReadyEdges::ToFiring)
         }
         Event::ReloadRequest if *up.ammo == MAGAZINE_SIZE => Next::Stay,
-        Event::ReloadRequest if cx.in_state(Character::JUMPING) => Next::Defer,
+        Event::ReloadRequest if cx.in_state(Character::JUMPING_ID) => Next::Defer,
         Event::ReloadRequest => Next::Goto(ReadyEdges::ToReloading),
         _ => Next::Bubble,
     }
@@ -78,7 +78,7 @@ pub fn on_empty<S: Sink<Command>>(
             cx.emit(Command::PlaySound(Sound::EmptyClick));
             Next::Stay
         }
-        Event::ReloadRequest if cx.in_state(Character::JUMPING) => Next::Defer,
+        Event::ReloadRequest if cx.in_state(Character::JUMPING_ID) => Next::Defer,
         Event::ReloadRequest => Next::Goto(EmptyEdges::ToReloading),
         _ => Next::Bubble,
     }

@@ -89,7 +89,7 @@ pub fn on_connected<S: Sink<Command>>(
 pub fn on_idle<S: Sink<Command>>(cx: &mut ConnCx<'_, S>, event: &Event) -> Next<Conn, IdleEdges> {
     note(cx, "handler Idle");
     match event {
-        Event::Send(_) if cx.in_state(Conn::AWAITING_PONG) => {
+        Event::Send(_) if cx.in_state(Conn::AWAITING_PONG_ID) => {
             note(cx, "link refuses to send while keepalive awaits the pong");
             Next::Defer
         }

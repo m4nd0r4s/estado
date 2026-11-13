@@ -262,7 +262,7 @@ mod watching {
         #[on(Looking)]
         fn on_looking(cx: &mut Cx<Self>, event: &Event) -> Next<Self> {
             match event {
-                Event::Ping if cx.in_state(Self::SEEN) => stay!(),
+                Event::Ping if cx.in_state(Self::SEEN_ID) => stay!(),
                 Event::Ping => goto!(Seen),
                 _ => bubble!(),
             }
@@ -292,7 +292,7 @@ mod helped {
     /// Helpers that take the `cx` of a handler may call `in_state` and
     /// `raise` too.
     fn is_seen<S: Sink<()>>(cx: &Cx<'_, Helped, S>) -> bool {
-        cx.in_state(Helped::SEEN)
+        cx.in_state(Helped::SEEN_ID)
     }
 
     fn shout<S: Sink<()>>(cx: &mut Cx<'_, Helped, S>) {

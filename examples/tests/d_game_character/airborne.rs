@@ -56,7 +56,7 @@ fn a_reload_request_in_the_air_is_deferred_and_starts_on_landing() {
     assert_eq!(step.report.microsteps, 2);
     assert_eq!(alive(&harness).movement, Movement::Standing);
     assert_eq!(alive(&harness).weapon, Weapon::Reloading);
-    let reload = timer_of(&harness, Character::RELOADING);
+    let reload = timer_of(&harness, Character::RELOADING_ID);
     assert_eq!(harness.pending_timers().len(), 1);
     assert_eq!(
         harness.pending_timers()[0].deadline,

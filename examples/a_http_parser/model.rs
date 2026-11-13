@@ -136,54 +136,54 @@ impl Headers {
 
 impl HttpParser {
     /// Id of `RequestLine`.
-    pub const REQUEST_LINE: StateId = StateId::new(0);
+    pub const REQUEST_LINE_ID: StateId = StateId::new(0);
     /// Id of `Method`.
-    pub const METHOD: StateId = StateId::new(1);
+    pub const METHOD_ID: StateId = StateId::new(1);
     /// Id of `Target`.
-    pub const TARGET: StateId = StateId::new(2);
+    pub const TARGET_ID: StateId = StateId::new(2);
     /// Id of `Version`.
-    pub const VERSION: StateId = StateId::new(3);
+    pub const VERSION_ID: StateId = StateId::new(3);
     /// Id of `Headers`.
-    pub const HEADERS: StateId = StateId::new(4);
+    pub const HEADERS_ID: StateId = StateId::new(4);
     /// Id of `LineStart`.
-    pub const LINE_START: StateId = StateId::new(5);
+    pub const LINE_START_ID: StateId = StateId::new(5);
     /// Id of `Name`.
-    pub const NAME: StateId = StateId::new(6);
+    pub const NAME_ID: StateId = StateId::new(6);
     /// Id of `Value`.
-    pub const VALUE: StateId = StateId::new(7);
+    pub const VALUE_ID: StateId = StateId::new(7);
     /// Id of `ValueLf`.
-    pub const VALUE_LF: StateId = StateId::new(8);
+    pub const VALUE_LF_ID: StateId = StateId::new(8);
     /// Id of `BlockLf`.
-    pub const BLOCK_LF: StateId = StateId::new(9);
+    pub const BLOCK_LF_ID: StateId = StateId::new(9);
     /// Id of `Body`.
-    pub const BODY: StateId = StateId::new(10);
+    pub const BODY_ID: StateId = StateId::new(10);
     /// Id of `Error`.
-    pub const ERROR: StateId = StateId::new(11);
+    pub const ERROR_ID: StateId = StateId::new(11);
 
     /// The active configuration, parent before child.
     pub fn active_path(&self) -> StatePath {
         let mut path = StatePath::new(&GRAPH);
         match self {
             Self::RequestLine(line) => {
-                path.push(Self::REQUEST_LINE);
+                path.push(Self::REQUEST_LINE_ID);
                 path.push(match line.sub {
-                    RequestLineSub::Method => Self::METHOD,
-                    RequestLineSub::Target => Self::TARGET,
-                    RequestLineSub::Version(_) => Self::VERSION,
+                    RequestLineSub::Method => Self::METHOD_ID,
+                    RequestLineSub::Target => Self::TARGET_ID,
+                    RequestLineSub::Version(_) => Self::VERSION_ID,
                 });
             }
             Self::Headers(headers) => {
-                path.push(Self::HEADERS);
+                path.push(Self::HEADERS_ID);
                 path.push(match headers.sub {
-                    HeadersSub::LineStart => Self::LINE_START,
-                    HeadersSub::Name(_) => Self::NAME,
-                    HeadersSub::Value(_) => Self::VALUE,
-                    HeadersSub::ValueLf => Self::VALUE_LF,
-                    HeadersSub::BlockLf => Self::BLOCK_LF,
+                    HeadersSub::LineStart => Self::LINE_START_ID,
+                    HeadersSub::Name(_) => Self::NAME_ID,
+                    HeadersSub::Value(_) => Self::VALUE_ID,
+                    HeadersSub::ValueLf => Self::VALUE_LF_ID,
+                    HeadersSub::BlockLf => Self::BLOCK_LF_ID,
                 });
             }
-            Self::Body(_) => path.push(Self::BODY),
-            Self::Error(_) => path.push(Self::ERROR),
+            Self::Body(_) => path.push(Self::BODY_ID),
+            Self::Error(_) => path.push(Self::ERROR_ID),
         }
         path
     }
@@ -201,73 +201,79 @@ const fn state(
 
 static STATES: [StateInfo; 12] = [
     state(
-        HttpParser::REQUEST_LINE,
+        HttpParser::REQUEST_LINE_ID,
         "RequestLine",
         None,
         StateKind::Compound,
         0,
     )
-    .with_initial(HttpParser::METHOD),
+    .with_initial(HttpParser::METHOD_ID),
     state(
-        HttpParser::METHOD,
+        HttpParser::METHOD_ID,
         "Method",
-        Some(HttpParser::REQUEST_LINE),
+        Some(HttpParser::REQUEST_LINE_ID),
         StateKind::Atomic,
         1,
     ),
     state(
-        HttpParser::TARGET,
+        HttpParser::TARGET_ID,
         "Target",
-        Some(HttpParser::REQUEST_LINE),
+        Some(HttpParser::REQUEST_LINE_ID),
         StateKind::Atomic,
         1,
     ),
     state(
-        HttpParser::VERSION,
+        HttpParser::VERSION_ID,
         "Version",
-        Some(HttpParser::REQUEST_LINE),
+        Some(HttpParser::REQUEST_LINE_ID),
         StateKind::Atomic,
         1,
     ),
-    state(HttpParser::HEADERS, "Headers", None, StateKind::Compound, 0)
-        .with_initial(HttpParser::LINE_START),
     state(
-        HttpParser::LINE_START,
+        HttpParser::HEADERS_ID,
+        "Headers",
+        None,
+        StateKind::Compound,
+        0,
+    )
+    .with_initial(HttpParser::LINE_START_ID),
+    state(
+        HttpParser::LINE_START_ID,
         "LineStart",
-        Some(HttpParser::HEADERS),
+        Some(HttpParser::HEADERS_ID),
         StateKind::Atomic,
         1,
     ),
     state(
-        HttpParser::NAME,
+        HttpParser::NAME_ID,
         "Name",
-        Some(HttpParser::HEADERS),
+        Some(HttpParser::HEADERS_ID),
         StateKind::Atomic,
         1,
     ),
     state(
-        HttpParser::VALUE,
+        HttpParser::VALUE_ID,
         "Value",
-        Some(HttpParser::HEADERS),
+        Some(HttpParser::HEADERS_ID),
         StateKind::Atomic,
         1,
     ),
     state(
-        HttpParser::VALUE_LF,
+        HttpParser::VALUE_LF_ID,
         "ValueLf",
-        Some(HttpParser::HEADERS),
+        Some(HttpParser::HEADERS_ID),
         StateKind::Atomic,
         1,
     ),
     state(
-        HttpParser::BLOCK_LF,
+        HttpParser::BLOCK_LF_ID,
         "BlockLf",
-        Some(HttpParser::HEADERS),
+        Some(HttpParser::HEADERS_ID),
         StateKind::Atomic,
         1,
     ),
-    state(HttpParser::BODY, "Body", None, StateKind::Atomic, 0),
-    state(HttpParser::ERROR, "Error", None, StateKind::Final, 0),
+    state(HttpParser::BODY_ID, "Body", None, StateKind::Atomic, 0),
+    state(HttpParser::ERROR_ID, "Error", None, StateKind::Final, 0),
 ];
 
 /// The static graph of the parser. Edges are not listed: the hand-written

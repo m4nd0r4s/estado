@@ -74,7 +74,7 @@ fn dead_cancels_the_timers_and_invokes_of_every_region() {
     // the only thing the new state scheduled.
     assert!(harness.pending_invokes().is_empty());
     let backoff_timer = only_timer(&harness);
-    assert_eq!(backoff_timer.state, Conn::BACKOFF);
+    assert_eq!(backoff_timer.state, Conn::BACKOFF_ID);
     assert_eq!(
         harness.pending_timers()[0].deadline,
         harness.now() + backoff(0)

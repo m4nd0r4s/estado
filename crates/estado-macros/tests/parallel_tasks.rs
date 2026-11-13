@@ -139,27 +139,27 @@ fn the_parallel_state_schedules_before_its_regions_and_cancels_after_them() {
         entered,
         [
             Effect::StartTimer {
-                key: timer(Session::ONLINE, 1),
+                key: timer(Session::ONLINE_ID, 1),
                 after: SECOND
             },
             Effect::Invoke {
-                key: invoke(Session::ONLINE, 1),
+                key: invoke(Session::ONLINE_ID, 1),
                 task: Command::Heartbeat
             },
             Effect::StartTimer {
-                key: timer(Session::CONNECTING, 1),
+                key: timer(Session::CONNECTING_ID, 1),
                 after: SECOND
             },
             Effect::Invoke {
-                key: invoke(Session::CONNECTING, 1),
+                key: invoke(Session::CONNECTING_ID, 1),
                 task: Command::Dial
             },
             Effect::StartTimer {
-                key: timer(Session::MUTED, 1),
+                key: timer(Session::MUTED_ID, 1),
                 after: SECOND
             },
             Effect::Invoke {
-                key: invoke(Session::MUTED, 1),
+                key: invoke(Session::MUTED_ID, 1),
                 task: Command::Listen
             },
         ]
@@ -172,12 +172,12 @@ fn the_parallel_state_schedules_before_its_regions_and_cancels_after_them() {
     assert_eq!(
         left,
         [
-            Effect::CancelTimer(timer(Session::MUTED, 1)),
-            Effect::Cancel(invoke(Session::MUTED, 1)),
-            Effect::CancelTimer(timer(Session::CONNECTING, 1)),
-            Effect::Cancel(invoke(Session::CONNECTING, 1)),
-            Effect::CancelTimer(timer(Session::ONLINE, 1)),
-            Effect::Cancel(invoke(Session::ONLINE, 1)),
+            Effect::CancelTimer(timer(Session::MUTED_ID, 1)),
+            Effect::Cancel(invoke(Session::MUTED_ID, 1)),
+            Effect::CancelTimer(timer(Session::CONNECTING_ID, 1)),
+            Effect::Cancel(invoke(Session::CONNECTING_ID, 1)),
+            Effect::CancelTimer(timer(Session::ONLINE_ID, 1)),
+            Effect::Cancel(invoke(Session::ONLINE_ID, 1)),
         ]
     );
 }
@@ -190,14 +190,20 @@ fn keys_of_a_previous_visit_to_the_parallel_state_are_stale() {
     send(&mut machine, Event::Join);
 
     // Second visit: every state with tasks is at epoch 2.
-    let stale = machine.fire(timer(Session::ONLINE, 1)).unwrap().report;
+    let stale = machine.fire(timer(Session::ONLINE_ID, 1)).unwrap().report;
     assert_eq!(stale.ignored, Some(IgnoreReason::Stale));
-    let stale_region = machine.fire(timer(Session::CONNECTING, 1)).unwrap().report;
+    let stale_region = machine
+        .fire(timer(Session::CONNECTING_ID, 1))
+        .unwrap()
+        .report;
     assert_eq!(stale_region.ignored, Some(IgnoreReason::Stale));
 
-    let current = machine.fire(timer(Session::CONNECTING, 2)).unwrap().report;
+    let current = machine
+        .fire(timer(Session::CONNECTING_ID, 2))
+        .unwrap()
+        .report;
     assert_ne!(current.ignored, Some(IgnoreReason::Stale));
-    let current_parallel = machine.fire(timer(Session::ONLINE, 2)).unwrap().report;
+    let current_parallel = machine.fire(timer(Session::ONLINE_ID, 2)).unwrap().report;
     assert_ne!(current_parallel.ignored, Some(IgnoreReason::Stale));
 }
 
@@ -211,15 +217,15 @@ fn a_constructor_edge_inside_a_region_cancels_and_starts_only_its_own_tasks() {
     assert_eq!(
         effects,
         [
-            Effect::CancelTimer(timer(Session::CONNECTING, 1)),
-            Effect::Cancel(invoke(Session::CONNECTING, 1)),
+            Effect::CancelTimer(timer(Session::CONNECTING_ID, 1)),
+            Effect::Cancel(invoke(Session::CONNECTING_ID, 1)),
             Effect::StartTimer {
-                key: timer(Session::UP, 1),
+                key: timer(Session::UP_ID, 1),
                 after: SECOND
             },
         ]
     );
     // The parallel state and the other region were not touched.
-    let untouched = machine.fire(timer(Session::MUTED, 1)).unwrap().report;
+    let untouched = machine.fire(timer(Session::MUTED_ID, 1)).unwrap().report;
     assert_ne!(untouched.ignored, Some(IgnoreReason::Stale));
 }

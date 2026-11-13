@@ -1,6 +1,0 @@
-error: estado::E0012: state `IO` is named like its own id constant `Bus::IO`
-         = help: name states in CamelCase (`Io` instead of `IO`) so that the id constant, in SCREAMING_SNAKE_CASE, is a different name
-  --> tests/ui/e0012_all_caps_name.rs:14:9
-   |
-14 |         IO,
-   |         ^^

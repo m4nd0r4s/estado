@@ -321,7 +321,7 @@ The enum is the level of substates, and it needs its own `#[initial]`. A handler
 - A struct with two or more `#[region]` fields is a parallel state: all regions are active at once. Each region enum needs an `#[initial]`.
 - One `#[region]` field is [`E0014`](../errors/E0014.md); use `#[substates]` instead.
 - A struct cannot have both `#[substates]` and `#[region]` fields ([`E0013`](../errors/E0013.md)); wrap the regions in a substate.
-- The field name is the name of the region. It is a state name like any other, so it must be unique ([`E0012`](../errors/E0012.md)), and it has an id constant such as `Panel::LIGHT`.
+- The field name is the name of the region. It is a state name like any other, so it must be unique ([`E0012`](../errors/E0012.md)), and it has an id constant such as `Panel::LIGHT_ID`.
 - A transition between states of two sibling regions is [`E0021`](../errors/E0021.md). Raise an event with `cx.raise(..)` and let the other region handle it.
 - A parallel state inside a region, a handler on a region itself, and a local transition whose least common ancestor is a parallel state are not supported yet ([`E0090`](../errors/E0090.md)).
 
@@ -418,7 +418,7 @@ fn main() {
     let mut machine = Machine::<Session>::new(());
     machine.send(Event::Start).unwrap();
     assert_eq!(machine.path().to_string(), "Running/upload:Sending,verify:Checking");
-    assert!(machine.is_in(Session::SENDING));
+    assert!(machine.is_in(Session::SENDING_ID));
 
     machine.send(Event::Sent).unwrap();
     assert!(!machine.is_done()); // `verify` is not finished yet

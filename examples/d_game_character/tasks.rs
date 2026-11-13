@@ -22,17 +22,17 @@ const fn timer(state: StateId, epoch: u32) -> TimerKey {
 
 /// `Jumping`'s `#[after]`.
 pub(super) const fn jump_timer(epoch: u32) -> TimerKey {
-    timer(Character::JUMPING, epoch)
+    timer(Character::JUMPING_ID, epoch)
 }
 
 /// `Firing`'s `#[after]`.
 pub(super) const fn firing_timer(epoch: u32) -> TimerKey {
-    timer(Character::FIRING, epoch)
+    timer(Character::FIRING_ID, epoch)
 }
 
 /// `Reloading`'s `#[after]`.
 pub(super) const fn reload_timer(epoch: u32) -> TimerKey {
-    timer(Character::RELOADING, epoch)
+    timer(Character::RELOADING_ID, epoch)
 }
 
 /// Tasks of the entered leaf of the `movement` region.

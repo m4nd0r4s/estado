@@ -1,4 +1,4 @@
-//! `impl Root { pub const PLAYING: StateId = ..; }` (spec 6.5).
+//! `impl Root { pub const PLAYING_ID: StateId = ..; }` (spec 6.5, errata 16).
 
 use std::collections::HashSet;
 

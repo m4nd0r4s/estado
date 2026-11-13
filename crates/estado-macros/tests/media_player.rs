@@ -83,11 +83,11 @@ pub use player::Player;
 
 #[test]
 fn state_id_constants_follow_the_pre_order_of_the_tree() {
-    assert_eq!(Player::IDLE, StateId::new(0));
-    assert_eq!(Player::ACTIVE, StateId::new(1));
-    assert_eq!(Player::PLAYING, StateId::new(2));
-    assert_eq!(Player::PAUSED, StateId::new(3));
-    assert_eq!(Player::FAILED, StateId::new(4));
+    assert_eq!(Player::IDLE_ID, StateId::new(0));
+    assert_eq!(Player::ACTIVE_ID, StateId::new(1));
+    assert_eq!(Player::PLAYING_ID, StateId::new(2));
+    assert_eq!(Player::PAUSED_ID, StateId::new(3));
+    assert_eq!(Player::FAILED_ID, StateId::new(4));
 }
 
 #[test]

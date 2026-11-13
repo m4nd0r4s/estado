@@ -82,7 +82,7 @@ fn a_successful_dial_enters_connected_with_both_regions() {
     // The dial and its timer were cancelled by the exit; only the ping
     // interval of the new keepalive region is pending.
     assert!(harness.pending_invokes().is_empty());
-    assert_eq!(only_timer(&harness).state, Conn::PINGING);
+    assert_eq!(only_timer(&harness).state, Conn::PINGING_ID);
 }
 
 #[test]

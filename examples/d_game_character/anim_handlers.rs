@@ -44,11 +44,11 @@ const fn changes_pose(event: &Event) -> bool {
 /// The pose the character should have right now: shooting wins over jumping,
 /// which wins over running.
 fn desired_pose<S: Sink<Command>>(cx: &CharacterCx<'_, S>) -> Anim {
-    if cx.in_state(Character::FIRING) {
+    if cx.in_state(Character::FIRING_ID) {
         Anim::Shoot
-    } else if cx.in_state(Character::JUMPING) {
+    } else if cx.in_state(Character::JUMPING_ID) {
         Anim::Jump
-    } else if cx.in_state(Character::WALKING) {
+    } else if cx.in_state(Character::WALKING_ID) {
         Anim::Run
     } else {
         Anim::Idle

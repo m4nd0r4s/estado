@@ -1,0 +1,6 @@
+error: estado::E0012: the id constant `Bus::IDLE_ID` of state `Idle` is also the variant `IDLE_ID`
+         = help: rename the variant: the id constants of the states end in `_ID`
+  --> tests/ui/e0012_variant_named_like_a_constant.rs:14:9
+   |
+14 |         Idle,
+   |         ^^^^

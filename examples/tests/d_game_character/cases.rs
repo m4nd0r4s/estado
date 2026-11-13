@@ -147,7 +147,7 @@ fn reloading_takes_the_reload_time_and_refills_the_magazine() {
     let step = harness.send(Event::ReloadRequest);
     assert_eq!(step.effects, [Command::PlaySound(Sound::ReloadStart)]);
     assert_eq!(alive(&harness).weapon, Weapon::Reloading);
-    let reload = timer_of(&harness, Character::RELOADING);
+    let reload = timer_of(&harness, Character::RELOADING_ID);
     assert_eq!(reload.epoch, 1);
 
     // The trigger is locked, a second request is absorbed.

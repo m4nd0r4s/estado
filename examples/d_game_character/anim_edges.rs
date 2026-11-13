@@ -20,7 +20,8 @@ pub enum IdleEdges {
 }
 
 impl Edge<Character> for IdleEdges {
-    const TARGETS: &'static [StateId] = &[Character::RUN, Character::JUMP, Character::SHOOT];
+    const TARGETS: &'static [StateId] =
+        &[Character::RUN_ID, Character::JUMP_ID, Character::SHOOT_ID];
 
     fn apply<S: Sink<Command>>(
         self,
@@ -48,7 +49,8 @@ pub enum RunEdges {
 }
 
 impl Edge<Character> for RunEdges {
-    const TARGETS: &'static [StateId] = &[Character::IDLE, Character::JUMP, Character::SHOOT];
+    const TARGETS: &'static [StateId] =
+        &[Character::IDLE_ID, Character::JUMP_ID, Character::SHOOT_ID];
 
     fn apply<S: Sink<Command>>(
         self,
@@ -76,7 +78,8 @@ pub enum JumpEdges {
 }
 
 impl Edge<Character> for JumpEdges {
-    const TARGETS: &'static [StateId] = &[Character::IDLE, Character::RUN, Character::SHOOT];
+    const TARGETS: &'static [StateId] =
+        &[Character::IDLE_ID, Character::RUN_ID, Character::SHOOT_ID];
 
     fn apply<S: Sink<Command>>(
         self,
@@ -104,7 +107,8 @@ pub enum ShootEdges {
 }
 
 impl Edge<Character> for ShootEdges {
-    const TARGETS: &'static [StateId] = &[Character::IDLE, Character::RUN, Character::JUMP];
+    const TARGETS: &'static [StateId] =
+        &[Character::IDLE_ID, Character::RUN_ID, Character::JUMP_ID];
 
     fn apply<S: Sink<Command>>(
         self,

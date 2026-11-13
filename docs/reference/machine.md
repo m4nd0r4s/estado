@@ -171,7 +171,7 @@ pub fn is_poisoned(&self) -> bool;
 | `state()` | The root state. Panics when the machine is not started, poisoned or finished. |
 | `try_state()` | `Some(&root)` when the machine is live, `None` otherwise. |
 | `path()` | The active configuration as a [`StatePath`](#statepath). Panics under the same conditions as `state()`. |
-| `is_in(id)` | Whether the state `id` is active. `false` when the machine is not live. Use the id constants, for example `Lamp::ON`. |
+| `is_in(id)` | Whether the state `id` is active. `false` when the machine is not live. Use the id constants, for example `Lamp::ON_ID`. |
 | `ctx()` / `ctx_mut()` | The global context. They work in every machine state, including poisoned. |
 | `is_done()` | `true` when the root is in a `#[terminal]` state, or after `take_output`. `false` for an unstarted or poisoned machine. |
 | `take_output()` | Moves the payload out of a root `#[terminal]` state and finishes the machine. `None` when the machine is not done. |

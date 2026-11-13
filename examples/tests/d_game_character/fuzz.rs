@@ -33,11 +33,11 @@ fn expected_pose(alive: &Alive) -> Anim {
 fn states_with_a_timer(alive: &Alive) -> BTreeSet<StateId> {
     let mut states = BTreeSet::new();
     if alive.movement == Movement::Jumping {
-        states.insert(Character::JUMPING);
+        states.insert(Character::JUMPING_ID);
     }
     match alive.weapon {
-        Weapon::Firing => states.insert(Character::FIRING),
-        Weapon::Reloading => states.insert(Character::RELOADING),
+        Weapon::Firing => states.insert(Character::FIRING_ID),
+        Weapon::Reloading => states.insert(Character::RELOADING_ID),
         Weapon::Ready | Weapon::Empty => false,
     };
     states

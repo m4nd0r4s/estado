@@ -100,3 +100,8 @@ Contradictions and errors in the spec. By rule 2 of section 0, section 5 wins. E
 
 - **Problem.** 6.1 gives the initializer the signature `fn(&mut Cx, &ParentFields) -> Self`. A constructor that needs `cx` and the parent's fields can only run inside the transition, after the exits, when the parent value does not exist yet; the edge would have to carry a generated "parts" struct per `goto!`. A root-level initial has no `Cx` at all, since `Spec::initial()` runs before the machine starts.
 - **Resolution** (lead decision, ADR 0013 item 12 and its amendments). In v0, `with = path` names a function with no arguments that returns the state's value; it is called when the state is entered through its initial. The signature of the spec is left for a later version, as an additive change (a second attribute form), so machines written today keep compiling.
+
+## 16. 6.5: the `StateId` constants end in `_ID`
+
+- **Problem.** 6.5 names the id constants after the state (`Player::PLAYING`). The constants are associated items of the root type, which is also the root enum, so a root-level state named `A` or `IO` is a variant and a constant with the same name. The macro rejected such names with E0012, which makes the common single-letter and acronym names unusable.
+- **Resolution** (bead 4.14). The constant is the name in SCREAMING_SNAKE_CASE with the suffix `_ID`: `Player::PLAYING_ID`, `Bus::IO_ID`. The suffix cannot clash with the name of any state (they are CamelCase or acronyms without the suffix); the only clash left is a variant that is itself called `<STATE>_ID`, which stays E0012. All docs and examples use the new names.

@@ -108,7 +108,7 @@ fn a_late_pong_timeout_after_the_pong_is_stale() {
     let mut harness = connected();
     harness.advance(PING_INTERVAL);
     let pong_deadline = only_timer(&harness);
-    assert_eq!(pong_deadline.state, Conn::AWAITING_PONG);
+    assert_eq!(pong_deadline.state, Conn::AWAITING_PONG_ID);
     harness.send(Event::Pong);
     assert_eq!(path(&harness), "Connected/link:Idle,keepalive:Pinging");
 

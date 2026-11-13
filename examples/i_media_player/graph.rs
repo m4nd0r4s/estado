@@ -8,36 +8,36 @@ use super::model::{ActiveSub, Player};
 
 impl Player {
     /// `Idle`.
-    pub const IDLE: StateId = StateId::new(0);
+    pub const IDLE_ID: StateId = StateId::new(0);
     /// `Active`.
-    pub const ACTIVE: StateId = StateId::new(1);
+    pub const ACTIVE_ID: StateId = StateId::new(1);
     /// `Active/Playing`.
-    pub const PLAYING: StateId = StateId::new(2);
+    pub const PLAYING_ID: StateId = StateId::new(2);
     /// `Active/Paused`.
-    pub const PAUSED: StateId = StateId::new(3);
+    pub const PAUSED_ID: StateId = StateId::new(3);
     /// `Failed`.
-    pub const FAILED: StateId = StateId::new(4);
+    pub const FAILED_ID: StateId = StateId::new(4);
 }
 
 static STATES: [StateInfo; 5] = [
-    StateInfo::new(Player::IDLE, "Idle", None, StateKind::Atomic, 0),
-    StateInfo::new(Player::ACTIVE, "Active", None, StateKind::Compound, 0)
-        .with_initial(Player::PLAYING),
+    StateInfo::new(Player::IDLE_ID, "Idle", None, StateKind::Atomic, 0),
+    StateInfo::new(Player::ACTIVE_ID, "Active", None, StateKind::Compound, 0)
+        .with_initial(Player::PLAYING_ID),
     StateInfo::new(
-        Player::PLAYING,
+        Player::PLAYING_ID,
         "Playing",
-        Some(Player::ACTIVE),
+        Some(Player::ACTIVE_ID),
         StateKind::Atomic,
         1,
     ),
     StateInfo::new(
-        Player::PAUSED,
+        Player::PAUSED_ID,
         "Paused",
-        Some(Player::ACTIVE),
+        Some(Player::ACTIVE_ID),
         StateKind::Atomic,
         1,
     ),
-    StateInfo::new(Player::FAILED, "Failed", None, StateKind::Atomic, 0),
+    StateInfo::new(Player::FAILED_ID, "Failed", None, StateKind::Atomic, 0),
 ];
 
 const fn edge(from: StateId, to: StateId, event_hint: &'static str) -> EdgeInfo {
@@ -54,14 +54,14 @@ pub static GRAPH: Graph = Graph {
     machine: "Player",
     states: &STATES,
     edges: &[
-        edge(Player::IDLE, Player::ACTIVE, "Event::Play"),
-        edge(Player::PLAYING, Player::PAUSED, "Event::Pause"),
-        edge(Player::PAUSED, Player::PLAYING, "Event::Resume"),
-        edge(Player::ACTIVE, Player::IDLE, "Event::Stop"),
-        edge(Player::ACTIVE, Player::ACTIVE, "Event::Play"),
-        edge(Player::ACTIVE, Player::FAILED, "Event::Error"),
-        edge(Player::FAILED, Player::ACTIVE, "Event::Play"),
-        edge(Player::FAILED, Player::IDLE, "Event::Stop"),
+        edge(Player::IDLE_ID, Player::ACTIVE_ID, "Event::Play"),
+        edge(Player::PLAYING_ID, Player::PAUSED_ID, "Event::Pause"),
+        edge(Player::PAUSED_ID, Player::PLAYING_ID, "Event::Resume"),
+        edge(Player::ACTIVE_ID, Player::IDLE_ID, "Event::Stop"),
+        edge(Player::ACTIVE_ID, Player::ACTIVE_ID, "Event::Play"),
+        edge(Player::ACTIVE_ID, Player::FAILED_ID, "Event::Error"),
+        edge(Player::FAILED_ID, Player::ACTIVE_ID, "Event::Play"),
+        edge(Player::FAILED_ID, Player::IDLE_ID, "Event::Stop"),
     ],
 };
 
@@ -70,15 +70,15 @@ impl Player {
     pub fn active_path(&self) -> StatePath {
         let mut path = StatePath::new(&GRAPH);
         match self {
-            Self::Idle => path.push(Self::IDLE),
+            Self::Idle => path.push(Self::IDLE_ID),
             Self::Active(active) => {
-                path.push(Self::ACTIVE);
+                path.push(Self::ACTIVE_ID);
                 path.push(match active.sub {
-                    ActiveSub::Playing { .. } => Self::PLAYING,
-                    ActiveSub::Paused { .. } => Self::PAUSED,
+                    ActiveSub::Playing { .. } => Self::PLAYING_ID,
+                    ActiveSub::Paused { .. } => Self::PAUSED_ID,
                 });
             }
-            Self::Failed { .. } => path.push(Self::FAILED),
+            Self::Failed { .. } => path.push(Self::FAILED_ID),
         }
         path
     }

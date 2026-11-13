@@ -97,7 +97,7 @@ pub enum AliveEdges {
 }
 
 impl Edge<Character> for AliveEdges {
-    const TARGETS: &'static [StateId] = &[Character::DEAD];
+    const TARGETS: &'static [StateId] = &[Character::DEAD_ID];
 
     fn apply<S: Sink<Command>>(
         self,
@@ -118,7 +118,7 @@ pub enum DeadEdges {
 }
 
 impl Edge<Character> for DeadEdges {
-    const TARGETS: &'static [StateId] = &[Character::ALIVE];
+    const TARGETS: &'static [StateId] = &[Character::ALIVE_ID];
 
     fn apply<S: Sink<Command>>(
         self,

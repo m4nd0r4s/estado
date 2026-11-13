@@ -33,7 +33,7 @@ pub fn exiting_name(base: &Ident) -> Ident {
 }
 
 /// `PlayingFast` -> `PLAYING_FAST`, `keep_alive` -> `KEEP_ALIVE`,
-/// `HTTPServer` -> `HTTP_SERVER`. Used for the `StateId` constants (spec 6.5).
+/// `HTTPServer` -> `HTTP_SERVER`. Base of the `StateId` constant names (spec 6.5).
 pub fn screaming_snake_case(name: &str) -> String {
     let characters: Vec<char> = name.chars().collect();
     let mut result = String::with_capacity(name.len() + 4);
@@ -67,9 +67,12 @@ pub fn plain_name(name: &Ident) -> String {
     name.unraw().to_string()
 }
 
-/// The `StateId` constant name of a state or region.
+/// The `StateId` constant name of a state or region: the name in
+/// SCREAMING_SNAKE_CASE and the suffix `_ID` (`Playing` -> `PLAYING_ID`).
+/// The suffix keeps the constant apart from the variants of the root enum,
+/// so states called `A` or `IO` work.
 pub fn state_constant_name(name: &Ident) -> String {
-    screaming_snake_case(&name.unraw().to_string())
+    format!("{}_ID", screaming_snake_case(&name.unraw().to_string()))
 }
 
 /// `ActiveSub` -> `active_sub`, `keep_alive` -> `keep_alive`: the base of the

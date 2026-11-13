@@ -111,7 +111,7 @@ mod panel {
         /// the sibling region entered first.
         #[entry(Idle)]
         fn entry_idle(cx: &mut Cx<Self>) {
-            let light_is_off = cx.in_state(Panel::OFF);
+            let light_is_off = cx.in_state(Panel::OFF_ID);
             cx.ctx_mut().push(light_is_off);
         }
     }

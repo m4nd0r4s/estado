@@ -60,8 +60,8 @@ fn a_fatal_damage_cancels_the_reload_and_leaves_no_timer_behind() {
 #[test]
 fn cancellations_follow_the_exit_order_and_the_death_sound_comes_last() {
     let mut harness = jumping_and_reloading();
-    let reload = timer_of(&harness, Character::RELOADING);
-    let jump = timer_of(&harness, Character::JUMPING);
+    let reload = timer_of(&harness, Character::RELOADING_ID);
+    let jump = timer_of(&harness, Character::JUMPING_ID);
 
     let mut effects = Vec::new();
     harness
@@ -81,8 +81,8 @@ fn cancellations_follow_the_exit_order_and_the_death_sound_comes_last() {
 #[test]
 fn a_late_timer_of_a_state_that_died_is_stale() {
     let mut harness = jumping_and_reloading();
-    let reload = timer_of(&harness, Character::RELOADING);
-    let jump = timer_of(&harness, Character::JUMPING);
+    let reload = timer_of(&harness, Character::RELOADING_ID);
+    let jump = timer_of(&harness, Character::JUMPING_ID);
     harness.send(Event::Damage(MAX_HEALTH));
 
     // The runtime did not cancel in time: the core discards them anyway.
@@ -148,7 +148,7 @@ fn dead_ignores_everything_but_respawn() {
 #[test]
 fn respawn_enters_a_fresh_alive_in_new_epochs() {
     let mut harness = jumping_and_reloading();
-    let old_reload = timer_of(&harness, Character::RELOADING);
+    let old_reload = timer_of(&harness, Character::RELOADING_ID);
     harness.send(Event::Damage(MAX_HEALTH));
     take_trace(&mut harness);
 
@@ -172,7 +172,7 @@ fn respawn_enters_a_fresh_alive_in_new_epochs() {
     // A new reload belongs to a new instance of `Reloading`.
     fire_once(&mut harness);
     harness.send(Event::ReloadRequest);
-    let new_reload = timer_of(&harness, Character::RELOADING);
+    let new_reload = timer_of(&harness, Character::RELOADING_ID);
     assert_eq!(new_reload.epoch, old_reload.epoch + 1);
     let stale = harness.machine_mut().fire(old_reload).unwrap();
     assert_eq!(stale.report.ignored, Some(IgnoreReason::Stale));

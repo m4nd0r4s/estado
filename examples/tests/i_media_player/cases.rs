@@ -244,20 +244,20 @@ fn an_unhandled_tick_while_paused_does_not_decode() {
 fn path_display_and_state_ids_follow_the_configuration() {
     let mut machine = idle();
     assert_eq!(machine.path().to_string(), "Idle");
-    assert!(machine.is_in(Player::IDLE));
+    assert!(machine.is_in(Player::IDLE_ID));
 
     machine.send(Event::Play(TrackId(1))).unwrap();
     assert_eq!(machine.path().to_string(), "Active/Playing");
-    assert!(machine.is_in(Player::ACTIVE) && machine.is_in(Player::PLAYING));
-    assert_eq!(machine.state().state_id(), Player::PLAYING);
+    assert!(machine.is_in(Player::ACTIVE_ID) && machine.is_in(Player::PLAYING_ID));
+    assert_eq!(machine.state().state_id(), Player::PLAYING_ID);
 
     machine.send(Event::Pause).unwrap();
     assert_eq!(machine.path().to_string(), "Active/Paused");
-    assert!(machine.is_in(Player::PAUSED) && !machine.is_in(Player::PLAYING));
+    assert!(machine.is_in(Player::PAUSED_ID) && !machine.is_in(Player::PLAYING_ID));
 
     machine.send(Event::Error("e".to_owned())).unwrap();
     assert_eq!(machine.path().to_string(), "Failed");
-    assert!(machine.is_in(Player::FAILED) && !machine.is_in(Player::ACTIVE));
+    assert!(machine.is_in(Player::FAILED_ID) && !machine.is_in(Player::ACTIVE_ID));
 }
 
 #[test]
@@ -265,10 +265,10 @@ fn the_graph_describes_the_hierarchy() {
     let graph = Player::GRAPH;
     assert_eq!(graph.machine, "Player");
     let playing = graph.find("Playing").unwrap();
-    assert_eq!(playing.parent, Some(Player::ACTIVE));
-    assert_eq!(graph.state(Player::ACTIVE).initial, Some(Player::PLAYING));
-    assert!(graph.is_ancestor_or_self(Player::ACTIVE, Player::PAUSED));
-    assert!(!graph.is_ancestor_or_self(Player::ACTIVE, Player::FAILED));
+    assert_eq!(playing.parent, Some(Player::ACTIVE_ID));
+    assert_eq!(graph.state(Player::ACTIVE_ID).initial, Some(Player::PLAYING_ID));
+    assert!(graph.is_ancestor_or_self(Player::ACTIVE_ID, Player::PAUSED_ID));
+    assert!(!graph.is_ancestor_or_self(Player::ACTIVE_ID, Player::FAILED_ID));
 }
 
 #[test]

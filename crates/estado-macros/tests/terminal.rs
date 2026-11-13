@@ -239,14 +239,17 @@ fn a_machine_that_is_not_in_a_root_terminal_has_no_output() {
 fn the_graph_marks_terminals_and_the_completion_edge() {
     use estado_core::{EdgeKind, Spec, StateKind};
     let graph = <Flow as Spec>::GRAPH;
-    assert_eq!(graph.state(Flow::CLOSED).kind, StateKind::Final);
-    assert_eq!(graph.state(Flow::COMPLETE).kind, StateKind::Final);
-    assert_eq!(graph.state(Flow::COMPLETE).parent, Some(Flow::WORKING));
+    assert_eq!(graph.state(Flow::CLOSED_ID).kind, StateKind::Final);
+    assert_eq!(graph.state(Flow::COMPLETE_ID).kind, StateKind::Final);
+    assert_eq!(
+        graph.state(Flow::COMPLETE_ID).parent,
+        Some(Flow::WORKING_ID)
+    );
     assert!(
         graph
             .edges
             .iter()
-            .any(|edge| edge.from == Flow::WORKING && edge.kind == EdgeKind::Done)
+            .any(|edge| edge.from == Flow::WORKING_ID && edge.kind == EdgeKind::Done)
     );
 }
 

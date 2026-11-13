@@ -35,8 +35,8 @@ impl Spec for Character {
 
     fn state_id(&self) -> StateId {
         match self {
-            Self::Alive(_) => Self::ALIVE,
-            Self::Dead => Self::DEAD,
+            Self::Alive(_) => Self::ALIVE_ID,
+            Self::Dead => Self::DEAD_ID,
         }
     }
 

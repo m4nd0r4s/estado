@@ -458,10 +458,10 @@ fn unhandled_at_the_top_follows_the_machine_default() {
 fn path_and_is_in_follow_the_active_configuration() {
     let mut machine = normal();
     assert_eq!(machine.path().to_string(), "Active/Playing/Normal");
-    assert!(machine.is_in(Tree::PLAYING));
+    assert!(machine.is_in(Tree::PLAYING_ID));
     machine.send(Event::ToPaused).unwrap();
     assert_eq!(machine.path().to_string(), "Active/Paused");
-    assert!(!machine.is_in(Tree::PLAYING));
+    assert!(!machine.is_in(Tree::PLAYING_ID));
 }
 
 #[test]
@@ -477,16 +477,16 @@ fn the_graph_is_the_union_of_the_edges() {
             .collect::<Vec<_>>()
     };
     assert_eq!(
-        edges_from(Tree::NORMAL),
+        edges_from(Tree::NORMAL_ID),
         [
-            EdgeTarget::State(Tree::PAUSED),
-            EdgeTarget::State(Tree::FAST),
-            EdgeTarget::State(Tree::ACTIVE),
-            EdgeTarget::State(Tree::ACTIVE),
-            EdgeTarget::State(Tree::NORMAL),
+            EdgeTarget::State(Tree::PAUSED_ID),
+            EdgeTarget::State(Tree::FAST_ID),
+            EdgeTarget::State(Tree::ACTIVE_ID),
+            EdgeTarget::State(Tree::ACTIVE_ID),
+            EdgeTarget::State(Tree::NORMAL_ID),
         ]
     );
-    assert_eq!(graph.state(Tree::PLAYING).initial, Some(Tree::NORMAL));
+    assert_eq!(graph.state(Tree::PLAYING_ID).initial, Some(Tree::NORMAL_ID));
 }
 
 #[test]

@@ -86,7 +86,7 @@ A handler, an entry, an exit, an `#[always]` and an `#[on_done]` can ask for `cx
 | `cx.ctx()` / `cx.ctx_mut()` | Read or write the global context. |
 | `cx.emit(command)` | Records a user effect. It leaves the machine in the step's `effects`. |
 | `cx.raise(event)` | Queues an internal event for the same run. See [Defer and raise](./18-defer-and-raise.md). |
-| `cx.in_state(Machine::STATE)` | `true` when that state is active, including states in sibling regions. See [Regions](./13-regions.md). |
+| `cx.in_state(Machine::STATE_ID)` | `true` when that state is active, including states in sibling regions. See [Regions](./13-regions.md). |
 
 Inside the machine module, write `&mut Cx<Self>` and the macro fills in the rest. In a helper function outside the module, you spell the full type, `Cx<'_, M, S>`, where `S` is any sink for the machine's effect type:
 

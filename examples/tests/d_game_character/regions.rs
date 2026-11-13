@@ -30,7 +30,7 @@ fn regions_are_evaluated_in_declaration_order_and_each_transition_is_applied_at_
             "entry anim:Jump",
         ]
     );
-    assert_eq!(timer_of(&harness, Character::JUMPING).epoch, 1);
+    assert_eq!(timer_of(&harness, Character::JUMPING_ID).epoch, 1);
 }
 
 #[test]
@@ -183,8 +183,8 @@ fn timers_of_different_regions_run_side_by_side() {
     fire_once(&mut harness);
     harness.send(Event::ReloadRequest);
     harness.send(Event::Jump);
-    assert_eq!(timer_of(&harness, Character::RELOADING).epoch, 1);
-    assert_eq!(timer_of(&harness, Character::JUMPING).epoch, 1);
+    assert_eq!(timer_of(&harness, Character::RELOADING_ID).epoch, 1);
+    assert_eq!(timer_of(&harness, Character::JUMPING_ID).epoch, 1);
 
     harness.advance(JUMP_TIME);
     assert_eq!(alive(&harness).movement, Movement::Standing);

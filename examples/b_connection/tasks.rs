@@ -36,32 +36,32 @@ const fn invoke(state: StateId, epoch: u32) -> InvokeKey {
 
 /// `Connecting`'s `#[after]`.
 pub(super) const fn connect_timer(epoch: u32) -> TimerKey {
-    timer(Conn::CONNECTING, epoch)
+    timer(Conn::CONNECTING_ID, epoch)
 }
 
 /// `Connecting`'s `#[invoke]` (the dial).
 pub(super) const fn dial_invoke(epoch: u32) -> InvokeKey {
-    invoke(Conn::CONNECTING, epoch)
+    invoke(Conn::CONNECTING_ID, epoch)
 }
 
 /// `Backoff`'s `#[after]`.
 pub(super) const fn backoff_timer(epoch: u32) -> TimerKey {
-    timer(Conn::BACKOFF, epoch)
+    timer(Conn::BACKOFF_ID, epoch)
 }
 
 /// `Sending`'s `#[invoke]`.
 pub(super) const fn send_invoke(epoch: u32) -> InvokeKey {
-    invoke(Conn::SENDING, epoch)
+    invoke(Conn::SENDING_ID, epoch)
 }
 
 /// `Pinging`'s `#[after]`.
 pub(super) const fn ping_timer(epoch: u32) -> TimerKey {
-    timer(Conn::PINGING, epoch)
+    timer(Conn::PINGING_ID, epoch)
 }
 
 /// `AwaitingPong`'s `#[after]`.
 pub(super) const fn pong_timer(epoch: u32) -> TimerKey {
-    timer(Conn::AWAITING_PONG, epoch)
+    timer(Conn::AWAITING_PONG_ID, epoch)
 }
 
 fn start_connecting<S: Sink<Command>>(attempt: u8, cx: &mut ConnCx<'_, S>) {

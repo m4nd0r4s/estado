@@ -53,25 +53,25 @@ The macro enables the queue when it sees `cx.raise(..)` in the module. For a cal
 
 ### in_state
 
-`in_state(Root::STATE)` tells a handler whether a state is active, including states in the sibling regions of a parallel state. It reads the configuration at the start of the microstep, and a later region sees the transitions that earlier regions of the same event already made.
+`in_state(Root::STATE_ID)` tells a handler whether a state is active, including states in the sibling regions of a parallel state. It reads the configuration at the start of the microstep, and a later region sees the transitions that earlier regions of the same event already made.
 
 - It needs the snapshot that `#[machine]` keeps only when it sees `cx.in_state(..)` in the module, or when you write `tracks_active`. Without the snapshot it returns `false` for every state.
 - It is available in `#[always]` handlers as well.
 
 ## State ids
 
-`#[machine]` adds one associated constant of type `StateId` per state and per region to the root type. The name is the state name in SCREAMING_SNAKE_CASE:
+`#[machine]` adds one associated constant of type `StateId` per state and per region to the root type. The name is the state name in SCREAMING_SNAKE_CASE with the suffix `_ID`. The suffix keeps the constant apart from the variants of the root enum, so states called `A` or `IO` work:
 
 | State | Constant |
 | --- | --- |
-| `Off` | `Player::OFF` |
-| `PlayingFast` | `Player::PLAYING_FAST` |
-| region field `keep_alive` | `Player::KEEP_ALIVE` |
-| `HTTPServer` | `Player::HTTP_SERVER` |
+| `Off` | `Player::OFF_ID` |
+| `PlayingFast` | `Player::PLAYING_FAST_ID` |
+| region field `keep_alive` | `Player::KEEP_ALIVE_ID` |
+| `HTTPServer` | `Player::HTTP_SERVER_ID` |
 
-`StateId` is `Copy`, `Eq`, `Ord` and `Hash`. `StateId::new(index)` builds one from a graph index and `index()` returns it. Ids are used with `Cx::in_state`, `Machine::is_in` and `StatePath::contains`. A constant that would equal a variant name of the root enum is [`E0012`](../errors/E0012.md).
+`StateId` is `Copy`, `Eq`, `Ord` and `Hash`. `StateId::new(index)` builds one from a graph index and `index()` returns it. Ids are used with `Cx::in_state`, `Machine::is_in` and `StatePath::contains`. A constant that would equal a variant name of the root enum (a variant `PLAYING_ID` next to `Playing`) is [`E0012`](../errors/E0012.md).
 
-To get the name or the parent of an id, use the static graph: `Root::GRAPH.state(Root::OFF)` returns a `StateInfo` with `name`, `parent`, `kind`, `initial`, `history`, `timers`, `invokes` and `depth`. See [core](core.md#graph).
+To get the name or the parent of an id, use the static graph: `Root::GRAPH.state(Root::OFF_ID)` returns a `StateInfo` with `name`, `parent`, `kind`, `initial`, `history`, `timers`, `invokes` and `depth`. See [core](core.md#graph).
 
 ```rust
 use estado::prelude::*;
@@ -146,7 +146,7 @@ mod panel {
                 }
                 // The raised event, processed in the same `send`.
                 Event::Pong => {
-                    if cx.in_state(Panel::ON) {
+                    if cx.in_state(Panel::ON_ID) {
                         // a state of the sibling region
                         goto!(Lit)
                     } else {
@@ -170,6 +170,6 @@ fn main() {
     assert_eq!(step.report.microsteps, 2); // `Ping`, then the raised `Pong`
     assert_eq!(*machine.ctx(), 1);
     assert_eq!(machine.path().to_string(), "Running/light:On,mode:Lit");
-    assert!(machine.is_in(Panel::LIT));
+    assert!(machine.is_in(Panel::LIT_ID));
 }
 ```

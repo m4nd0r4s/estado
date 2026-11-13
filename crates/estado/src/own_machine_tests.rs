@@ -43,5 +43,5 @@ fn a_machine_inside_the_facade_package_compiles_and_runs() {
 
     machine.send(Flip::Toggle).unwrap();
 
-    assert!(machine.is_in(switch::Switch::ON));
+    assert!(machine.is_in(switch::Switch::ON_ID));
 }

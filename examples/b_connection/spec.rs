@@ -36,10 +36,10 @@ impl Spec for Conn {
 
     fn state_id(&self) -> StateId {
         match self {
-            Self::Disconnected => Self::DISCONNECTED,
-            Self::Connecting { .. } => Self::CONNECTING,
-            Self::Backoff { .. } => Self::BACKOFF,
-            Self::Connected(_) => Self::CONNECTED,
+            Self::Disconnected => Self::DISCONNECTED_ID,
+            Self::Connecting { .. } => Self::CONNECTING_ID,
+            Self::Backoff { .. } => Self::BACKOFF_ID,
+            Self::Connected(_) => Self::CONNECTED_ID,
         }
     }
 

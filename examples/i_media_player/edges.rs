@@ -91,7 +91,7 @@ pub enum IdleEdges {
 }
 
 impl Edge<Player> for IdleEdges {
-    const TARGETS: &'static [StateId] = &[Player::ACTIVE];
+    const TARGETS: &'static [StateId] = &[Player::ACTIVE_ID];
 
     fn apply<S: Sink<Command>>(self, slot: &mut Slot<Player>, cx: &mut PlayerCx<'_, S>) -> bool {
         match self {
@@ -111,7 +111,7 @@ pub enum PlayingEdges {
 }
 
 impl Edge<Player> for PlayingEdges {
-    const TARGETS: &'static [StateId] = &[Player::PAUSED];
+    const TARGETS: &'static [StateId] = &[Player::PAUSED_ID];
 
     fn apply<S: Sink<Command>>(self, slot: &mut Slot<Player>, cx: &mut PlayerCx<'_, S>) -> bool {
         match self {
@@ -128,7 +128,7 @@ pub enum PausedEdges {
 }
 
 impl Edge<Player> for PausedEdges {
-    const TARGETS: &'static [StateId] = &[Player::PLAYING];
+    const TARGETS: &'static [StateId] = &[Player::PLAYING_ID];
 
     fn apply<S: Sink<Command>>(self, slot: &mut Slot<Player>, cx: &mut PlayerCx<'_, S>) -> bool {
         match self {
@@ -152,7 +152,7 @@ pub enum ActiveEdges<FailedConstructor> {
 impl<FailedConstructor: FnOnce(ActiveExiting) -> Player> Edge<Player>
     for ActiveEdges<FailedConstructor>
 {
-    const TARGETS: &'static [StateId] = &[Player::IDLE, Player::ACTIVE, Player::FAILED];
+    const TARGETS: &'static [StateId] = &[Player::IDLE_ID, Player::ACTIVE_ID, Player::FAILED_ID];
 
     fn apply<S: Sink<Command>>(self, slot: &mut Slot<Player>, cx: &mut PlayerCx<'_, S>) -> bool {
         match self {
@@ -183,7 +183,7 @@ pub enum FailedEdges<ActiveConstructor> {
 impl<ActiveConstructor: FnOnce(FailedExiting) -> Player> Edge<Player>
     for FailedEdges<ActiveConstructor>
 {
-    const TARGETS: &'static [StateId] = &[Player::ACTIVE, Player::IDLE];
+    const TARGETS: &'static [StateId] = &[Player::ACTIVE_ID, Player::IDLE_ID];
 
     fn apply<S: Sink<Command>>(self, slot: &mut Slot<Player>, cx: &mut PlayerCx<'_, S>) -> bool {
         match self {
@@ -208,11 +208,14 @@ mod tests {
         type NoConstructor = fn(ActiveExiting) -> Player;
         type NoFailedConstructor = fn(FailedExiting) -> Player;
         let declared: [(StateId, &[StateId]); 5] = [
-            (Player::IDLE, IdleEdges::TARGETS),
-            (Player::PLAYING, PlayingEdges::TARGETS),
-            (Player::PAUSED, PausedEdges::TARGETS),
-            (Player::ACTIVE, <ActiveEdges<NoConstructor>>::TARGETS),
-            (Player::FAILED, <FailedEdges<NoFailedConstructor>>::TARGETS),
+            (Player::IDLE_ID, IdleEdges::TARGETS),
+            (Player::PLAYING_ID, PlayingEdges::TARGETS),
+            (Player::PAUSED_ID, PausedEdges::TARGETS),
+            (Player::ACTIVE_ID, <ActiveEdges<NoConstructor>>::TARGETS),
+            (
+                Player::FAILED_ID,
+                <FailedEdges<NoFailedConstructor>>::TARGETS,
+            ),
         ];
         for (from, targets) in declared {
             let in_graph: Vec<_> = GRAPH

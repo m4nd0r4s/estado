@@ -341,7 +341,7 @@ fn main() {
 ```rust,ignore
 let graph = <Player as Spec>::GRAPH;
 let playing = graph.find("Playing").unwrap();
-assert!(graph.is_ancestor_or_self(Player::ACTIVE, playing.id));
+assert!(graph.is_ancestor_or_self(Player::ACTIVE_ID, playing.id));
 ```
 
 | Item | Fields and methods |

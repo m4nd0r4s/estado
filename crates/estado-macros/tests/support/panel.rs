@@ -262,7 +262,7 @@ mod panel {
         fn on_mute(cx: &mut Cx<Self>, event: &Event) -> Next<Self> {
             note(cx, "Mute handles");
             match event {
-                Event::Toggle if cx.in_state(Self::BRIGHT) => goto!(Beep { count: 0 }),
+                Event::Toggle if cx.in_state(Self::BRIGHT_ID) => goto!(Beep { count: 0 }),
                 Event::Park => defer!(),
                 _ => bubble!(),
             }

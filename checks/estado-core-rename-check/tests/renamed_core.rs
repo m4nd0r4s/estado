@@ -10,5 +10,5 @@ fn a_machine_over_a_renamed_core_crate_runs() {
 
     machine.send(Toggle::Flip).unwrap();
 
-    assert!(machine.is_in(Switch::ON));
+    assert!(machine.is_in(Switch::ON_ID));
 }

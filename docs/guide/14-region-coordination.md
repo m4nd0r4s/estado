@@ -4,7 +4,7 @@ Regions run side by side. This page shows how they look at each other, how an un
 
 ## Asking about another region with `in_state`
 
-Regions cannot transition into each other: a `goto!` between sibling regions is [E0021](../errors/E0021.md). They can still **look** at each other with `cx.in_state(Self::STATE)`, which says whether a state is active in any region. Raise an event with `cx.raise` when one region needs to push another (see [Defer and raise](./18-defer-and-raise.md)).
+Regions cannot transition into each other: a `goto!` between sibling regions is [E0021](../errors/E0021.md). They can still **look** at each other with `cx.in_state(Self::STATE_ID)`, which says whether a state is active in any region. Raise an event with `cx.raise` when one region needs to push another (see [Defer and raise](./18-defer-and-raise.md)).
 
 Because regions run one after the other, the configuration that `in_state` shows is **up to date**. When `light` has just moved to `Bright` in this very event, `sound` already sees `Bright` active.
 
@@ -74,7 +74,7 @@ mod stage {
         // The sound region reacts only while the light is bright.
         #[on(Mute)]
         fn on_mute(cx: &mut Cx<Self>, _event: &Event) -> Next<Self> {
-            let bright = cx.in_state(Self::BRIGHT);
+            let bright = cx.in_state(Self::BRIGHT_ID);
             cx.ctx_mut().push(format!("Mute sees bright = {bright}"));
             if bright { goto!(Beep) } else { stay!() }
         }
@@ -99,9 +99,9 @@ fn main() {
 }
 ```
 
-`Self::BRIGHT` is the id constant of the state `Bright`. The macro turns on the active-configuration snapshot when it sees a `cx.in_state(..)` call in the module. A call that lives in a helper outside the module is invisible to it, so add `tracks_active` to the machine attribute. See [Warnings and options](./22-warnings-and-options.md).
+`Self::BRIGHT_ID` is the id constant of the state `Bright`. The macro turns on the active-configuration snapshot when it sees a `cx.in_state(..)` call in the module. A call that lives in a helper outside the module is invisible to it, so add `tracks_active` to the machine attribute. See [Warnings and options](./22-warnings-and-options.md).
 
-`machine.is_in(Stage::BRIGHT)` asks the same question from outside the machine.
+`machine.is_in(Stage::BRIGHT_ID)` asks the same question from outside the machine.
 
 ## `#[unhandled]` inside a region
 

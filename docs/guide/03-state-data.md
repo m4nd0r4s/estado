@@ -315,7 +315,7 @@ fn main() {
 
 ## State ids and the static graph
 
-Each state has an id constant on the root type, named in SCREAMING_SNAKE_CASE after the state. The ids follow the tree in pre-order from 0. They are `StateId` values that you can compare, pass to `machine.is_in(..)` and `cx.in_state(..)`, and look up in the machine's **graph**.
+Each state has an id constant on the root type, named after the state in SCREAMING_SNAKE_CASE, with the suffix `_ID` (`Player::PAUSED_ID`). The ids follow the tree in pre-order from 0. They are `StateId` values that you can compare, pass to `machine.is_in(..)` and `cx.in_state(..)`, and look up in the machine's **graph**.
 
 The graph is a `static` that the macro builds from your code: every state with its parent and kind, and every `goto!` as an edge. It is plain data. Read it through `<Player as Spec>::GRAPH`.
 
@@ -389,17 +389,17 @@ fn main() {
     // States, in pre-order.
     let names: Vec<_> = graph.states.iter().map(|state| state.name).collect();
     assert_eq!(names, ["Idle", "Active", "Playing", "Paused"]);
-    assert_eq!(graph.state(Player::ACTIVE).kind, StateKind::Compound);
-    assert_eq!(graph.state(Player::PLAYING).parent, Some(Player::ACTIVE));
-    assert_eq!(graph.state(Player::ACTIVE).initial, Some(Player::PLAYING));
-    assert_eq!(graph.find("Paused").map(|state| state.id), Some(Player::PAUSED));
+    assert_eq!(graph.state(Player::ACTIVE_ID).kind, StateKind::Compound);
+    assert_eq!(graph.state(Player::PLAYING_ID).parent, Some(Player::ACTIVE_ID));
+    assert_eq!(graph.state(Player::ACTIVE_ID).initial, Some(Player::PLAYING_ID));
+    assert_eq!(graph.find("Paused").map(|state| state.id), Some(Player::PAUSED_ID));
 
     // One edge per `goto!`: Idle -> Active, Playing -> Paused, Paused -> Playing, Active -> Idle.
     assert_eq!(graph.edges.len(), 4);
     assert!(graph
         .edges
         .iter()
-        .any(|edge| edge.from == Player::IDLE && edge.to == EdgeTarget::State(Player::ACTIVE)));
+        .any(|edge| edge.from == Player::IDLE_ID && edge.to == EdgeTarget::State(Player::ACTIVE_ID)));
 }
 ```
 

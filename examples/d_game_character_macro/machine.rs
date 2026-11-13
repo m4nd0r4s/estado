@@ -52,11 +52,11 @@ const fn changes_pose(event: &Event) -> bool {
 /// The pose the character should have right now: shooting wins over
 /// jumping, which wins over running.
 fn desired_pose<S: Sink<Command>>(cx: &Cx<'_, character::Character, S>) -> character::Anim {
-    if cx.in_state(character::Character::FIRING) {
+    if cx.in_state(character::Character::FIRING_ID) {
         character::Anim::Shoot
-    } else if cx.in_state(character::Character::JUMPING) {
+    } else if cx.in_state(character::Character::JUMPING_ID) {
         character::Anim::Jump
-    } else if cx.in_state(character::Character::WALKING) {
+    } else if cx.in_state(character::Character::WALKING_ID) {
         character::Anim::Run
     } else {
         character::Anim::Idle
@@ -422,7 +422,7 @@ pub mod character {
                     goto!(Firing)
                 }
                 Event::ReloadRequest if *up.ammo == MAGAZINE_SIZE => stay!(),
-                Event::ReloadRequest if cx.in_state(Self::JUMPING) => defer!(),
+                Event::ReloadRequest if cx.in_state(Self::JUMPING_ID) => defer!(),
                 Event::ReloadRequest => goto!(Reloading),
                 _ => bubble!(),
             }
@@ -465,7 +465,7 @@ pub mod character {
                     cx.emit(Command::PlaySound(Sound::EmptyClick));
                     stay!()
                 }
-                Event::ReloadRequest if cx.in_state(Self::JUMPING) => defer!(),
+                Event::ReloadRequest if cx.in_state(Self::JUMPING_ID) => defer!(),
                 Event::ReloadRequest => goto!(Reloading),
                 _ => bubble!(),
             }

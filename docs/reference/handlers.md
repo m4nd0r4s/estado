@@ -240,4 +240,4 @@ fn playing(mut up: ActiveFields<'_>, event: &Event) -> Next<Self> {
 
 ## State id constants
 
-The macro adds one `StateId` constant per state and per region to the root type, in SCREAMING_SNAKE_CASE: `Player::PLAYING`, `Player::PAUSED`, and `Conn::KEEP_ALIVE` for a region called `keep_alive`. See [context](context.md#state-ids). Two states whose names give the same constant (`Link` and a region `link`), and a root-level state named like its own constant (`IO`), are `E0012`. A substate named `IO` is fine.
+The macro adds one `StateId` constant per state and per region to the root type, in SCREAMING_SNAKE_CASE with the suffix `_ID`: `Player::PLAYING_ID`, `Player::PAUSED_ID`, and `Conn::KEEP_ALIVE_ID` for a region called `keep_alive`. See [context](context.md#state-ids). Two states whose names give the same constant (`Link` and a region `link`) are [`E0012`](../errors/E0012.md). States named `A` or `IO` are fine.

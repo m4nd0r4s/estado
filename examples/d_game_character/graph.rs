@@ -11,43 +11,43 @@ use super::model::{Anim, Character, Movement, Weapon};
 
 impl Character {
     /// `Alive`, the parallel state.
-    pub const ALIVE: StateId = StateId::new(0);
+    pub const ALIVE_ID: StateId = StateId::new(0);
     /// Region `movement`.
-    pub const MOVEMENT: StateId = StateId::new(1);
+    pub const MOVEMENT_ID: StateId = StateId::new(1);
     /// `movement:Standing`.
-    pub const STANDING: StateId = StateId::new(2);
+    pub const STANDING_ID: StateId = StateId::new(2);
     /// `movement:Walking`.
-    pub const WALKING: StateId = StateId::new(3);
+    pub const WALKING_ID: StateId = StateId::new(3);
     /// `movement:Jumping`.
-    pub const JUMPING: StateId = StateId::new(4);
+    pub const JUMPING_ID: StateId = StateId::new(4);
     /// `movement:Crouching`.
-    pub const CROUCHING: StateId = StateId::new(5);
+    pub const CROUCHING_ID: StateId = StateId::new(5);
     /// Region `weapon`.
-    pub const WEAPON: StateId = StateId::new(6);
+    pub const WEAPON_ID: StateId = StateId::new(6);
     /// `weapon:Ready`.
-    pub const READY: StateId = StateId::new(7);
+    pub const READY_ID: StateId = StateId::new(7);
     /// `weapon:Firing`.
-    pub const FIRING: StateId = StateId::new(8);
+    pub const FIRING_ID: StateId = StateId::new(8);
     /// `weapon:Reloading`.
-    pub const RELOADING: StateId = StateId::new(9);
+    pub const RELOADING_ID: StateId = StateId::new(9);
     /// `weapon:Empty`.
-    pub const EMPTY: StateId = StateId::new(10);
+    pub const EMPTY_ID: StateId = StateId::new(10);
     /// Region `anim`.
-    pub const ANIM: StateId = StateId::new(11);
+    pub const ANIM_ID: StateId = StateId::new(11);
     /// `anim:Idle`.
-    pub const IDLE: StateId = StateId::new(12);
+    pub const IDLE_ID: StateId = StateId::new(12);
     /// `anim:Run`.
-    pub const RUN: StateId = StateId::new(13);
+    pub const RUN_ID: StateId = StateId::new(13);
     /// `anim:Jump`.
-    pub const JUMP: StateId = StateId::new(14);
+    pub const JUMP_ID: StateId = StateId::new(14);
     /// `anim:Shoot`.
-    pub const SHOOT: StateId = StateId::new(15);
+    pub const SHOOT_ID: StateId = StateId::new(15);
     /// `Dead`.
-    pub const DEAD: StateId = StateId::new(16);
+    pub const DEAD_ID: StateId = StateId::new(16);
 }
 
 const fn region(id: StateId, name: &'static str, initial: StateId) -> StateInfo {
-    StateInfo::new(id, name, Some(Character::ALIVE), StateKind::Region, 1).with_initial(initial)
+    StateInfo::new(id, name, Some(Character::ALIVE_ID), StateKind::Region, 1).with_initial(initial)
 }
 
 const fn leaf(id: StateId, name: &'static str, region: StateId) -> StateInfo {
@@ -55,23 +55,23 @@ const fn leaf(id: StateId, name: &'static str, region: StateId) -> StateInfo {
 }
 
 static STATES: [StateInfo; 17] = [
-    StateInfo::new(Character::ALIVE, "Alive", None, StateKind::Parallel, 0),
-    region(Character::MOVEMENT, "movement", Character::STANDING),
-    leaf(Character::STANDING, "Standing", Character::MOVEMENT),
-    leaf(Character::WALKING, "Walking", Character::MOVEMENT),
-    leaf(Character::JUMPING, "Jumping", Character::MOVEMENT).with_tasks(1, 0),
-    leaf(Character::CROUCHING, "Crouching", Character::MOVEMENT),
-    region(Character::WEAPON, "weapon", Character::READY),
-    leaf(Character::READY, "Ready", Character::WEAPON),
-    leaf(Character::FIRING, "Firing", Character::WEAPON).with_tasks(1, 0),
-    leaf(Character::RELOADING, "Reloading", Character::WEAPON).with_tasks(1, 0),
-    leaf(Character::EMPTY, "Empty", Character::WEAPON),
-    region(Character::ANIM, "anim", Character::IDLE),
-    leaf(Character::IDLE, "Idle", Character::ANIM),
-    leaf(Character::RUN, "Run", Character::ANIM),
-    leaf(Character::JUMP, "Jump", Character::ANIM),
-    leaf(Character::SHOOT, "Shoot", Character::ANIM),
-    StateInfo::new(Character::DEAD, "Dead", None, StateKind::Atomic, 0),
+    StateInfo::new(Character::ALIVE_ID, "Alive", None, StateKind::Parallel, 0),
+    region(Character::MOVEMENT_ID, "movement", Character::STANDING_ID),
+    leaf(Character::STANDING_ID, "Standing", Character::MOVEMENT_ID),
+    leaf(Character::WALKING_ID, "Walking", Character::MOVEMENT_ID),
+    leaf(Character::JUMPING_ID, "Jumping", Character::MOVEMENT_ID).with_tasks(1, 0),
+    leaf(Character::CROUCHING_ID, "Crouching", Character::MOVEMENT_ID),
+    region(Character::WEAPON_ID, "weapon", Character::READY_ID),
+    leaf(Character::READY_ID, "Ready", Character::WEAPON_ID),
+    leaf(Character::FIRING_ID, "Firing", Character::WEAPON_ID).with_tasks(1, 0),
+    leaf(Character::RELOADING_ID, "Reloading", Character::WEAPON_ID).with_tasks(1, 0),
+    leaf(Character::EMPTY_ID, "Empty", Character::WEAPON_ID),
+    region(Character::ANIM_ID, "anim", Character::IDLE_ID),
+    leaf(Character::IDLE_ID, "Idle", Character::ANIM_ID),
+    leaf(Character::RUN_ID, "Run", Character::ANIM_ID),
+    leaf(Character::JUMP_ID, "Jump", Character::ANIM_ID),
+    leaf(Character::SHOOT_ID, "Shoot", Character::ANIM_ID),
+    StateInfo::new(Character::DEAD_ID, "Dead", None, StateKind::Atomic, 0),
 ];
 
 const fn edge(from: StateId, to: StateId, kind: EdgeKind, event_hint: &'static str) -> EdgeInfo {
@@ -100,50 +100,66 @@ pub static GRAPH: Graph = Graph {
     machine: "Character",
     states: &STATES,
     edges: &[
-        normal(Character::ALIVE, Character::DEAD, "Event::Damage"),
-        normal(Character::DEAD, Character::ALIVE, "Event::Respawn"),
-        normal(Character::STANDING, Character::WALKING, "Event::Move"),
-        normal(Character::STANDING, Character::JUMPING, "Event::Jump"),
-        normal(Character::STANDING, Character::CROUCHING, "Event::Crouch"),
-        normal(Character::WALKING, Character::STANDING, "Event::Stop"),
-        normal(Character::WALKING, Character::JUMPING, "Event::Jump"),
-        normal(Character::WALKING, Character::CROUCHING, "Event::Crouch"),
-        timer(Character::JUMPING, Character::STANDING, "Event::Land"),
-        normal(Character::CROUCHING, Character::STANDING, "Event::Stand"),
-        normal(Character::READY, Character::FIRING, "Event::Fire"),
+        normal(Character::ALIVE_ID, Character::DEAD_ID, "Event::Damage"),
+        normal(Character::DEAD_ID, Character::ALIVE_ID, "Event::Respawn"),
+        normal(Character::STANDING_ID, Character::WALKING_ID, "Event::Move"),
+        normal(Character::STANDING_ID, Character::JUMPING_ID, "Event::Jump"),
         normal(
-            Character::READY,
-            Character::RELOADING,
+            Character::STANDING_ID,
+            Character::CROUCHING_ID,
+            "Event::Crouch",
+        ),
+        normal(Character::WALKING_ID, Character::STANDING_ID, "Event::Stop"),
+        normal(Character::WALKING_ID, Character::JUMPING_ID, "Event::Jump"),
+        normal(
+            Character::WALKING_ID,
+            Character::CROUCHING_ID,
+            "Event::Crouch",
+        ),
+        timer(Character::JUMPING_ID, Character::STANDING_ID, "Event::Land"),
+        normal(
+            Character::CROUCHING_ID,
+            Character::STANDING_ID,
+            "Event::Stand",
+        ),
+        normal(Character::READY_ID, Character::FIRING_ID, "Event::Fire"),
+        normal(
+            Character::READY_ID,
+            Character::RELOADING_ID,
             "Event::ReloadRequest",
         ),
         timer(
-            Character::FIRING,
-            Character::READY,
+            Character::FIRING_ID,
+            Character::READY_ID,
             "Event::CooldownElapsed",
         ),
         timer(
-            Character::FIRING,
-            Character::EMPTY,
+            Character::FIRING_ID,
+            Character::EMPTY_ID,
             "Event::CooldownElapsed",
         ),
-        timer(Character::RELOADING, Character::READY, "Event::ReloadDone"),
+        timer(
+            Character::RELOADING_ID,
+            Character::READY_ID,
+            "Event::ReloadDone",
+        ),
         normal(
-            Character::EMPTY,
-            Character::RELOADING,
+            Character::EMPTY_ID,
+            Character::RELOADING_ID,
             "Event::ReloadRequest",
         ),
-        normal(Character::IDLE, Character::RUN, POSE),
-        normal(Character::IDLE, Character::JUMP, POSE),
-        normal(Character::IDLE, Character::SHOOT, POSE),
-        normal(Character::RUN, Character::IDLE, POSE),
-        normal(Character::RUN, Character::JUMP, POSE),
-        normal(Character::RUN, Character::SHOOT, POSE),
-        normal(Character::JUMP, Character::IDLE, POSE),
-        normal(Character::JUMP, Character::RUN, POSE),
-        normal(Character::JUMP, Character::SHOOT, POSE),
-        normal(Character::SHOOT, Character::IDLE, POSE),
-        normal(Character::SHOOT, Character::RUN, POSE),
-        normal(Character::SHOOT, Character::JUMP, POSE),
+        normal(Character::IDLE_ID, Character::RUN_ID, POSE),
+        normal(Character::IDLE_ID, Character::JUMP_ID, POSE),
+        normal(Character::IDLE_ID, Character::SHOOT_ID, POSE),
+        normal(Character::RUN_ID, Character::IDLE_ID, POSE),
+        normal(Character::RUN_ID, Character::JUMP_ID, POSE),
+        normal(Character::RUN_ID, Character::SHOOT_ID, POSE),
+        normal(Character::JUMP_ID, Character::IDLE_ID, POSE),
+        normal(Character::JUMP_ID, Character::RUN_ID, POSE),
+        normal(Character::JUMP_ID, Character::SHOOT_ID, POSE),
+        normal(Character::SHOOT_ID, Character::IDLE_ID, POSE),
+        normal(Character::SHOOT_ID, Character::RUN_ID, POSE),
+        normal(Character::SHOOT_ID, Character::JUMP_ID, POSE),
     ],
 };
 
@@ -151,10 +167,10 @@ impl Movement {
     /// Id of the active leaf of the region.
     pub fn state_id(self) -> StateId {
         match self {
-            Self::Standing => Character::STANDING,
-            Self::Walking => Character::WALKING,
-            Self::Jumping => Character::JUMPING,
-            Self::Crouching => Character::CROUCHING,
+            Self::Standing => Character::STANDING_ID,
+            Self::Walking => Character::WALKING_ID,
+            Self::Jumping => Character::JUMPING_ID,
+            Self::Crouching => Character::CROUCHING_ID,
         }
     }
 }
@@ -163,10 +179,10 @@ impl Weapon {
     /// Id of the active leaf of the region.
     pub fn state_id(self) -> StateId {
         match self {
-            Self::Ready => Character::READY,
-            Self::Firing => Character::FIRING,
-            Self::Reloading => Character::RELOADING,
-            Self::Empty => Character::EMPTY,
+            Self::Ready => Character::READY_ID,
+            Self::Firing => Character::FIRING_ID,
+            Self::Reloading => Character::RELOADING_ID,
+            Self::Empty => Character::EMPTY_ID,
         }
     }
 }
@@ -175,10 +191,10 @@ impl Anim {
     /// Id of the active leaf of the region.
     pub fn state_id(self) -> StateId {
         match self {
-            Self::Idle => Character::IDLE,
-            Self::Run => Character::RUN,
-            Self::Jump => Character::JUMP,
-            Self::Shoot => Character::SHOOT,
+            Self::Idle => Character::IDLE_ID,
+            Self::Run => Character::RUN_ID,
+            Self::Jump => Character::JUMP_ID,
+            Self::Shoot => Character::SHOOT_ID,
         }
     }
 }
@@ -190,15 +206,15 @@ impl Character {
         let mut path = StatePath::new(&GRAPH);
         match self {
             Self::Alive(alive) => {
-                path.push(Self::ALIVE);
-                path.push(Self::MOVEMENT);
+                path.push(Self::ALIVE_ID);
+                path.push(Self::MOVEMENT_ID);
                 path.push(alive.movement.state_id());
-                path.push(Self::WEAPON);
+                path.push(Self::WEAPON_ID);
                 path.push(alive.weapon.state_id());
-                path.push(Self::ANIM);
+                path.push(Self::ANIM_ID);
                 path.push(alive.anim.state_id());
             }
-            Self::Dead => path.push(Self::DEAD),
+            Self::Dead => path.push(Self::DEAD_ID),
         }
         path
     }
@@ -222,22 +238,22 @@ mod tests {
     #[test]
     fn graph_edges_match_the_targets_of_the_edge_enums() {
         let declared: [(StateId, &[StateId]); 16] = [
-            (Character::ALIVE, AliveEdges::TARGETS),
-            (Character::DEAD, DeadEdges::TARGETS),
-            (Character::STANDING, StandingEdges::TARGETS),
-            (Character::WALKING, WalkingEdges::TARGETS),
-            (Character::JUMPING, JumpingEdges::TARGETS),
-            (Character::CROUCHING, CrouchingEdges::TARGETS),
-            (Character::READY, ReadyEdges::TARGETS),
-            (Character::FIRING, FiringEdges::TARGETS),
-            (Character::RELOADING, ReloadingEdges::TARGETS),
-            (Character::EMPTY, EmptyEdges::TARGETS),
-            (Character::IDLE, IdleEdges::TARGETS),
-            (Character::RUN, RunEdges::TARGETS),
-            (Character::JUMP, JumpEdges::TARGETS),
-            (Character::SHOOT, ShootEdges::TARGETS),
-            (Character::ANIM, &[]),
-            (Character::MOVEMENT, &[]),
+            (Character::ALIVE_ID, AliveEdges::TARGETS),
+            (Character::DEAD_ID, DeadEdges::TARGETS),
+            (Character::STANDING_ID, StandingEdges::TARGETS),
+            (Character::WALKING_ID, WalkingEdges::TARGETS),
+            (Character::JUMPING_ID, JumpingEdges::TARGETS),
+            (Character::CROUCHING_ID, CrouchingEdges::TARGETS),
+            (Character::READY_ID, ReadyEdges::TARGETS),
+            (Character::FIRING_ID, FiringEdges::TARGETS),
+            (Character::RELOADING_ID, ReloadingEdges::TARGETS),
+            (Character::EMPTY_ID, EmptyEdges::TARGETS),
+            (Character::IDLE_ID, IdleEdges::TARGETS),
+            (Character::RUN_ID, RunEdges::TARGETS),
+            (Character::JUMP_ID, JumpEdges::TARGETS),
+            (Character::SHOOT_ID, ShootEdges::TARGETS),
+            (Character::ANIM_ID, &[]),
+            (Character::MOVEMENT_ID, &[]),
         ];
         for (from, targets) in declared {
             let in_graph: Vec<_> = GRAPH
@@ -266,7 +282,11 @@ mod tests {
             .collect();
         assert_eq!(
             with_timer,
-            [Character::JUMPING, Character::FIRING, Character::RELOADING]
+            [
+                Character::JUMPING_ID,
+                Character::FIRING_ID,
+                Character::RELOADING_ID
+            ]
         );
     }
 }

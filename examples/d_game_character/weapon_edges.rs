@@ -17,7 +17,7 @@ pub enum ReadyEdges {
 }
 
 impl Edge<Character> for ReadyEdges {
-    const TARGETS: &'static [StateId] = &[Character::FIRING, Character::RELOADING];
+    const TARGETS: &'static [StateId] = &[Character::FIRING_ID, Character::RELOADING_ID];
 
     fn apply<S: Sink<Command>>(
         self,
@@ -42,7 +42,7 @@ pub enum FiringEdges {
 }
 
 impl Edge<Character> for FiringEdges {
-    const TARGETS: &'static [StateId] = &[Character::READY, Character::EMPTY];
+    const TARGETS: &'static [StateId] = &[Character::READY_ID, Character::EMPTY_ID];
 
     fn apply<S: Sink<Command>>(
         self,
@@ -65,7 +65,7 @@ pub enum ReloadingEdges {
 }
 
 impl Edge<Character> for ReloadingEdges {
-    const TARGETS: &'static [StateId] = &[Character::READY];
+    const TARGETS: &'static [StateId] = &[Character::READY_ID];
 
     fn apply<S: Sink<Command>>(
         self,
@@ -86,7 +86,7 @@ pub enum EmptyEdges {
 }
 
 impl Edge<Character> for EmptyEdges {
-    const TARGETS: &'static [StateId] = &[Character::RELOADING];
+    const TARGETS: &'static [StateId] = &[Character::RELOADING_ID];
 
     fn apply<S: Sink<Command>>(
         self,

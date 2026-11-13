@@ -74,7 +74,7 @@ pub enum DisconnectedEdges {
 }
 
 impl Edge<Conn> for DisconnectedEdges {
-    const TARGETS: &'static [StateId] = &[Conn::CONNECTING];
+    const TARGETS: &'static [StateId] = &[Conn::CONNECTING_ID];
 
     fn apply<S: Sink<Command>>(self, slot: &mut Slot<Conn>, cx: &mut ConnCx<'_, S>) -> bool {
         match self {
@@ -104,10 +104,10 @@ pub enum ConnectingEdges {
 
 impl Edge<Conn> for ConnectingEdges {
     const TARGETS: &'static [StateId] = &[
-        Conn::CONNECTED,
-        Conn::BACKOFF,
-        Conn::DISCONNECTED,
-        Conn::DISCONNECTED,
+        Conn::CONNECTED_ID,
+        Conn::BACKOFF_ID,
+        Conn::DISCONNECTED_ID,
+        Conn::DISCONNECTED_ID,
     ];
 
     fn apply<S: Sink<Command>>(self, slot: &mut Slot<Conn>, cx: &mut ConnCx<'_, S>) -> bool {
@@ -133,7 +133,7 @@ pub enum BackoffEdges {
 }
 
 impl Edge<Conn> for BackoffEdges {
-    const TARGETS: &'static [StateId] = &[Conn::CONNECTING, Conn::DISCONNECTED];
+    const TARGETS: &'static [StateId] = &[Conn::CONNECTING_ID, Conn::DISCONNECTED_ID];
 
     fn apply<S: Sink<Command>>(self, slot: &mut Slot<Conn>, cx: &mut ConnCx<'_, S>) -> bool {
         let target = match self {
@@ -152,7 +152,7 @@ pub enum ConnectedEdges {
 }
 
 impl Edge<Conn> for ConnectedEdges {
-    const TARGETS: &'static [StateId] = &[Conn::DISCONNECTED];
+    const TARGETS: &'static [StateId] = &[Conn::DISCONNECTED_ID];
 
     fn apply<S: Sink<Command>>(self, slot: &mut Slot<Conn>, cx: &mut ConnCx<'_, S>) -> bool {
         match self {
@@ -172,7 +172,7 @@ pub enum IdleEdges {
 }
 
 impl Edge<Conn> for IdleEdges {
-    const TARGETS: &'static [StateId] = &[Conn::SENDING];
+    const TARGETS: &'static [StateId] = &[Conn::SENDING_ID];
 
     fn apply<S: Sink<Command>>(self, slot: &mut Slot<Conn>, cx: &mut ConnCx<'_, S>) -> bool {
         match self {
@@ -195,7 +195,7 @@ pub enum SendingEdges {
 }
 
 impl Edge<Conn> for SendingEdges {
-    const TARGETS: &'static [StateId] = &[Conn::IDLE];
+    const TARGETS: &'static [StateId] = &[Conn::IDLE_ID];
 
     fn apply<S: Sink<Command>>(self, slot: &mut Slot<Conn>, cx: &mut ConnCx<'_, S>) -> bool {
         match self {
@@ -218,7 +218,7 @@ pub enum PingingEdges {
 }
 
 impl Edge<Conn> for PingingEdges {
-    const TARGETS: &'static [StateId] = &[Conn::AWAITING_PONG];
+    const TARGETS: &'static [StateId] = &[Conn::AWAITING_PONG_ID];
 
     fn apply<S: Sink<Command>>(self, slot: &mut Slot<Conn>, cx: &mut ConnCx<'_, S>) -> bool {
         match self {
@@ -243,7 +243,7 @@ pub enum AwaitingPongEdges {
 }
 
 impl Edge<Conn> for AwaitingPongEdges {
-    const TARGETS: &'static [StateId] = &[Conn::PINGING, Conn::DEAD];
+    const TARGETS: &'static [StateId] = &[Conn::PINGING_ID, Conn::DEAD_ID];
 
     fn apply<S: Sink<Command>>(self, slot: &mut Slot<Conn>, cx: &mut ConnCx<'_, S>) -> bool {
         match self {
@@ -268,7 +268,7 @@ pub enum DeadEdges {
 }
 
 impl Edge<Conn> for DeadEdges {
-    const TARGETS: &'static [StateId] = &[Conn::BACKOFF];
+    const TARGETS: &'static [StateId] = &[Conn::BACKOFF_ID];
 
     fn apply<S: Sink<Command>>(self, slot: &mut Slot<Conn>, cx: &mut ConnCx<'_, S>) -> bool {
         match self {
@@ -293,15 +293,15 @@ mod tests {
     #[test]
     fn graph_edges_match_the_targets_of_the_edge_enums() {
         let declared: [(StateId, &[StateId]); 9] = [
-            (Conn::DISCONNECTED, DisconnectedEdges::TARGETS),
-            (Conn::CONNECTING, ConnectingEdges::TARGETS),
-            (Conn::BACKOFF, BackoffEdges::TARGETS),
-            (Conn::CONNECTED, ConnectedEdges::TARGETS),
-            (Conn::IDLE, IdleEdges::TARGETS),
-            (Conn::SENDING, SendingEdges::TARGETS),
-            (Conn::PINGING, PingingEdges::TARGETS),
-            (Conn::AWAITING_PONG, AwaitingPongEdges::TARGETS),
-            (Conn::DEAD, DeadEdges::TARGETS),
+            (Conn::DISCONNECTED_ID, DisconnectedEdges::TARGETS),
+            (Conn::CONNECTING_ID, ConnectingEdges::TARGETS),
+            (Conn::BACKOFF_ID, BackoffEdges::TARGETS),
+            (Conn::CONNECTED_ID, ConnectedEdges::TARGETS),
+            (Conn::IDLE_ID, IdleEdges::TARGETS),
+            (Conn::SENDING_ID, SendingEdges::TARGETS),
+            (Conn::PINGING_ID, PingingEdges::TARGETS),
+            (Conn::AWAITING_PONG_ID, AwaitingPongEdges::TARGETS),
+            (Conn::DEAD_ID, DeadEdges::TARGETS),
         ];
         for (from, targets) in declared {
             let in_graph: Vec<_> = GRAPH

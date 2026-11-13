@@ -1,5 +1,5 @@
-//! State names must be unique across the machine, regions included, and must
-//! not be their own id constant (E0012).
+//! State names must be unique across the machine, regions included, and their
+//! id constants must not clash with the variants of the root enum (E0012).
 
 use std::collections::HashMap;
 
@@ -38,9 +38,10 @@ pub fn check_unique_names(tree: &StateTree, diagnostics: &mut Vec<Diagnostic>) {
 }
 
 /// The id constants are associated constants of the root type, so a constant
-/// named like a variant of the root enum (`IO` for a state called `IO`)
-/// would be both at once: reported here instead of as a type error in the
-/// generated code.
+/// named like a variant of the root enum (a state called `PLAYING_ID` next to
+/// `Playing`) would be both at once: reported here instead of as a type error
+/// in the generated code. The `_ID` suffix makes this a corner case only;
+/// names such as `A` or `IO` are fine.
 fn check_constants_against_variants(tree: &StateTree, diagnostics: &mut Vec<Diagnostic>) {
     let root_variants: Vec<(String, &Ident)> = tree
         .root()
@@ -55,20 +56,16 @@ fn check_constants_against_variants(tree: &StateTree, diagnostics: &mut Vec<Diag
         let Some((_, variant)) = root_variants.iter().find(|(name, _)| *name == constant) else {
             continue;
         };
-        let message = if node.name == **variant {
-            format!(
-                "state `{}` is named like its own id constant `{root}::{constant}`",
-                node.name
-            )
-        } else {
-            format!(
-                "the id constant `{root}::{constant}` of state `{}` is also the variant `{variant}`",
-                node.name
-            )
-        };
         diagnostics.push(
-            Diagnostic::new("E0012", node.name.span(), message)
-                .with_help("name states in CamelCase (`Io` instead of `IO`) so that the id constant, in SCREAMING_SNAKE_CASE, is a different name"),
+            Diagnostic::new(
+                "E0012",
+                node.name.span(),
+                format!(
+                    "the id constant `{root}::{constant}` of state `{}` is also the variant `{variant}`",
+                    node.name
+                ),
+            )
+            .with_help("rename the variant: the id constants of the states end in `_ID`"),
         );
     }
 }

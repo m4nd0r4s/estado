@@ -98,7 +98,7 @@ mod helper_path {
     }
 
     fn note_where_we_are<S: ::estado_core::Sink<()>>(cx: &mut Cx<'_, HelperPath, S>) {
-        let on_start = Cx::in_state(cx, HelperPath::START);
+        let on_start = Cx::in_state(cx, HelperPath::START_ID);
         cx.ctx_mut()
             .push(if on_start { "start" } else { "elsewhere" });
     }

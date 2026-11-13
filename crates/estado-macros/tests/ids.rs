@@ -61,14 +61,14 @@ pub use connection::Connection;
 
 #[test]
 fn regions_and_acronym_names_get_constants() {
-    assert_eq!(Connection::DISCONNECTED, StateId::new(0));
-    assert_eq!(Connection::CONNECTING, StateId::new(1));
-    assert_eq!(Connection::CONNECTED, StateId::new(2));
-    assert_eq!(Connection::LINK, StateId::new(3));
-    assert_eq!(Connection::OPEN, StateId::new(4));
-    assert_eq!(Connection::DRAINING, StateId::new(5));
-    assert_eq!(Connection::KEEP_ALIVE, StateId::new(6));
-    assert_eq!(Connection::WAITING_FOR_PING, StateId::new(7));
-    assert_eq!(Connection::PING_SENT, StateId::new(8));
-    assert_eq!(Connection::CLOSED, StateId::new(9));
+    assert_eq!(Connection::DISCONNECTED_ID, StateId::new(0));
+    assert_eq!(Connection::CONNECTING_ID, StateId::new(1));
+    assert_eq!(Connection::CONNECTED_ID, StateId::new(2));
+    assert_eq!(Connection::LINK_ID, StateId::new(3));
+    assert_eq!(Connection::OPEN_ID, StateId::new(4));
+    assert_eq!(Connection::DRAINING_ID, StateId::new(5));
+    assert_eq!(Connection::KEEP_ALIVE_ID, StateId::new(6));
+    assert_eq!(Connection::WAITING_FOR_PING_ID, StateId::new(7));
+    assert_eq!(Connection::PING_SENT_ID, StateId::new(8));
+    assert_eq!(Connection::CLOSED_ID, StateId::new(9));
 }

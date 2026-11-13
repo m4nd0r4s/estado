@@ -303,13 +303,13 @@ fn main() {
 
     machine.send(Event::Pause).unwrap();
     assert_eq!(machine.path().to_string(), "Active/Paused");
-    assert!(machine.is_in(Player::ACTIVE));
-    assert!(machine.is_in(Player::PAUSED));
-    assert!(!machine.is_in(Player::PLAYING));
+    assert!(machine.is_in(Player::ACTIVE_ID));
+    assert!(machine.is_in(Player::PAUSED_ID));
+    assert!(!machine.is_in(Player::PLAYING_ID));
 }
 ```
 
-`path()` renders the active states from the root down, separated by `/`. `machine.is_in(id)` tests one state. Each state has an id constant on the root type, in SCREAMING_SNAKE_CASE: `Player::ACTIVE`, `Player::PLAYING`. Ids follow the tree in pre-order, starting at 0. A root-level state whose name equals its own id constant, such as `IO`, is [E0012](../errors/E0012.md), because the constant would share its name with the variant. Substates are not affected: a substate named `IO` is fine.
+`path()` renders the active states from the root down, separated by `/`. `machine.is_in(id)` tests one state. Each state has an id constant on the root type, in SCREAMING_SNAKE_CASE with the suffix `_ID`: `Player::ACTIVE_ID`, `Player::PLAYING_ID`. Ids follow the tree in pre-order, starting at 0. The suffix keeps the constant apart from the variants, so state names such as `A` or `IO` work.
 
 A struct cannot mix `#[substates]` with `#[region]` fields ([E0013](../errors/E0013.md)). Regions make a parallel state, covered in [Regions](./13-regions.md).
 

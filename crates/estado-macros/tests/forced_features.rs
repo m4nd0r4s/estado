@@ -25,7 +25,7 @@ fn flash<S: Sink<()>>(cx: &mut Cx<'_, lamp::Lamp, S>) {
 }
 
 fn is_on<S: Sink<()>>(cx: &Cx<'_, lamp::Lamp, S>) -> bool {
-    Cx::in_state(cx, lamp::Lamp::ON)
+    Cx::in_state(cx, lamp::Lamp::ON_ID)
 }
 
 #[machine(event = Event, ctx = Vec<String>, raise_cap = 2, tracks_active, allow(W0002))]

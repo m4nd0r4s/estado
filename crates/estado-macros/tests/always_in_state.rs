@@ -69,7 +69,7 @@ mod panel {
         /// Records whether the sibling region's `On` is active.
         #[always(Checking)]
         fn always_checking(cx: &mut Cx<Self>) -> Next<Self> {
-            let light_is_on = cx.in_state(Panel::ON);
+            let light_is_on = cx.in_state(Panel::ON_ID);
             cx.ctx_mut().push(light_is_on);
             goto!(Done)
         }

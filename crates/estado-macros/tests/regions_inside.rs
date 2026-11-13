@@ -157,15 +157,15 @@ fn a_handler_of_a_compound_above_the_parallel_state_sees_what_bubbles_out() {
 #[test]
 fn regions_are_states_of_the_graph() {
     let graph = <Panel as Spec>::GRAPH;
-    for region in [Panel::LIGHT, Panel::SOUND, Panel::SCREEN] {
+    for region in [Panel::LIGHT_ID, Panel::SOUND_ID, Panel::SCREEN_ID] {
         let info = graph.state(region);
         assert_eq!(info.kind, StateKind::Region);
-        assert_eq!(info.parent, Some(Panel::ON));
+        assert_eq!(info.parent, Some(Panel::ON_ID));
     }
-    assert_eq!(graph.state(Panel::ON).kind, StateKind::Parallel);
-    assert_eq!(graph.state(Panel::TOP).parent, Some(Panel::MENU));
-    assert_eq!(graph.state(Panel::MENU).parent, Some(Panel::SCREEN));
-    assert_eq!(graph.state(Panel::LIGHT).initial, Some(Panel::DIM));
+    assert_eq!(graph.state(Panel::ON_ID).kind, StateKind::Parallel);
+    assert_eq!(graph.state(Panel::TOP_ID).parent, Some(Panel::MENU_ID));
+    assert_eq!(graph.state(Panel::MENU_ID).parent, Some(Panel::SCREEN_ID));
+    assert_eq!(graph.state(Panel::LIGHT_ID).initial, Some(Panel::DIM_ID));
     const { assert!(<Panel as Spec>::TRACKS_ACTIVE) };
 }
 

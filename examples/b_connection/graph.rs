@@ -11,85 +11,104 @@ use super::model::{Conn, Keepalive, Link};
 
 impl Conn {
     /// `Disconnected`.
-    pub const DISCONNECTED: StateId = StateId::new(0);
+    pub const DISCONNECTED_ID: StateId = StateId::new(0);
     /// `Connecting`.
-    pub const CONNECTING: StateId = StateId::new(1);
+    pub const CONNECTING_ID: StateId = StateId::new(1);
     /// `Backoff`.
-    pub const BACKOFF: StateId = StateId::new(2);
+    pub const BACKOFF_ID: StateId = StateId::new(2);
     /// `Connected`, the parallel state.
-    pub const CONNECTED: StateId = StateId::new(3);
+    pub const CONNECTED_ID: StateId = StateId::new(3);
     /// Region `link`.
-    pub const LINK: StateId = StateId::new(4);
+    pub const LINK_ID: StateId = StateId::new(4);
     /// `link:Idle`.
-    pub const IDLE: StateId = StateId::new(5);
+    pub const IDLE_ID: StateId = StateId::new(5);
     /// `link:Sending`.
-    pub const SENDING: StateId = StateId::new(6);
+    pub const SENDING_ID: StateId = StateId::new(6);
     /// Region `keepalive`.
-    pub const KEEPALIVE: StateId = StateId::new(7);
+    pub const KEEPALIVE_ID: StateId = StateId::new(7);
     /// `keepalive:Pinging`.
-    pub const PINGING: StateId = StateId::new(8);
+    pub const PINGING_ID: StateId = StateId::new(8);
     /// `keepalive:AwaitingPong`.
-    pub const AWAITING_PONG: StateId = StateId::new(9);
+    pub const AWAITING_PONG_ID: StateId = StateId::new(9);
     /// `keepalive:Dead`.
-    pub const DEAD: StateId = StateId::new(10);
+    pub const DEAD_ID: StateId = StateId::new(10);
 }
 
 static STATES: [StateInfo; 11] = [
     StateInfo::new(
-        Conn::DISCONNECTED,
+        Conn::DISCONNECTED_ID,
         "Disconnected",
         None,
         StateKind::Atomic,
         0,
     ),
-    StateInfo::new(Conn::CONNECTING, "Connecting", None, StateKind::Atomic, 0).with_tasks(1, 1),
-    StateInfo::new(Conn::BACKOFF, "Backoff", None, StateKind::Atomic, 0).with_tasks(1, 0),
-    StateInfo::new(Conn::CONNECTED, "Connected", None, StateKind::Parallel, 0),
     StateInfo::new(
-        Conn::LINK,
+        Conn::CONNECTING_ID,
+        "Connecting",
+        None,
+        StateKind::Atomic,
+        0,
+    )
+    .with_tasks(1, 1),
+    StateInfo::new(Conn::BACKOFF_ID, "Backoff", None, StateKind::Atomic, 0).with_tasks(1, 0),
+    StateInfo::new(
+        Conn::CONNECTED_ID,
+        "Connected",
+        None,
+        StateKind::Parallel,
+        0,
+    ),
+    StateInfo::new(
+        Conn::LINK_ID,
         "link",
-        Some(Conn::CONNECTED),
+        Some(Conn::CONNECTED_ID),
         StateKind::Region,
         1,
     )
-    .with_initial(Conn::IDLE),
-    StateInfo::new(Conn::IDLE, "Idle", Some(Conn::LINK), StateKind::Atomic, 2),
+    .with_initial(Conn::IDLE_ID),
     StateInfo::new(
-        Conn::SENDING,
+        Conn::IDLE_ID,
+        "Idle",
+        Some(Conn::LINK_ID),
+        StateKind::Atomic,
+        2,
+    ),
+    StateInfo::new(
+        Conn::SENDING_ID,
         "Sending",
-        Some(Conn::LINK),
+        Some(Conn::LINK_ID),
         StateKind::Atomic,
         2,
     )
     .with_tasks(0, 1),
     StateInfo::new(
-        Conn::KEEPALIVE,
+        Conn::KEEPALIVE_ID,
         "keepalive",
-        Some(Conn::CONNECTED),
+        Some(Conn::CONNECTED_ID),
         StateKind::Region,
         1,
     )
-    .with_initial(Conn::PINGING),
+    .with_initial(Conn::PINGING_ID),
     StateInfo::new(
-        Conn::PINGING,
+        Conn::PINGING_ID,
         "Pinging",
-        Some(Conn::KEEPALIVE),
+        Some(Conn::KEEPALIVE_ID),
         StateKind::Atomic,
         2,
     )
     .with_tasks(1, 0),
     StateInfo::new(
-        Conn::AWAITING_PONG,
+        Conn::AWAITING_PONG_ID,
         "AwaitingPong",
-        Some(Conn::KEEPALIVE),
+        Some(Conn::KEEPALIVE_ID),
         StateKind::Atomic,
         2,
     )
     .with_tasks(1, 0),
     StateInfo::new(
-        Conn::DEAD,
+        Conn::DEAD_ID,
         "Dead",
-        Some(Conn::KEEPALIVE),
+        Some(Conn::KEEPALIVE_ID),
         StateKind::Atomic,
         2,
     ),
@@ -110,81 +129,86 @@ pub static GRAPH: Graph = Graph {
     states: &STATES,
     edges: &[
         edge(
-            Conn::DISCONNECTED,
-            Conn::CONNECTING,
+            Conn::DISCONNECTED_ID,
+            Conn::CONNECTING_ID,
             EdgeKind::Normal,
             "Event::Connect",
         ),
         edge(
-            Conn::CONNECTING,
-            Conn::CONNECTED,
+            Conn::CONNECTING_ID,
+            Conn::CONNECTED_ID,
             EdgeKind::Normal,
             "Event::Connected",
         ),
         edge(
-            Conn::CONNECTING,
-            Conn::BACKOFF,
+            Conn::CONNECTING_ID,
+            Conn::BACKOFF_ID,
             EdgeKind::Timer,
             "Event::ConnectTimeout",
         ),
         edge(
-            Conn::CONNECTING,
-            Conn::DISCONNECTED,
+            Conn::CONNECTING_ID,
+            Conn::DISCONNECTED_ID,
             EdgeKind::Normal,
             "Event::Disconnect",
         ),
         edge(
-            Conn::CONNECTING,
-            Conn::DISCONNECTED,
+            Conn::CONNECTING_ID,
+            Conn::DISCONNECTED_ID,
             EdgeKind::Timer,
             "Event::ConnectTimeout",
         ),
         edge(
-            Conn::BACKOFF,
-            Conn::CONNECTING,
+            Conn::BACKOFF_ID,
+            Conn::CONNECTING_ID,
             EdgeKind::Timer,
             "Event::Retry",
         ),
         edge(
-            Conn::BACKOFF,
-            Conn::DISCONNECTED,
+            Conn::BACKOFF_ID,
+            Conn::DISCONNECTED_ID,
             EdgeKind::Normal,
             "Event::Disconnect",
         ),
         edge(
-            Conn::CONNECTED,
-            Conn::DISCONNECTED,
+            Conn::CONNECTED_ID,
+            Conn::DISCONNECTED_ID,
             EdgeKind::Normal,
             "Event::Disconnect",
         ),
-        edge(Conn::IDLE, Conn::SENDING, EdgeKind::Normal, "Event::Send"),
         edge(
-            Conn::SENDING,
-            Conn::IDLE,
+            Conn::IDLE_ID,
+            Conn::SENDING_ID,
+            EdgeKind::Normal,
+            "Event::Send",
+        ),
+        edge(
+            Conn::SENDING_ID,
+            Conn::IDLE_ID,
             EdgeKind::Normal,
             "Event::FrameSent",
         ),
         edge(
-            Conn::PINGING,
-            Conn::AWAITING_PONG,
+            Conn::PINGING_ID,
+            Conn::AWAITING_PONG_ID,
             EdgeKind::Timer,
             "Event::PingDue",
         ),
         edge(
-            Conn::AWAITING_PONG,
-            Conn::PINGING,
+            Conn::AWAITING_PONG_ID,
+            Conn::PINGING_ID,
             EdgeKind::Normal,
             "Event::Pong",
         ),
         edge(
-            Conn::AWAITING_PONG,
-            Conn::DEAD,
+            Conn::AWAITING_PONG_ID,
+            Conn::DEAD_ID,
             EdgeKind::Timer,
             "Event::PongTimeout",
         ),
         edge(
-            Conn::DEAD,
-            Conn::BACKOFF,
+            Conn::DEAD_ID,
+            Conn::BACKOFF_ID,
             EdgeKind::Normal,
             "Event::KeepaliveDead",
         ),
@@ -195,8 +219,8 @@ impl Link {
     /// Id of the active leaf of the region.
     pub fn state_id(&self) -> StateId {
         match self {
-            Self::Idle => Conn::IDLE,
-            Self::Sending { .. } => Conn::SENDING,
+            Self::Idle => Conn::IDLE_ID,
+            Self::Sending { .. } => Conn::SENDING_ID,
         }
     }
 }
@@ -205,9 +229,9 @@ impl Keepalive {
     /// Id of the active leaf of the region.
     pub fn state_id(&self) -> StateId {
         match self {
-            Self::Pinging => Conn::PINGING,
-            Self::AwaitingPong => Conn::AWAITING_PONG,
-            Self::Dead => Conn::DEAD,
+            Self::Pinging => Conn::PINGING_ID,
+            Self::AwaitingPong => Conn::AWAITING_PONG_ID,
+            Self::Dead => Conn::DEAD_ID,
         }
     }
 }
@@ -218,14 +242,14 @@ impl Conn {
     pub fn active_path(&self) -> StatePath {
         let mut path = StatePath::new(&GRAPH);
         match self {
-            Self::Disconnected => path.push(Self::DISCONNECTED),
-            Self::Connecting { .. } => path.push(Self::CONNECTING),
-            Self::Backoff { .. } => path.push(Self::BACKOFF),
+            Self::Disconnected => path.push(Self::DISCONNECTED_ID),
+            Self::Connecting { .. } => path.push(Self::CONNECTING_ID),
+            Self::Backoff { .. } => path.push(Self::BACKOFF_ID),
             Self::Connected(connected) => {
-                path.push(Self::CONNECTED);
-                path.push(Self::LINK);
+                path.push(Self::CONNECTED_ID);
+                path.push(Self::LINK_ID);
                 path.push(connected.link.state_id());
-                path.push(Self::KEEPALIVE);
+                path.push(Self::KEEPALIVE_ID);
                 path.push(connected.keepalive.state_id());
             }
         }

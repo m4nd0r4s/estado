@@ -26,11 +26,11 @@ fn entering_a_state_starts_its_timer_and_invoke_in_one_epoch() {
         effects,
         [
             Effect::StartTimer {
-                key: timer(Net::CONNECTING, 1, 0),
+                key: timer(Net::CONNECTING_ID, 1, 0),
                 after: THREE
             },
             Effect::Invoke {
-                key: invoke(Net::CONNECTING, 1, 0),
+                key: invoke(Net::CONNECTING_ID, 1, 0),
                 task: Command::Dial(0)
             },
         ]
@@ -47,8 +47,8 @@ fn leaving_a_state_cancels_its_timer_and_invoke_before_the_next_entries() {
     assert_eq!(
         effects,
         [
-            Effect::CancelTimer(timer(Net::CONNECTING, 1, 0)),
-            Effect::Cancel(invoke(Net::CONNECTING, 1, 0)),
+            Effect::CancelTimer(timer(Net::CONNECTING_ID, 1, 0)),
+            Effect::Cancel(invoke(Net::CONNECTING_ID, 1, 0)),
         ]
     );
 }
@@ -57,15 +57,15 @@ fn leaving_a_state_cancels_its_timer_and_invoke_before_the_next_entries() {
 fn the_duration_is_computed_from_the_data_of_the_state_on_entry() {
     let mut machine = started();
     send(&mut machine, Event::Connect);
-    let effects = fire(&mut machine, timer(Net::CONNECTING, 1, 0)).0;
+    let effects = fire(&mut machine, timer(Net::CONNECTING_ID, 1, 0)).0;
 
     assert_eq!(
         effects,
         [
-            Effect::CancelTimer(timer(Net::CONNECTING, 1, 0)),
-            Effect::Cancel(invoke(Net::CONNECTING, 1, 0)),
+            Effect::CancelTimer(timer(Net::CONNECTING_ID, 1, 0)),
+            Effect::Cancel(invoke(Net::CONNECTING_ID, 1, 0)),
             Effect::StartTimer {
-                key: timer(Net::BACKOFF, 1, 0),
+                key: timer(Net::BACKOFF_ID, 1, 0),
                 after: Duration::from_millis(200)
             },
         ]
@@ -73,10 +73,10 @@ fn the_duration_is_computed_from_the_data_of_the_state_on_entry() {
     assert_eq!(*machine.state(), Net::Backoff { attempt: 1 });
 
     // The next failure waits twice as long.
-    fire(&mut machine, timer(Net::BACKOFF, 1, 0));
-    let effects = fire(&mut machine, timer(Net::CONNECTING, 2, 0)).0;
+    fire(&mut machine, timer(Net::BACKOFF_ID, 1, 0));
+    let effects = fire(&mut machine, timer(Net::CONNECTING_ID, 2, 0)).0;
     assert!(effects.contains(&Effect::StartTimer {
-        key: timer(Net::BACKOFF, 2, 0),
+        key: timer(Net::BACKOFF_ID, 2, 0),
         after: Duration::from_millis(400)
     }));
 }
@@ -85,9 +85,9 @@ fn the_duration_is_computed_from_the_data_of_the_state_on_entry() {
 fn every_entry_gets_a_new_epoch_and_old_keys_are_stale() {
     let mut machine = started();
     send(&mut machine, Event::Connect);
-    let first = timer(Net::CONNECTING, 1, 0);
+    let first = timer(Net::CONNECTING_ID, 1, 0);
     fire(&mut machine, first);
-    fire(&mut machine, timer(Net::BACKOFF, 1, 0));
+    fire(&mut machine, timer(Net::BACKOFF_ID, 1, 0));
     assert_eq!(*machine.state(), Net::Connecting { attempt: 1 });
 
     // `Connecting` was entered again: the key of its first instance is stale
@@ -97,7 +97,7 @@ fn every_entry_gets_a_new_epoch_and_old_keys_are_stale() {
     assert_eq!(ignored, Some(IgnoreReason::Stale));
     assert_eq!(*machine.state(), Net::Connecting { attempt: 1 });
 
-    let (_, ignored) = fire(&mut machine, timer(Net::CONNECTING, 2, 0));
+    let (_, ignored) = fire(&mut machine, timer(Net::CONNECTING_ID, 2, 0));
     assert_eq!(ignored, None);
     assert_eq!(*machine.state(), Net::Backoff { attempt: 2 });
 }
@@ -105,7 +105,7 @@ fn every_entry_gets_a_new_epoch_and_old_keys_are_stale() {
 #[test]
 fn a_key_of_a_state_that_is_not_active_is_stale() {
     let mut machine = started();
-    let (_, ignored) = fire(&mut machine, timer(Net::CONNECTING, 1, 0));
+    let (_, ignored) = fire(&mut machine, timer(Net::CONNECTING_ID, 1, 0));
     assert_eq!(ignored, Some(IgnoreReason::Stale));
     assert_eq!(*machine.state(), Net::Idle);
 }
@@ -117,7 +117,7 @@ fn an_invoke_result_is_accepted_only_for_the_active_instance() {
 
     let (_, ignored) = complete(
         &mut machine,
-        invoke(Net::CONNECTING, 7, 0),
+        invoke(Net::CONNECTING_ID, 7, 0),
         Event::Connected(1),
     );
     assert_eq!(ignored, Some(IgnoreReason::Stale));
@@ -125,7 +125,7 @@ fn an_invoke_result_is_accepted_only_for_the_active_instance() {
 
     let (effects, ignored) = complete(
         &mut machine,
-        invoke(Net::CONNECTING, 1, 0),
+        invoke(Net::CONNECTING_ID, 1, 0),
         Event::Connected(5),
     );
     assert_eq!(ignored, None);
@@ -134,14 +134,14 @@ fn an_invoke_result_is_accepted_only_for_the_active_instance() {
     assert_eq!(
         effects,
         [
-            Effect::CancelTimer(timer(Net::CONNECTING, 1, 0)),
-            Effect::Cancel(invoke(Net::CONNECTING, 1, 0)),
+            Effect::CancelTimer(timer(Net::CONNECTING_ID, 1, 0)),
+            Effect::Cancel(invoke(Net::CONNECTING_ID, 1, 0)),
             Effect::StartTimer {
-                key: timer(Net::ONLINE, 1, 0),
+                key: timer(Net::ONLINE_ID, 1, 0),
                 after: Duration::from_secs(10)
             },
             Effect::Invoke {
-                key: invoke(Net::ONLINE, 1, 0),
+                key: invoke(Net::ONLINE_ID, 1, 0),
                 task: Command::Probe(5)
             },
         ]
@@ -154,14 +154,14 @@ fn the_event_of_a_timer_is_built_from_the_data_when_it_fires() {
     send(&mut machine, Event::Connect);
     complete(
         &mut machine,
-        invoke(Net::CONNECTING, 1, 0),
+        invoke(Net::CONNECTING_ID, 1, 0),
         Event::Connected(5),
     );
     send(&mut machine, Event::Add(4));
 
     // `Expired(online.count)`: the data changed after the timer started, and
     // the handler echoes what it received.
-    let (_, ignored) = fire(&mut machine, timer(Net::ONLINE, 1, 0));
+    let (_, ignored) = fire(&mut machine, timer(Net::ONLINE_ID, 1, 0));
     assert_eq!(ignored, None);
     assert_eq!(*machine.state(), Net::Online(Online { count: 1009 }));
 }
@@ -174,29 +174,29 @@ fn a_state_may_have_several_timers_told_apart_by_index() {
         effects,
         [
             Effect::StartTimer {
-                key: timer(Net::TICKING, 1, 0),
+                key: timer(Net::TICKING_ID, 1, 0),
                 after: Duration::from_secs(1)
             },
             Effect::StartTimer {
-                key: timer(Net::TICKING, 1, 1),
+                key: timer(Net::TICKING_ID, 1, 1),
                 after: Duration::from_millis(250)
             },
         ]
     );
     // Each key builds its own event: index 1 is the fast tick, which leaves.
-    let (effects, ignored) = fire(&mut machine, timer(Net::TICKING, 1, 1));
+    let (effects, ignored) = fire(&mut machine, timer(Net::TICKING_ID, 1, 1));
     assert_eq!(ignored, None);
     assert_eq!(*machine.state(), Net::Idle);
     assert_eq!(
         effects,
         [
-            Effect::CancelTimer(timer(Net::TICKING, 1, 0)),
-            Effect::CancelTimer(timer(Net::TICKING, 1, 1)),
+            Effect::CancelTimer(timer(Net::TICKING_ID, 1, 0)),
+            Effect::CancelTimer(timer(Net::TICKING_ID, 1, 1)),
         ]
     );
     // There is no timer 2.
     send(&mut machine, Event::SlowTick);
-    let (_, ignored) = fire(&mut machine, timer(Net::TICKING, 2, 2));
+    let (_, ignored) = fire(&mut machine, timer(Net::TICKING_ID, 2, 2));
     assert_eq!(ignored, Some(IgnoreReason::Stale));
 }
 
@@ -209,7 +209,7 @@ fn a_compound_state_and_its_substate_have_timers_of_their_own() {
     assert_eq!(
         effects,
         [Effect::StartTimer {
-            key: timer(Net::SESSION, 1, 0),
+            key: timer(Net::SESSION_ID, 1, 0),
             after: Duration::from_secs(30)
         }]
     );
@@ -219,7 +219,7 @@ fn a_compound_state_and_its_substate_have_timers_of_their_own() {
     assert_eq!(
         effects,
         [Effect::StartTimer {
-            key: timer(Net::PAUSED, 1, 0),
+            key: timer(Net::PAUSED_ID, 1, 0),
             after: Duration::from_secs(60)
         }]
     );
@@ -229,8 +229,8 @@ fn a_compound_state_and_its_substate_have_timers_of_their_own() {
     assert_eq!(
         effects,
         [
-            Effect::CancelTimer(timer(Net::PAUSED, 1, 0)),
-            Effect::CancelTimer(timer(Net::SESSION, 1, 0)),
+            Effect::CancelTimer(timer(Net::PAUSED_ID, 1, 0)),
+            Effect::CancelTimer(timer(Net::SESSION_ID, 1, 0)),
         ]
     );
 }
@@ -238,10 +238,10 @@ fn a_compound_state_and_its_substate_have_timers_of_their_own() {
 #[test]
 fn the_graph_counts_the_timers_and_invokes_of_each_state() {
     let graph = <Net as Spec>::GRAPH;
-    assert_eq!(graph.state(Net::CONNECTING).timers, 1);
-    assert_eq!(graph.state(Net::CONNECTING).invokes, 1);
-    assert_eq!(graph.state(Net::TICKING).timers, 2);
-    assert_eq!(graph.state(Net::IDLE).timers, 0);
+    assert_eq!(graph.state(Net::CONNECTING_ID).timers, 1);
+    assert_eq!(graph.state(Net::CONNECTING_ID).invokes, 1);
+    assert_eq!(graph.state(Net::TICKING_ID).timers, 2);
+    assert_eq!(graph.state(Net::IDLE_ID).timers, 0);
 }
 
 #[machine(event = Event, effect = Command)]
@@ -288,7 +288,7 @@ fn the_initial_entry_starts_the_timers_of_the_initial_state() {
     assert_eq!(
         effects,
         [Effect::StartTimer {
-            key: timer(clock::Clock::RUNNING, 1, 0),
+            key: timer(clock::Clock::RUNNING_ID, 1, 0),
             after: Duration::from_secs(1)
         }]
     );

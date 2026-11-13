@@ -75,7 +75,7 @@ pub fn enter_function(tree: &StateTree, owner: StateId) -> Ident {
     children_function("enter", tree, owner)
 }
 
-/// `Root::PLAYING`: the id constant of a state.
+/// `Root::PLAYING_ID`: the id constant of a state.
 pub fn state_constant(generation: &Generation<'_>, node: StateId) -> TokenStream {
     let root = generation.root;
     let constant = format_ident!("{}", state_constant_name(&generation.tree.node(node).name));

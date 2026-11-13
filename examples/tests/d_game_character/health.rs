@@ -30,11 +30,11 @@ fn non_fatal_damage_does_not_disturb_a_running_reload() {
     let mut harness = started();
     fire_once(&mut harness);
     harness.send(Event::ReloadRequest);
-    let reload = timer_of(&harness, Character::RELOADING);
+    let reload = timer_of(&harness, Character::RELOADING_ID);
 
     harness.send(Event::Damage(99));
     assert_eq!(alive(&harness).health, 1);
-    assert_eq!(timer_of(&harness, Character::RELOADING), reload);
+    assert_eq!(timer_of(&harness, Character::RELOADING_ID), reload);
     harness.advance(RELOAD_TIME);
     assert_eq!(alive(&harness).ammo, 6);
 }

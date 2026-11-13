@@ -281,7 +281,7 @@ pub mod conn {
         fn on_idle(cx: &mut Cx<Self>, event: &Event) -> Next<Self> {
             note(cx, "handler Idle");
             match event {
-                Event::Send(_) if cx.in_state(Self::AWAITING_PONG) => {
+                Event::Send(_) if cx.in_state(Self::AWAITING_PONG_ID) => {
                     note(cx, "link refuses to send while keepalive awaits the pong");
                     defer!()
                 }

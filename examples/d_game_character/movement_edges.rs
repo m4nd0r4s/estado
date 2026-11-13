@@ -19,8 +19,11 @@ pub enum StandingEdges {
 }
 
 impl Edge<Character> for StandingEdges {
-    const TARGETS: &'static [StateId] =
-        &[Character::WALKING, Character::JUMPING, Character::CROUCHING];
+    const TARGETS: &'static [StateId] = &[
+        Character::WALKING_ID,
+        Character::JUMPING_ID,
+        Character::CROUCHING_ID,
+    ];
 
     fn apply<S: Sink<Command>>(
         self,
@@ -49,9 +52,9 @@ pub enum WalkingEdges {
 
 impl Edge<Character> for WalkingEdges {
     const TARGETS: &'static [StateId] = &[
-        Character::STANDING,
-        Character::JUMPING,
-        Character::CROUCHING,
+        Character::STANDING_ID,
+        Character::JUMPING_ID,
+        Character::CROUCHING_ID,
     ];
 
     fn apply<S: Sink<Command>>(
@@ -76,7 +79,7 @@ pub enum JumpingEdges {
 }
 
 impl Edge<Character> for JumpingEdges {
-    const TARGETS: &'static [StateId] = &[Character::STANDING];
+    const TARGETS: &'static [StateId] = &[Character::STANDING_ID];
 
     fn apply<S: Sink<Command>>(
         self,
@@ -97,7 +100,7 @@ pub enum CrouchingEdges {
 }
 
 impl Edge<Character> for CrouchingEdges {
-    const TARGETS: &'static [StateId] = &[Character::STANDING];
+    const TARGETS: &'static [StateId] = &[Character::STANDING_ID];
 
     fn apply<S: Sink<Command>>(
         self,

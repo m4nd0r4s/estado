@@ -128,7 +128,7 @@ pub mod connection {
         /// Defers.
         #[on(Open)]
         fn open(cx: &mut Cx<Self>, _event: &Ev) -> Next<Self> {
-            if cx.in_state(Connection::OPEN) {
+            if cx.in_state(Connection::OPEN_ID) {
                 defer!()
             } else {
                 stay!()

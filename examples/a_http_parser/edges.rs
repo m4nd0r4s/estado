@@ -69,7 +69,7 @@ pub enum MethodEdges {
 }
 
 impl Edge<HttpParser> for MethodEdges {
-    const TARGETS: &'static [StateId] = &[HttpParser::TARGET, HttpParser::ERROR];
+    const TARGETS: &'static [StateId] = &[HttpParser::TARGET_ID, HttpParser::ERROR_ID];
 
     #[inline]
     fn apply<S: Sink<()>>(self, slot: &mut Slot<HttpParser>, cx: &mut ParserCx<'_, S>) -> bool {
@@ -90,7 +90,7 @@ pub enum TargetEdges {
 }
 
 impl Edge<HttpParser> for TargetEdges {
-    const TARGETS: &'static [StateId] = &[HttpParser::VERSION, HttpParser::ERROR];
+    const TARGETS: &'static [StateId] = &[HttpParser::VERSION_ID, HttpParser::ERROR_ID];
 
     #[inline]
     fn apply<S: Sink<()>>(self, slot: &mut Slot<HttpParser>, cx: &mut ParserCx<'_, S>) -> bool {
@@ -113,7 +113,7 @@ pub enum VersionEdges {
 }
 
 impl Edge<HttpParser> for VersionEdges {
-    const TARGETS: &'static [StateId] = &[HttpParser::HEADERS, HttpParser::ERROR];
+    const TARGETS: &'static [StateId] = &[HttpParser::HEADERS_ID, HttpParser::ERROR_ID];
 
     #[inline]
     fn apply<S: Sink<()>>(self, slot: &mut Slot<HttpParser>, cx: &mut ParserCx<'_, S>) -> bool {
@@ -135,7 +135,7 @@ pub enum RequestLineEdges {
 }
 
 impl Edge<HttpParser> for RequestLineEdges {
-    const TARGETS: &'static [StateId] = &[HttpParser::ERROR];
+    const TARGETS: &'static [StateId] = &[HttpParser::ERROR_ID];
 
     #[inline]
     fn apply<S: Sink<()>>(self, slot: &mut Slot<HttpParser>, cx: &mut ParserCx<'_, S>) -> bool {
@@ -155,7 +155,7 @@ pub enum LineStartEdges {
 }
 
 impl Edge<HttpParser> for LineStartEdges {
-    const TARGETS: &'static [StateId] = &[HttpParser::NAME, HttpParser::BLOCK_LF];
+    const TARGETS: &'static [StateId] = &[HttpParser::NAME_ID, HttpParser::BLOCK_LF_ID];
 
     #[inline]
     fn apply<S: Sink<()>>(self, slot: &mut Slot<HttpParser>, _: &mut ParserCx<'_, S>) -> bool {
@@ -174,7 +174,7 @@ pub enum NameEdges {
 }
 
 impl Edge<HttpParser> for NameEdges {
-    const TARGETS: &'static [StateId] = &[HttpParser::VALUE];
+    const TARGETS: &'static [StateId] = &[HttpParser::VALUE_ID];
 
     #[inline]
     fn apply<S: Sink<()>>(self, slot: &mut Slot<HttpParser>, _: &mut ParserCx<'_, S>) -> bool {
@@ -194,7 +194,7 @@ pub enum ValueEdges {
 }
 
 impl Edge<HttpParser> for ValueEdges {
-    const TARGETS: &'static [StateId] = &[HttpParser::VALUE_LF, HttpParser::ERROR];
+    const TARGETS: &'static [StateId] = &[HttpParser::VALUE_LF_ID, HttpParser::ERROR_ID];
 
     #[inline]
     fn apply<S: Sink<()>>(self, slot: &mut Slot<HttpParser>, cx: &mut ParserCx<'_, S>) -> bool {
@@ -213,7 +213,7 @@ pub enum ValueLfEdges {
 }
 
 impl Edge<HttpParser> for ValueLfEdges {
-    const TARGETS: &'static [StateId] = &[HttpParser::LINE_START];
+    const TARGETS: &'static [StateId] = &[HttpParser::LINE_START_ID];
 
     #[inline]
     fn apply<S: Sink<()>>(self, slot: &mut Slot<HttpParser>, _: &mut ParserCx<'_, S>) -> bool {
@@ -233,7 +233,7 @@ pub enum BlockLfEdges {
 }
 
 impl Edge<HttpParser> for BlockLfEdges {
-    const TARGETS: &'static [StateId] = &[HttpParser::BODY, HttpParser::REQUEST_LINE];
+    const TARGETS: &'static [StateId] = &[HttpParser::BODY_ID, HttpParser::REQUEST_LINE_ID];
 
     #[inline]
     fn apply<S: Sink<()>>(self, slot: &mut Slot<HttpParser>, cx: &mut ParserCx<'_, S>) -> bool {
@@ -255,7 +255,7 @@ pub enum HeadersEdges {
 }
 
 impl Edge<HttpParser> for HeadersEdges {
-    const TARGETS: &'static [StateId] = &[HttpParser::ERROR];
+    const TARGETS: &'static [StateId] = &[HttpParser::ERROR_ID];
 
     #[inline]
     fn apply<S: Sink<()>>(self, slot: &mut Slot<HttpParser>, cx: &mut ParserCx<'_, S>) -> bool {
@@ -273,7 +273,7 @@ pub enum BodyEdges {
 }
 
 impl Edge<HttpParser> for BodyEdges {
-    const TARGETS: &'static [StateId] = &[HttpParser::REQUEST_LINE];
+    const TARGETS: &'static [StateId] = &[HttpParser::REQUEST_LINE_ID];
 
     #[inline]
     fn apply<S: Sink<()>>(self, slot: &mut Slot<HttpParser>, cx: &mut ParserCx<'_, S>) -> bool {

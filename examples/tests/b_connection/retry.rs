@@ -37,7 +37,7 @@ fn a_connect_timeout_backs_off_and_the_retry_dials_again() {
     // `Connecting` left: its timer and its dial are cancelled; the backoff
     // timer is the only pending one.
     assert!(harness.pending_invokes().is_empty());
-    assert_eq!(only_timer(&harness).state, Conn::BACKOFF);
+    assert_eq!(only_timer(&harness).state, Conn::BACKOFF_ID);
     assert_eq!(
         harness.pending_timers()[0].deadline,
         CONNECT_TIMEOUT + 100.millis()
