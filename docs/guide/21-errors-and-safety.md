@@ -10,7 +10,7 @@ This page covers what can go wrong while a machine runs, and how `estado` keeps 
 | --- | --- | --- |
 | `Unhandled(event)` | No state handled the event and the policy is `error`. The event is given back. The configuration is unchanged. Data the handler changed before it answered stays changed. | no |
 | `DeferOverflow(event)` | The defer queue is full under `defer_overflow = error`. The event that did not fit is given back. A raised or redelivered event can overflow it after transitions already ran, and those stay applied. | no |
-| `EffectOverflow` | The sink you passed has no room for an effect. The transition is kept, the refused effect is lost and the rest of the step is cut short. Raised events that are still queued run on the next `send`. During a start it poisons the machine. | no, except during a start |
+| `EffectOverflow` | The sink you passed has no room for an effect. The step stops half-way: the refused effect is lost and the rest of the step never runs. | **yes** |
 | `RaiseOverflow` | The raise queue is full. A modelling bug. | **yes** |
 | `Livelock { microsteps, last }` | A run took more than `max_microsteps` microsteps. | **yes** |
 | `Poisoned` | An earlier panic or fatal error left the machine unusable. | already poisoned |
@@ -75,7 +75,7 @@ fn main() {
 
 ## Poisoning
 
-During the middle of a transition (after the old state left, before the new one is written) the machine holds no valid state. If a panic unwinds through that window, from a handler, an entry, an exit or a constructor, the machine stays **poisoned**. The same holds for a panic anywhere else while `send`, `start`, `fire` or `complete` processes an event. That includes the event expression of an `#[after]` timer, which `fire` evaluates when the timer fires. Every later `send` returns `Err(SendError::Poisoned)`. The same happens after `RaiseOverflow`, after a `Livelock`, and after any error while the machine starts.
+During the middle of a transition (after the old state left, before the new one is written) the machine holds no valid state. If a panic unwinds through that window, from a handler, an entry, an exit or a constructor, the machine stays **poisoned**. The same holds for a panic anywhere else while `send`, `start`, `fire` or `complete` processes an event. That includes the event expression of an `#[after]` timer, which `fire` evaluates when the timer fires. Every later `send` returns `Err(SendError::Poisoned)`. The same happens after `RaiseOverflow`, after `EffectOverflow`, after a `Livelock`, and after any error while the machine starts.
 
 On a poisoned machine:
 
@@ -208,7 +208,7 @@ The macro cannot see every loop. If your machine can loop by design, such as a p
 
 ## Effect overflow
 
-`send` collects effects in an `InlineEffects` buffer. With the `alloc` feature (on by default through `std`), it spills to the heap and never overflows. Without `alloc`, a buffer of `fx_inline` slots can fill up, and the effect that does not fit makes `send` return `Err(SendError::EffectOverflow)`.
+`send` collects effects in an `InlineEffects` buffer. With the `alloc` feature (on by default through `std`), it spills to the heap and never overflows. Without `alloc`, a buffer of `fx_inline` slots can fill up, and the effect that does not fit makes `send` return `Err(SendError::EffectOverflow)`. The step has already half run by then, so the machine is poisoned: size `fx_inline` for the largest burst of one step.
 
 You can meet the same error with a sink of your own that reports `Overflow`. See [Sinks and drivers](./12-sinks-and-drivers.md).
 
@@ -275,9 +275,10 @@ fn main() {
 
     let error = machine.send_into(Event::Burst, &mut sink).unwrap_err();
     assert_eq!(error, SendError::EffectOverflow);
-    assert_eq!(error.to_string(), "the effect buffer is full");
-    // The first effect did arrive.
+    assert_eq!(error.to_string(), "the effect buffer is full; the machine is poisoned");
+    // The first effect did arrive; the machine is poisoned.
     assert_eq!(sink.0, Some(Effect::User(Command::Beep)));
+    assert!(machine.is_poisoned());
 }
 ```
 

@@ -83,7 +83,7 @@ fn main() {
 
 ## Writing a sink
 
-A sink is one method: `push(&mut self, effect: Effect<Command>) -> Result<(), Overflow>`. Return `Err(Overflow)` when you have no room, and `send` reports `SendError::EffectOverflow`.
+A sink is one method: `push(&mut self, effect: Effect<Command>) -> Result<(), Overflow>`. Return `Err(Overflow)` when you have no room, and `send` reports `SendError::EffectOverflow` and poisons the machine.
 
 A sink of your own can sort effects as they arrive. This one files user commands, timers and tasks into separate lists. It is also a good way to see all four `_into` methods side by side: `start_into`, `send_into`, `fire_into` and `complete_into`.
 

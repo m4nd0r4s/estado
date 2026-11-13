@@ -242,7 +242,7 @@ An **effect** is something the machine asks its runtime to do. There are five ki
 
 `Command` is the type you name with `effect = ...`. Without it, it is `()`. [Timers](./15-timers.md) and [Tasks](./16-tasks.md) explain the last four.
 
-`send` collects the effects of a whole run in `step.effects`, in the order the machine produced them. That value is an `InlineEffects`. It stores up to `fx_inline` effects (default 4) without allocating, then spills to the heap when the `alloc` feature is on. Without `alloc`, an effect that does not fit makes `send` return `SendError::EffectOverflow`.
+`send` collects the effects of a whole run in `step.effects`, in the order the machine produced them. That value is an `InlineEffects`. It stores up to `fx_inline` effects (default 4) without allocating, then spills to the heap when the `alloc` feature is on. Without `alloc`, an effect that does not fit makes `send` return `SendError::EffectOverflow` and poisons the machine.
 
 ```rust
 use estado::prelude::*;

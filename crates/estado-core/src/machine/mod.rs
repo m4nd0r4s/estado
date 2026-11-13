@@ -417,8 +417,15 @@ impl<M: Spec> Machine<M> {
 }
 
 /// Ends a failed step: poisons for a fatal error, otherwise leaves the state.
+///
+/// A fault found while a step runs (a full raise queue, a full effect sink, a
+/// livelock) stops the step half-way, after transitions ran and effects went
+/// out, so none of them leaves a configuration to resume from (ADR 0014).
 fn settle_error<M, Event>(guard: PoisonGuard<'_, M>, error: SendError<Event>) -> SendError<Event> {
-    let poisons = matches!(error, SendError::RaiseOverflow | SendError::Livelock { .. });
+    let poisons = matches!(
+        error,
+        SendError::RaiseOverflow | SendError::EffectOverflow | SendError::Livelock { .. }
+    );
     if poisons {
         drop(guard);
     } else {

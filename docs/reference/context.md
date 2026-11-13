@@ -32,7 +32,7 @@ The global context is the value you passed to `Machine::new(ctx)`, of the type g
 
 `emit(command)` pushes `Effect::User(command)` to the sink, after the effects that came before it. `Step::effects` and the sink you passed to `send_into` receive it. The type is the `effect` option.
 
-If the sink refuses it ([`Overflow`](effects.md#sink)), the step reports `SendError::EffectOverflow` when the microstep ends. See [errors](errors.md#senderror).
+If the sink refuses it ([`Overflow`](effects.md#sink)), the step reports `SendError::EffectOverflow` when the microstep ends, and the machine is poisoned. See [errors](errors.md#senderror).
 
 ### raise
 

@@ -53,7 +53,7 @@ pub trait Sink<Command> {
 pub struct Overflow;
 ```
 
-`push` returns `Err(Overflow)` when there is no room. The step then ends with `SendError::EffectOverflow` (see [errors](errors.md#senderror)).
+`push` returns `Err(Overflow)` when there is no room. The step then ends with `SendError::EffectOverflow` and the machine is poisoned (see [errors](errors.md#senderror)).
 
 | Sink | Behavior |
 | --- | --- |

@@ -21,7 +21,16 @@ pub enum SendError<Event> {
     DeferOverflow(Event),
     /// The internal queue overflowed; the machine is poisoned.
     RaiseOverflow,
-    /// The effect sink is full.
+    /// The effect sink refused an effect; the machine is poisoned.
+    ///
+    /// The microstep that emitted the effect had already run: its transition
+    /// is applied, the refused effect is lost, and the rest of the step
+    /// (raised events, `#[always]`, redelivery) never runs. Effects such as
+    /// timers and tasks are how the machine tells the driver what to start and
+    /// cancel, so a lost one leaves the driver out of step with the machine.
+    /// That is why every `EffectOverflow` poisons, during a `start` and during
+    /// a `send` alike. Size `fx_inline` for the largest burst, or use a sink
+    /// that cannot overflow.
     EffectOverflow,
     /// More than `max_microsteps` microsteps; the machine is poisoned.
     Livelock {
@@ -43,7 +52,9 @@ impl<Event> fmt::Display for SendError<Event> {
             Self::RaiseOverflow => {
                 formatter.write_str("the internal event queue overflowed; the machine is poisoned")
             }
-            Self::EffectOverflow => formatter.write_str("the effect buffer is full"),
+            Self::EffectOverflow => {
+                formatter.write_str("the effect buffer is full; the machine is poisoned")
+            }
             Self::Livelock { microsteps, last } => write!(
                 formatter,
                 "livelock: {microsteps} microsteps without settling, last in {last}; the machine is poisoned"
