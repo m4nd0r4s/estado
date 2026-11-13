@@ -2,6 +2,8 @@
 
 Hierarchical statecharts for Rust: handlers in idiomatic Rust, an exact static graph and an optional typestate mode, at zero cost when a feature is not used.
 
+Documentation: **[m4nd0r4s.github.io/estado](https://m4nd0r4s.github.io/estado/)**: a guide that walks through every feature, the API reference and the error index.
+
 > Status: v0 in development (milestone M3 of [`docs/spec.md`](docs/spec.md)). The macro, the core and the test harness work; graph export, runtimes, persistence and typestate come in M4-M6. Expect breaking changes.
 
 ## Quick start
