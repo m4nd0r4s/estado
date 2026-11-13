@@ -9,7 +9,7 @@ repository.workspace = true
 publish = false
 
 [dependencies]
-estado = { path = "../estado" }
+estado = { path = "../../crates/estado" }
 
 [lints]
 workspace = true
