@@ -35,3 +35,4 @@ Spec: affected section(s)
 | [0015](0015-in-state-without-tracking-panics.md) | `cx.in_state` on an untracked machine panics |
 | [0016](0016-initial-with-context.md) | `#[initial(with = f)]` takes the `Cx` and the parent fields |
 | [0017](0017-bm-01-revised-target.md) | BM-01: a dedicated batch loop, and a revised target for a one-event-per-byte machine |
+| [0018](0018-graph-export.md) | Graph export: formats, snapshots and the JSON schema |
