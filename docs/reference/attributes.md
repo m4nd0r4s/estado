@@ -473,6 +473,8 @@ The closure parameter is a shared reference to the data of the state:
 | A struct-like or tuple variant | `&<Variant>Ref`, with a shared reference for each field (`*state.attempt`) |
 | A unit variant | `&()` |
 
+`<Variant>Ref` is a generated struct that lives next to the state type, in the machine module, with the visibility of the enum that owns the variant. It exists for a struct-like or tuple variant that has `#[after]` or `#[invoke]`, and it is documented like any other item. Its fields are `pub` shared references: named fields for a struct-like variant (`state.attempt`), `.0`, `.1` for a tuple variant. You rarely name the type, since the closure parameter is inferred; write it when you annotate the parameter or pass the view to a helper (`fn delay(state: &BackoffRef<'_>) -> Duration`). The same view is the parameter of the closures of [`#[invoke]`](#invoke).
+
 **Rules**
 
 - The duration is computed when the state is entered, and a `StartTimer` effect is emitted. The event is built when the timer fires, from the data the state has then.

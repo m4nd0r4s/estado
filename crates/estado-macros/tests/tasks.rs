@@ -293,3 +293,15 @@ fn the_initial_entry_starts_the_timers_of_the_initial_state() {
         }]
     );
 }
+
+/// A closure of `#[after]` can be written over the generated `<Variant>Ref`
+/// view: the type is public and named by the machine module.
+#[test]
+fn the_ref_view_of_a_variant_can_be_named_by_user_code() {
+    fn doubled(state: &net_machine::net::BackoffRef<'_>) -> Duration {
+        Duration::from_millis(u64::from(*state.attempt) * 2)
+    }
+    let attempt = 4u8;
+    let view = net_machine::net::BackoffRef { attempt: &attempt };
+    assert_eq!(doubled(&view), Duration::from_millis(8));
+}

@@ -34,7 +34,7 @@ pub type Fx = Effect<Command>;
 // `Session` (`Expired`) fire events no handler matches, so the tests can
 // observe an unhandled timer event.
 #[machine(event = Event, effect = Command, allow(W0005))]
-mod net {
+pub mod net {
     use super::*;
 
     #[root]

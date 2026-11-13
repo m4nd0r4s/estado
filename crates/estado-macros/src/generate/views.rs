@@ -178,7 +178,9 @@ fn ref_view(generation: &Generation<'_>, node: StateId, fields: &[Field]) -> Tok
     let visibility = enum_visibility(generation, node);
     let variant = &tree.node(node).name;
     let documentation = format!(
-        "Shared view of the variant `{variant}`, for the closures of its `#[after]` and `#[invoke]`."
+        "Shared view of the variant `{variant}`: a `&` to each of its fields.\n\n\
+         The closures of the `#[after]` and `#[invoke]` of `{variant}` receive it as `&{view}<'_>`, \
+         because they run from a shared borrow of the state."
     );
     let types: Vec<_> = fields.iter().map(|field| &field.ty).collect();
     if matches!(tree.node(node).payload, Payload::Struct(_)) {
@@ -192,13 +194,11 @@ fn ref_view(generation: &Generation<'_>, node: StateId, fields: &[Field]) -> Tok
             .collect();
         quote! {
             #[doc = #documentation]
-            #[doc(hidden)]
             #visibility struct #view<'a> { #( #[doc = #docs] pub #names: &'a #types, )* }
         }
     } else {
         quote! {
             #[doc = #documentation]
-            #[doc(hidden)]
             #visibility struct #view<'a>( #( pub &'a #types, )* );
         }
     }

@@ -49,12 +49,14 @@ fn timed_machine() -> String {
 }
 
 #[test]
-fn the_shared_view_of_a_timed_variant_is_hidden_from_the_docs() {
+fn the_shared_view_of_a_timed_variant_is_visible_in_the_docs() {
     let output = timed_machine();
     let at = output.find("struct BackoffRef").expect("the view exists");
+    let before = &output[..at];
+    let declaration_start = before.rfind("# [doc =").expect("the view is documented");
     assert!(
-        output[..at].ends_with("# [doc (hidden)] pub struct BackoffRef")
-            || output[..at].trim_end().ends_with("# [doc (hidden)] pub")
+        !before[declaration_start..].contains("doc (hidden)"),
+        "users write closures over the view"
     );
 }
 
