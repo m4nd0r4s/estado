@@ -9,7 +9,7 @@ This page covers what can go wrong while a machine runs, and how `estado` keeps 
 | Variant | Meaning | Poisons the machine? |
 | --- | --- | --- |
 | `Unhandled(event)` | No state handled the event and the policy is `error`. The event is given back. The configuration is unchanged. Data the handler changed before it answered stays changed. | no |
-| `DeferOverflow(event)` | The defer queue is full under `defer_overflow = error`. The event that did not fit is given back. A raised or redelivered event can overflow it after transitions already ran, and those stay applied. | no |
+| `DeferOverflow(event)` | The defer queue is full under `defer_overflow = error`. The event that did not fit is given back. If it is the event you sent, nothing ran and the machine is unchanged. If it is a raised or redelivered event, transitions of the step already ran and the step is cut half-way. | **only for a raised or redelivered event** |
 | `EffectOverflow` | The sink you passed has no room for an effect. The step stops half-way: the refused effect is lost and the rest of the step never runs. | **yes** |
 | `RaiseOverflow` | The raise queue is full. A modelling bug. | **yes** |
 | `Livelock { microsteps, last }` | A run took more than `max_microsteps` microsteps. | **yes** |
@@ -75,7 +75,7 @@ fn main() {
 
 ## Poisoning
 
-During the middle of a transition (after the old state left, before the new one is written) the machine holds no valid state. If a panic unwinds through that window, from a handler, an entry, an exit or a constructor, the machine stays **poisoned**. The same holds for a panic anywhere else while `send`, `start`, `fire` or `complete` processes an event. That includes the event expression of an `#[after]` timer, which `fire` evaluates when the timer fires. Every later `send` returns `Err(SendError::Poisoned)`. The same happens after `RaiseOverflow`, after `EffectOverflow`, after a `Livelock`, and after any error while the machine starts.
+During the middle of a transition (after the old state left, before the new one is written) the machine holds no valid state. If a panic unwinds through that window, from a handler, an entry, an exit or a constructor, the machine stays **poisoned**. The same holds for a panic anywhere else while `send`, `start`, `fire` or `complete` processes an event. That includes the event expression of an `#[after]` timer, which `fire` evaluates when the timer fires. Every later `send` returns `Err(SendError::Poisoned)`. The same happens after `RaiseOverflow`, after `EffectOverflow`, after a `Livelock`, after a `DeferOverflow` of a raised or redelivered event, and after any error while the machine starts.
 
 On a poisoned machine:
 

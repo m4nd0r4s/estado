@@ -420,7 +420,10 @@ impl<M: Spec> Machine<M> {
 ///
 /// A fault found while a step runs (a full raise queue, a full effect sink, a
 /// livelock) stops the step half-way, after transitions ran and effects went
-/// out, so none of them leaves a configuration to resume from (ADR 0014).
+/// out, so none of them leaves a configuration to resume from (ADR 0014). A
+/// `DeferOverflow` of the external event refused it before anything ran and
+/// does not poison; one of a raised or requeued event does, and `drain`
+/// poisons the slot itself before it gets here.
 fn settle_error<M, Event>(guard: PoisonGuard<'_, M>, error: SendError<Event>) -> SendError<Event> {
     let poisons = matches!(
         error,
@@ -532,6 +535,22 @@ fn defer<M: Spec>(runtime: &mut M::Runtime, event: M::Event) -> Result<(), SendE
     }
 }
 
+/// A `DeferOverflow` of a raised or requeued event comes after the microsteps
+/// that raised or requeued it, which already ran and sent their effects: the
+/// step is cut half-way, so it poisons like the other faults (ADR 0014,
+/// amendment). The same error of the external event does not pass through
+/// here: it refused the event before anything of the step ran.
+#[cold]
+fn poison_on_defer_overflow<M, Event>(
+    slot: &mut Slot<M>,
+    error: SendError<Event>,
+) -> SendError<Event> {
+    if matches!(error, SendError::DeferOverflow(_)) {
+        *slot = Slot::Poisoned;
+    }
+    error
+}
+
 /// Runs pending always > internal > requeued events until none is left.
 #[inline(always)]
 fn drain<M: Spec, S: Sink<M::Effect>>(
@@ -572,7 +591,13 @@ fn drain<M: Spec, S: Sink<M::Effect>>(
             queues.pop_raised().or_else(|| queues.pop_requeued())
         };
         match next {
-            Some(event) => microstep(slot, ctx, runtime, sink, event, Source::Internal, report)?,
+            Some(event) => {
+                if let Err(error) =
+                    microstep(slot, ctx, runtime, sink, event, Source::Internal, report)
+                {
+                    return Err(poison_on_defer_overflow(slot, error));
+                }
+            }
             None => return Ok(()),
         }
     }

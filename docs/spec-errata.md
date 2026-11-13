@@ -105,3 +105,8 @@ Contradictions and errors in the spec. By rule 2 of section 0, section 5 wins. E
 
 - **Problem.** 6.5 names the id constants after the state (`Player::PLAYING`). The constants are associated items of the root type, which is also the root enum, so a root-level state named `A` or `IO` is a variant and a constant with the same name. The macro rejected such names with E0012, which makes the common single-letter and acronym names unusable.
 - **Resolution** (bead 4.14). The constant is the name in SCREAMING_SNAKE_CASE with the suffix `_ID`: `Player::PLAYING_ID`, `Bus::IO_ID`. The suffix cannot clash with the name of any state (they are CamelCase or acronyms without the suffix); the only clash left is a variant that is itself called `<STATE>_ID`, which stays E0012. All docs and examples use the new names.
+
+## 17. 5.5, 5.11: a `DeferOverflow` after the first microstep poisons
+
+- **Problem.** 5.5 says `defer_overflow = error` returns `Err(DeferOverflow(ev))` without changing state. That is true for the external event, but a raised or redelivered event can overflow after transitions of the same step already ran, so the state has changed and the step is cut half-way. 5.11 lists only panics and the raise overflow as poisoning.
+- **Resolution** (bead 4.17, ADR 0014 amendment). A `DeferOverflow` in the microstep of the external event keeps the 5.5 behaviour: the event is given back, nothing changed, the machine is not poisoned. In any later microstep of the same step it poisons the machine, like `RaiseOverflow`, `EffectOverflow` and `Livelock`; the error still carries the event that did not fit.

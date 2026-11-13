@@ -114,7 +114,7 @@ fn main() {
 The defer queue holds `defer_cap` events (default 8). Set the size and the overflow behaviour on the machine:
 
 - `defer_cap = N` sets the capacity.
-- `defer_overflow = error` (default): `send` returns `Err(SendError::DeferOverflow(event))` and the event is not stored. The machine is **not** poisoned. The overflow can come from a raised or redelivered event, after transitions already ran in the same `send`: those transitions stay applied.
+- `defer_overflow = error` (default): `send` returns `Err(SendError::DeferOverflow(event))` and the event is not stored. If the event that overflowed is the one you sent, nothing ran: the machine is unchanged and not poisoned, so you can retry later. If it is a raised or redelivered event, transitions already ran in the same `send` and the rest of the step is lost, so the machine is **poisoned**. Size `defer_cap` for the events one step can defer, or use `drop_oldest`.
 - `defer_overflow = drop_oldest`: the oldest deferred event is dropped to make room.
 
 ```rust

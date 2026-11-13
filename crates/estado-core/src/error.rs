@@ -17,7 +17,14 @@ pub enum SendError<Event> {
     Poisoned,
     /// Unhandled under the `error` policy; the event is given back and nothing changed.
     Unhandled(Event),
-    /// The defer queue is full under the `error` overflow policy.
+    /// The defer queue is full under the `error` overflow policy; the event
+    /// that did not fit is given back.
+    ///
+    /// When the external event itself overflows, nothing of the step ran: the
+    /// machine is unchanged and not poisoned. When a raised or redelivered
+    /// event overflows, the microsteps before it already ran and their effects
+    /// went out, so the step is cut half-way and the machine is poisoned, like
+    /// every other fault that stops a step half-way.
     DeferOverflow(Event),
     /// The internal queue overflowed; the machine is poisoned.
     RaiseOverflow,

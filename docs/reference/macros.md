@@ -279,7 +279,7 @@ Unlike `bubble!`, `unhandled!` does not ask the ancestors for a handler. See [er
 `defer!()` keeps the event in the defer queue. Deferred events are delivered again, in order, after the active configuration changes. They run after the internal events that a transition raised.
 
 - The event is stored by value in the queue.
-- The queue holds `defer_cap` events (default 8). When it is full, `defer_overflow` decides: `error` returns `Err(SendError::DeferOverflow(event))` without storing the event (transitions that already ran in the step stay applied), `drop_oldest` removes the oldest deferred event.
+- The queue holds `defer_cap` events (default 8). When it is full, `defer_overflow` decides: `error` returns `Err(SendError::DeferOverflow(event))` without storing the event (the machine stays usable when it is the event you sent, and is poisoned when it is a raised or redelivered event, after the earlier microsteps of the step already ran), `drop_oldest` removes the oldest deferred event.
 - A `defer!()` in a state that can never leave it is the warning [`W0003`](../errors/W0003.md).
 - It is not allowed in `#[always]` or `#[on_done]` ([`E0045`](../errors/E0045.md)).
 

@@ -21,7 +21,7 @@ It is returned by `start`, `send`, `send_into`, `send_with`, `send_batch`, `fire
 | --- | --- | --- | --- |
 | `Poisoned` | Any call on a machine that is already poisoned. | n/a | Unchanged; the machine stays poisoned. |
 | `Unhandled(event)` | An external event nobody handled, under the `error` policy (the machine's `unhandled = error`, or an `#[unhandled(error)]` on the state). The event is given back. | No | Unchanged. |
-| `DeferOverflow(event)` | `defer!()` with a full defer queue under `defer_overflow = error`. The event is given back. | No | Unchanged by the deferred event. Anything that ran earlier in the step stays applied. |
+| `DeferOverflow(event)` | `defer!()` with a full defer queue under `defer_overflow = error`. The event that did not fit is given back. | Only for a raised or redelivered event, not for the event you sent | For the event you sent: unchanged, nothing ran. For a raised or redelivered event: what ran earlier in the step stays applied and the rest of the step is lost. |
 | `RaiseOverflow` | `cx.raise(..)` with a full internal queue (`raise_cap`). | Yes | Lost. |
 | `EffectOverflow` | The sink refused an effect (`Overflow`). With the default `InlineEffects` this needs a build without `alloc`: with `alloc`, extra effects spill to the heap. | Yes | Lost. See below. |
 | `Livelock { microsteps, last }` | A step ran more than `max_microsteps` microsteps. | Yes | Lost. |
@@ -42,6 +42,7 @@ Details:
 - `Unhandled` is only returned for an **external** event. An internal event (raised, or redelivered after a deferral) that nobody handles is counted in `report.unhandled_internal` and is never an error.
 - With the `panic` policy an unhandled event panics instead, and the panic poisons the machine.
 - `EffectOverflow` is fatal, in a `start` and in a `send` alike. The microstep that overflowed has already run, so the step stops half-way: part of its effects reached the sink, the refused one is lost, and the rest of the step (raised events, `#[always]`, redelivery) never runs. Timers and tasks are effects too, so a lost one would leave the driver out of step with the machine. The machine is poisoned instead. Treat the error as a bug in the sink or in the `fx_inline` size.
+- `DeferOverflow` depends on which event overflowed. The event you sent is refused before anything of it ran: it is given back, the machine is unchanged and stays usable, and you can retry it later. A raised or redelivered event is deferred in a later microstep of the same step, after the earlier microsteps already ran, so the step stops half-way and the machine is poisoned; the error still carries the event that did not fit. Size `defer_cap` for the events one step can defer, or use `defer_overflow = drop_oldest`.
 - `last` of `Livelock` is the active configuration when the budget ran out. Its `Display` form names the states, for example `Ping`.
 
 ## Poisoning
@@ -51,7 +52,7 @@ A poisoned machine has lost its state. It has no way back: build a new `Machine`
 A machine becomes poisoned when:
 
 1. Any code that runs while `send`, `start`, `fire` or `complete` processes an event **panics**: a handler, an entry, an exit, a constructor, the event expression of an `#[after]` timer when `fire` evaluates it, a closure of a task that runs inside the step, or the `panic` unhandled policy. The panic propagates to the caller as usual, and the machine is poisoned when it unwinds. With `panic = "abort"` the process ends instead.
-2. A step fails with `RaiseOverflow`, `EffectOverflow` or `Livelock`.
+2. A step fails with `RaiseOverflow`, `EffectOverflow` or `Livelock`, or with `DeferOverflow` on a raised or redelivered event (not on the event you sent).
 3. A `start` fails with any error.
 
 A poisoned machine:

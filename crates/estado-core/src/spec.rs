@@ -23,7 +23,8 @@ pub enum UnhandledPolicy {
 /// What happens when the defer queue is full (spec 5.5).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DeferOverflowPolicy {
-    /// `Err(DeferOverflow(event))`, state unchanged.
+    /// `Err(DeferOverflow(event))`: state unchanged when the external event
+    /// overflowed, machine poisoned when a raised or redelivered one did.
     Error,
     /// Drop the oldest deferred event to make room.
     DropOldest,
