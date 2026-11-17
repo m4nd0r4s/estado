@@ -134,13 +134,21 @@ pub fn dead_end_states(tree: &StateTree, edges: &[EdgeSource]) -> Vec<StateId> {
         .collect()
 }
 
-/// Marks `state` active: it, its ancestors, and what entering it activates by
-/// default (the initial substate, every region and its initial state).
+/// Marks `state` active: it, its ancestors, what entering it activates by
+/// default (the initial substate, every region and its initial state) and,
+/// for each parallel state among its ancestors, the other regions: entering
+/// one region, even by an explicit path, starts them all.
 fn activate(tree: &StateTree, state: StateId, reached: &mut HashSet<StateId>) {
     if state == 0 {
         return;
     }
-    reached.extend(tree.ancestors(state));
+    let ancestors = tree.ancestors(state);
+    for &ancestor in &ancestors {
+        if tree.node(ancestor).kind == StateKind::Parallel {
+            activate_defaults(tree, ancestor, reached);
+        }
+    }
+    reached.extend(ancestors);
     activate_defaults(tree, state, reached);
 }
 
