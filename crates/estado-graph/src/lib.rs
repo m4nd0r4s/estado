@@ -1,4 +1,4 @@
-//! Graph export (Mermaid, DOT, SCXML, JSON) for estado machines.
+//! Graph export (Mermaid, DOT, SCXML, JSON) and analyses for estado machines.
 //!
 //! Every `#[machine]` has a static [`Graph`](estado_core::Graph) (`GRAPH`, or
 //! `M::GRAPH` through `Spec`). This crate turns it into text:
@@ -45,6 +45,12 @@
 //! assert!(diagram.contains("    Off --> On : Event#58;#58;Toggle\n"));
 //! ```
 //!
+//! [`GraphAnalysis`] answers questions about the graph (spec 8.3): which states
+//! are reachable, which ones are dead ends, the shortest path between two
+//! states, and a minimal set of paths that takes every edge for model-based
+//! tests. The count of entry and exit calls of the costliest transition is
+//! `Graph::worst_case_actions` in `estado-core`.
+//!
 //! Builds as `no_std` with `alloc`; the `std` feature adds the snapshot
 //! helpers.
 #![no_std]
@@ -53,6 +59,7 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+mod analysis;
 mod dot;
 mod format;
 mod json;
@@ -64,6 +71,7 @@ mod scxml;
 pub mod snapshot;
 mod tree;
 
+pub use analysis::{GraphAnalysis, Path, dead_ends, edge_cover, reachable, shortest_path};
 pub use dot::to_dot;
 pub use format::{Format, GraphExport};
 pub use json::{JSON_VERSION, to_json};

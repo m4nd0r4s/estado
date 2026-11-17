@@ -67,7 +67,7 @@ impl<'graph> Tree<'graph> {
     }
 
     /// The lowest state that is an ancestor-or-self of both, if any.
-    fn lowest_common_ancestor(&self, left: usize, right: usize) -> Option<usize> {
+    pub(crate) fn lowest_common_ancestor(&self, left: usize, right: usize) -> Option<usize> {
         let mut current = Some(left);
         while let Some(candidate) = current {
             if candidate == right || self.is_strict_ancestor(candidate, right) {

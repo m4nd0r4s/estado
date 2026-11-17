@@ -3,10 +3,10 @@
 //! Everything here is `const fn` and allocation free, so a machine can
 //! evaluate its bound at compile time (`Motor::WORST_CASE_ACTIONS`). The
 //! price is that the helpers rescan the state table instead of memoising;
-//! that is fine for the machines this is meant for and for any machine of a
-//! few dozen states. A table of hundreds of states may exceed the compiler's
-//! `long_running_const_eval` budget when the bound is evaluated in a
-//! constant; evaluating it at run time has no such limit.
+//! that is fine for the machines this is meant for: the 200-state, 600-edge
+//! machine of BM-05 evaluates within the compiler's `long_running_const_eval`
+//! budget. A much larger table may not; evaluating at run time has no such
+//! limit.
 //!
 //! The model follows spec 5.2 and 5.3 (ADR 0019):
 //!
