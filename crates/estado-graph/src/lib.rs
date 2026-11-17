@@ -37,19 +37,13 @@
 //!         event_hint: Some("Event::Toggle"),
 //!     },
 //! ];
-//! static GRAPH: Graph = Graph { machine: "Light", states: &STATES, edges: &EDGES };
+//! static GRAPH: Graph = Graph { machine: "Light", initial: Some(StateId::new(0)), states: &STATES, edges: &EDGES };
 //!
 //! let diagram = GRAPH.to_mermaid();
 //! assert!(diagram.starts_with("stateDiagram-v2\n"));
 //! assert!(diagram.contains("    [*] --> Off\n"));
 //! assert!(diagram.contains("    Off --> On : Event#58;#58;Toggle\n"));
 //! ```
-//!
-//! # Limits
-//!
-//! The graph does not record the `#[initial]` of the root enum, so every
-//! format takes the first top-level state in declaration order as the initial
-//! state of the machine (spec errata 19).
 //!
 //! Builds as `no_std` with `alloc`; the `std` feature adds the snapshot
 //! helpers.

@@ -159,6 +159,7 @@ static STATES: [StateInfo; 2] = [
 
 static GRAPH: Graph = Graph {
     machine: "Turnstile",
+    initial: Some(Turnstile::LOCKED),
     states: &STATES,
     edges: &[
         EdgeInfo {

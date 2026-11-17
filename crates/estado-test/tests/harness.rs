@@ -46,6 +46,7 @@ static STATES: [StateInfo; 3] = [
 ];
 static GRAPH: Graph = Graph {
     machine: "Lamp",
+    initial: Some(OFF),
     states: &STATES,
     edges: &[],
 };

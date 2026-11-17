@@ -101,12 +101,20 @@ pub fn graph_items(generation: &Generation<'_>) -> TokenStream {
             }
         }
     }
+    let initial = tree.root().initial.map_or_else(
+        || quote! { ::core::option::Option::None },
+        |initial| {
+            let initial = state_constant(generation, initial);
+            quote! { ::core::option::Option::Some(#initial) }
+        },
+    );
     quote! {
         static STATES: [__estado_core::StateInfo; #count] = [ #(#states),* ];
 
         /// The static graph: the exact union of the edges of the handlers (spec 6.3).
         pub static GRAPH: __estado_core::Graph = __estado_core::Graph {
             machine: #root_name,
+            initial: #initial,
             states: &STATES,
             edges: &[ #(#edges),* ],
         };

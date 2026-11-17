@@ -40,7 +40,7 @@ pub const MAX_ACTIVE_STATES: usize = 32;
 ///     StateInfo::new(StateId::new(0), "Active", None, StateKind::Compound, 0),
 ///     StateInfo::new(StateId::new(1), "Playing", Some(StateId::new(0)), StateKind::Atomic, 1),
 /// ];
-/// static GRAPH: Graph = Graph { machine: "Player", states: &STATES, edges: &[] };
+/// static GRAPH: Graph = Graph { machine: "Player", initial: Some(StateId::new(0)), states: &STATES, edges: &[] };
 ///
 /// let mut path = StatePath::new(&GRAPH);
 /// path.push(StateId::new(0));
@@ -150,6 +150,7 @@ mod tests {
     )];
     static GRAPH: Graph = Graph {
         machine: "Hand",
+        initial: Some(StateId(0)),
         states: &STATES,
         edges: &[],
     };

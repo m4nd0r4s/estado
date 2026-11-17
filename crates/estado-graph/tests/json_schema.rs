@@ -59,8 +59,16 @@ fn the_schema_rejects_what_it_should() {
     let valid: Value = serde_json::from_str(&to_json(&SAMPLE)).unwrap();
 
     let mut wrong_version = valid.clone();
-    wrong_version["version"] = json!(2);
+    wrong_version["version"] = json!(1);
     assert!(validate(&schema, &wrong_version).is_err());
+
+    let mut missing_initial = valid.clone();
+    missing_initial.as_object_mut().unwrap().remove("initial");
+    assert!(validate(&schema, &missing_initial).is_err());
+
+    let mut negative_initial = valid.clone();
+    negative_initial["initial"] = json!(-1);
+    assert!(validate(&schema, &negative_initial).is_err());
 
     let mut extra_property = valid.clone();
     extra_property["extra"] = json!(true);
@@ -94,6 +102,12 @@ fn the_schema_rejects_what_it_should() {
 fn json_follows_the_graph() {
     let instance: Value = serde_json::from_str(&to_json(&SAMPLE)).unwrap();
     assert_eq!(instance["machine"], SAMPLE.machine);
+    assert_eq!(
+        instance["initial"],
+        SAMPLE
+            .initial
+            .map_or(Value::Null, |initial| json!(initial.index()))
+    );
     assert_eq!(
         instance["states"].as_array().unwrap().len(),
         SAMPLE.states.len()

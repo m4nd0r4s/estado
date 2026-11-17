@@ -6,7 +6,7 @@ use alloc::string::String;
 use estado_core::{EdgeKind, EdgeTarget, Graph, HistoryKind, StateKind};
 
 /// The value of the `version` property of the JSON document.
-pub const JSON_VERSION: u32 = 1;
+pub const JSON_VERSION: u32 = 2;
 
 /// Renders the graph as JSON, in the shape `docs/graph.schema.json` describes.
 ///
@@ -14,8 +14,9 @@ pub const JSON_VERSION: u32 = 1;
 /// lists states and edges in the order of the graph, so the same graph
 /// always gives the same text.
 ///
-/// The top-level object has `version` ([`JSON_VERSION`]), `machine`, `states`
-/// and `edges`. A state has `id`, `name`, `parent`, `kind` (`atomic`,
+/// The top-level object has `version` ([`JSON_VERSION`]), `machine`, `initial`
+/// (the id of the state the machine starts in, `null` without states),
+/// `states` and `edges`. A state has `id`, `name`, `parent`, `kind` (`atomic`,
 /// `compound`, `parallel`, `region`, `final`, `choice`), `initial`, `history`
 /// (`none`, `shallow`, `deep`), `timers`, `invokes` and `depth`. An edge has
 /// `from`, `to`, `kind` (`normal`, `external`, `history`, `error`, `timer`,
@@ -28,10 +29,10 @@ pub const JSON_VERSION: u32 = 1;
 ///
 /// static STATES: [StateInfo; 1] =
 ///     [StateInfo::new(StateId::new(0), "Off", None, StateKind::Atomic, 0)];
-/// static GRAPH: Graph = Graph { machine: "Light", states: &STATES, edges: &[] };
+/// static GRAPH: Graph = Graph { machine: "Light", initial: Some(StateId::new(0)), states: &STATES, edges: &[] };
 ///
 /// let json = estado_graph::to_json(&GRAPH);
-/// assert!(json.starts_with("{\n  \"version\": 1,\n  \"machine\": \"Light\",\n"));
+/// assert!(json.starts_with("{\n  \"version\": 2,\n  \"machine\": \"Light\",\n"));
 /// assert!(json.contains("\"kind\": \"atomic\""));
 /// ```
 pub fn to_json(graph: &Graph) -> String {
@@ -39,6 +40,10 @@ pub fn to_json(graph: &Graph) -> String {
     out.push_str("{\n");
     out.push_str(&format!("  \"version\": {JSON_VERSION},\n"));
     out.push_str(&format!("  \"machine\": {},\n", string(graph.machine)));
+    out.push_str(&format!(
+        "  \"initial\": {},\n",
+        optional_id(graph.initial.map(|initial| initial.index()))
+    ));
     if graph.states.is_empty() {
         out.push_str("  \"states\": [],\n");
     } else {

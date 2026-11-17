@@ -118,6 +118,7 @@ static STATES: [StateInfo; 7] = [
 
 pub static GRAPH: Graph = Graph {
     machine: "Tree",
+    initial: Some(IDLE),
     states: &STATES,
     edges: &[],
 };

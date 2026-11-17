@@ -46,7 +46,7 @@ use crate::tree::Tree;
 ///     kind: EdgeKind::Normal,
 ///     event_hint: Some("Event::Toggle"),
 /// }];
-/// static GRAPH: Graph = Graph { machine: "Light", states: &STATES, edges: &EDGES };
+/// static GRAPH: Graph = Graph { machine: "Light", initial: Some(StateId::new(0)), states: &STATES, edges: &EDGES };
 ///
 /// let document = estado_graph::to_scxml(&GRAPH);
 /// assert!(document.contains(

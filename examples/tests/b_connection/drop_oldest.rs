@@ -43,6 +43,7 @@ static STATES: [StateInfo; 2] = [
 ];
 static GRAPH: Graph = Graph {
     machine: "Tray",
+    initial: Some(StateId::new(0)),
     states: &STATES,
     edges: &[],
 };

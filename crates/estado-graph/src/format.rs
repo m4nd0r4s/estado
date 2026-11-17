@@ -78,7 +78,7 @@ impl Format {
 ///
 /// static STATES: [StateInfo; 1] =
 ///     [StateInfo::new(StateId::new(0), "Off", None, StateKind::Atomic, 0)];
-/// static GRAPH: Graph = Graph { machine: "Light", states: &STATES, edges: &[] };
+/// static GRAPH: Graph = Graph { machine: "Light", initial: Some(StateId::new(0)), states: &STATES, edges: &[] };
 ///
 /// assert_eq!(GRAPH.to_mermaid(), estado_graph::to_mermaid(&GRAPH));
 /// assert!(GRAPH.to_json().contains("\"machine\": \"Light\""));

@@ -65,6 +65,7 @@ static STATES: [StateInfo; 3] = [
 ];
 static GRAPH: Graph = Graph {
     machine: "Probe",
+    initial: Some(StateId::new(0)),
     states: &STATES,
     edges: &[],
 };

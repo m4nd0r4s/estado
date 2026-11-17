@@ -33,6 +33,7 @@ impl Spec for Boot {
     const NAME: &'static str = "Boot";
     const GRAPH: &'static Graph = &Graph {
         machine: "Boot",
+        initial: None,
         states: &[],
         edges: &[],
     };

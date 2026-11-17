@@ -268,8 +268,9 @@ Timers, tasks and guards are not part of the document.
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "machine": "Player",
+  "initial": 0,
   "states": [
     { "id": 0, "name": "Idle", "parent": null, "kind": "atomic", "initial": null, "history": "none", "timers": 0, "invokes": 0, "depth": 0 }
   ],
@@ -283,7 +284,8 @@ Timers, tasks and guards are not part of the document.
 
 | Property | Values |
 | --- | --- |
-| `version` | `1`. Also `estado_graph::JSON_VERSION`. |
+| `version` | `2`. Also `estado_graph::JSON_VERSION`. Version 2 added `initial`. |
+| `initial` | The id of the state the machine starts in (`Graph::initial`), or `null` for a graph without states. |
 | `states[]` | Same order as `Graph::states`, so `states[n].id == n`. |
 | `states[].kind` | `atomic`, `compound`, `parallel`, `region`, `final`, `choice` |
 | `states[].history` | `none`, `shallow`, `deep` |
@@ -292,7 +294,7 @@ Timers, tasks and guards are not part of the document.
 | `edges[].to` | `{"type": "state", "id": n}`, `{"type": "choice", "id": n}` or `{"type": "dynamic"}` |
 | `edges[].event` | The event pattern as text, or `null` |
 
-The JSON is a faithful copy of the `Graph`: it holds no data the graph does not have, in particular no initial state of the machine (see [limits](#limits)). The tests of the crate validate the output of every example against the schema, so the schema and the exporter cannot drift apart.
+The JSON is a faithful copy of the `Graph`. The tests of the crate validate the output of every example against the schema, so the schema and the exporter cannot drift apart.
 
 ## assert_snapshot
 
@@ -357,7 +359,6 @@ std::fs::remove_file(&path).unwrap();
 
 ## Limits
 
-- **The initial state of the machine is a guess.** `Graph` records the `#[initial]` of every compound state and region, but not the one of the root enum (spec 8.1 has no field for it). The exports use the first top-level state in declaration order, which is the initial state whenever `#[initial]` is on the first variant, as in every example. A root enum whose `#[initial]` is not first gets a wrong `[*]` arrow in Mermaid and DOT and a wrong `initial` in SCXML until the graph records it ([errata 19](../spec-errata.md)).
 - **Events are text.** The label comes from the pattern of the `match` arm (`event_hint`). A handler without a `match`, or an arm with a wildcard or a binding, has no hint, and its edge has no label.
 - **Mermaid has no history pseudostate and no names for regions.** History is drawn as a labelled state and regions as comments, as described above. Mermaid versions differ in what they render for edges that cross compound states; the DOT output gives exact control over clusters.
 - **Choice and dynamic targets** (`#[choice]`, `goto_dyn!`) are reserved: the macro does not generate them yet ([E0090](../errors/E0090.md)). The exporters handle them for graphs built by hand.

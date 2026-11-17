@@ -27,6 +27,7 @@ macro_rules! implement_stay_only_spec {
             const NAME: &'static str = stringify!($root);
             const GRAPH: &'static Graph = &Graph {
                 machine: stringify!($root),
+                initial: None,
                 states: &[],
                 edges: &[],
             };

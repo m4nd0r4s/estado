@@ -72,6 +72,7 @@ static STATES: [StateInfo; 2] = [
 ];
 static GRAPH: Graph = Graph {
     machine: "PingPong",
+    initial: Some(StateId::new(0)),
     states: &STATES,
     edges: &[],
 };

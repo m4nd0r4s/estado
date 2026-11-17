@@ -98,6 +98,7 @@ const POSE: &str = "Move | Stop | Jump | Land | Crouch | Stand | Fire | Cooldown
 /// The exact union of the edges of the handlers (spec 6.3).
 pub static GRAPH: Graph = Graph {
     machine: "Character",
+    initial: Some(Character::ALIVE_ID),
     states: &STATES,
     edges: &[
         normal(Character::ALIVE_ID, Character::DEAD_ID, "Event::Damage"),

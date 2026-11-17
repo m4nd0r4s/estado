@@ -4,6 +4,7 @@
 
 - `estado-graph` exports a machine's `GRAPH` to Mermaid, DOT, SCXML and JSON (schema in `docs/graph.schema.json`), with `assert_snapshot!` and `ESTADO_BLESS=1` (ADR 0018). Mermaid and DOT output is checked by rendering with mermaid-cli and Graphviz.
 - Snapshots of scenarios A, B, D and I in every format under `docs/graphs/`.
+- `Graph::initial` records the `#[initial]` of the root enum; the exports use it and the JSON gained `initial` (`JSON_VERSION` 2, errata 19 resolved).
 
 ## M3 — the macro
 

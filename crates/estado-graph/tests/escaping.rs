@@ -26,6 +26,7 @@ fn graph_of(names: &[&'static str], hint: Option<&'static str>) -> Graph {
     };
     Graph {
         machine: "M",
+        initial: names.first().map(|_| StateId::new(0)),
         states: Box::leak(states.into_boxed_slice()),
         edges: Box::leak(edges.into_boxed_slice()),
     }

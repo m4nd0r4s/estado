@@ -70,7 +70,7 @@ const RESERVED: [&str; 22] = [
 ///     kind: EdgeKind::Normal,
 ///     event_hint: Some("Event::Toggle"),
 /// }];
-/// static GRAPH: Graph = Graph { machine: "Light", states: &STATES, edges: &EDGES };
+/// static GRAPH: Graph = Graph { machine: "Light", initial: Some(StateId::new(0)), states: &STATES, edges: &EDGES };
 ///
 /// let diagram = estado_graph::to_mermaid(&GRAPH);
 /// assert!(diagram.starts_with("stateDiagram-v2\n"));

@@ -34,6 +34,7 @@ pub fn stub_spec(model: &MachineModel) -> TokenStream {
                 const NAME: &'static str = #name;
                 const GRAPH: &'static __estado_core::Graph = &__estado_core::Graph {
                     machine: #name,
+                    initial: ::core::option::Option::None,
                     states: &[],
                     edges: &[],
                 };

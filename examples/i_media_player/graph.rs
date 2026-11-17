@@ -52,6 +52,7 @@ const fn edge(from: StateId, to: StateId, event_hint: &'static str) -> EdgeInfo 
 /// The exact union of the edges of the handlers (spec 6.3).
 pub static GRAPH: Graph = Graph {
     machine: "Player",
+    initial: Some(Player::IDLE_ID),
     states: &STATES,
     edges: &[
         edge(Player::IDLE_ID, Player::ACTIVE_ID, "Event::Play"),

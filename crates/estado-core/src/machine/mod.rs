@@ -44,7 +44,7 @@ use step::{check_fault, drain, step_live};
 ///     type Effects = Discard;
 ///
 ///     const NAME: &'static str = "Switch";
-///     const GRAPH: &'static Graph = &Graph { machine: "Switch", states: &[], edges: &[] };
+///     const GRAPH: &'static Graph = &Graph { machine: "Switch", initial: None, states: &[], edges: &[] };
 ///
 ///     fn initial() -> Self {
 ///         Self::Off

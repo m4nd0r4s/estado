@@ -281,6 +281,7 @@ static STATES: [StateInfo; 12] = [
 /// [`Edge::TARGETS`](estado_core::Edge::TARGETS)).
 pub static GRAPH: Graph = Graph {
     machine: "HttpParser",
+    initial: Some(HttpParser::REQUEST_LINE_ID),
     states: &STATES,
     edges: &[],
 };

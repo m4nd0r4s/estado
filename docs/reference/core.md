@@ -164,6 +164,7 @@ static STATES: [StateInfo; 2] = [
 ];
 static GRAPH: Graph = Graph {
     machine: "Door",
+    initial: Some(StateId::new(0)),
     states: &STATES,
     edges: &[],
 };
@@ -276,6 +277,7 @@ static STATES: [StateInfo; 2] = [
 ];
 static GRAPH: Graph = Graph {
     machine: "Job",
+    initial: Some(StateId::new(0)),
     states: &STATES,
     edges: &[],
 };
@@ -348,7 +350,7 @@ assert!(graph.is_ancestor_or_self(Player::ACTIVE_ID, playing.id));
 
 | Item | Fields and methods |
 | --- | --- |
-| `Graph` | `machine: &'static str`, `states: &'static [StateInfo]`, `edges: &'static [EdgeInfo]`; `state(id)`, `find(name)`, `is_ancestor_or_self(ancestor, state)` |
+| `Graph` | `machine: &'static str`, `initial: Option<StateId>`, `states: &'static [StateInfo]`, `edges: &'static [EdgeInfo]`; `state(id)`, `find(name)`, `is_ancestor_or_self(ancestor, state)` |
 | `StateInfo` | `id`, `name`, `parent`, `kind`, `initial`, `history`, `timers`, `invokes`, `depth`; builders `new`, `with_initial`, `with_history`, `with_tasks` |
 | `StateKind` | `Atomic`, `Compound`, `Parallel`, `Region`, `Final`, `Choice` |
 | `HistoryKind` | `None`, `Shallow`, `DeepKeep` |

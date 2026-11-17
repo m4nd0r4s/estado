@@ -48,6 +48,7 @@ static STATES: [StateInfo; 4] = [
 ];
 static GRAPH: Graph = Graph {
     machine: "Fetch",
+    initial: Some(IDLE),
     states: &STATES,
     edges: &[],
 };

@@ -127,6 +127,7 @@ static STATES: [StateInfo; 17] = [
 
 pub static GRAPH: Graph = Graph {
     machine: "Conn",
+    initial: Some(Conn::IDLE),
     states: &STATES,
     edges: &[],
 };

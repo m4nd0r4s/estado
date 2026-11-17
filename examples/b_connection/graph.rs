@@ -126,6 +126,7 @@ const fn edge(from: StateId, to: StateId, kind: EdgeKind, event_hint: &'static s
 /// The exact union of the edges of the handlers (spec 6.3).
 pub static GRAPH: Graph = Graph {
     machine: "Conn",
+    initial: Some(Conn::DISCONNECTED_ID),
     states: &STATES,
     edges: &[
         edge(

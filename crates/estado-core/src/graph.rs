@@ -11,8 +11,14 @@ use crate::ids::StateId;
 ///     StateInfo::new(StateId::new(0), "Active", None, StateKind::Compound, 0),
 ///     StateInfo::new(StateId::new(1), "Playing", Some(StateId::new(0)), StateKind::Atomic, 1),
 /// ];
-/// static GRAPH: Graph = Graph { machine: "Player", states: &STATES, edges: &[] };
+/// static GRAPH: Graph = Graph {
+///     machine: "Player",
+///     initial: Some(StateId::new(0)),
+///     states: &STATES,
+///     edges: &[],
+/// };
 ///
+/// assert_eq!(GRAPH.initial, Some(StateId::new(0)));
 /// let playing = GRAPH.find("Playing").unwrap();
 /// assert!(GRAPH.is_ancestor_or_self(StateId::new(0), playing.id));
 /// assert!(!GRAPH.is_ancestor_or_self(playing.id, StateId::new(0)));
@@ -21,6 +27,11 @@ use crate::ids::StateId;
 pub struct Graph {
     /// Machine name.
     pub machine: &'static str,
+    /// The top-level state the machine starts in: the variant of the root
+    /// enum marked `#[initial]`. The root enum has no [`StateInfo`] of its
+    /// own, so this is the root's counterpart of [`StateInfo::initial`].
+    /// `None` only for a graph without states.
+    pub initial: Option<StateId>,
     /// Every state, in declaration order; index = [`StateId::index`].
     pub states: &'static [StateInfo],
     /// Every edge declared by a handler.

@@ -143,7 +143,7 @@ The graph is exact. Every transition your code can make is an edge, and an edge 
 - **History** appears as a small `H` (shallow) or `H*` (deep) circle inside the compound state. A `goto!(State, history)` points at it.
 - **Edge labels** are the event the `match` arm handles. Edges that are not plain transitions say so in brackets: `[timer]` for an `#[after]` event, `[always]`, `[done]`, `[history]`, `[external]`.
 
-Two limits to know: the graph records the event pattern as text, so an arm with a guard or a wildcard has a vague label or none; and it does not record which state is the initial one of the whole machine, so the exports take the first top-level state (see [the reference](../reference/graph.md#limits)).
+One limit to know: the graph records the event pattern as text, so an arm with a guard or a wildcard has a vague label or none (see [the reference](../reference/graph.md#limits)). The arrow from `[*]` at the top level points at the variant of the root enum marked `#[initial]`, wherever it is declared.
 
 ## Keeping a diagram in the repository
 

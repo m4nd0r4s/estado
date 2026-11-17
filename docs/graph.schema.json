@@ -4,16 +4,20 @@
   "title": "estado machine graph",
   "description": "The static graph of an estado machine, as written by estado_graph::to_json (spec 8.1 and 8.2).",
   "type": "object",
-  "required": ["version", "machine", "states", "edges"],
+  "required": ["version", "machine", "initial", "states", "edges"],
   "additionalProperties": false,
   "properties": {
     "version": {
       "description": "Version of this format.",
-      "const": 1
+      "const": 2
     },
     "machine": {
       "description": "Name of the machine: its root enum.",
       "type": "string"
+    },
+    "initial": {
+      "description": "Id of the top-level state the machine starts in: the variant of the root enum marked #[initial]. Null only for a graph without states.",
+      "$ref": "#/$defs/optionalStateId"
     },
     "states": {
       "description": "Every state, in declaration order. The index of a state in this array is its id.",

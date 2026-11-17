@@ -49,12 +49,9 @@ impl<'graph> Tree<'graph> {
         self.graph.states[state].parent.map(|parent| parent.index())
     }
 
-    /// The initial state of the machine: the first top-level state.
-    ///
-    /// The graph does not record the root `#[initial]` (spec errata 19), so
-    /// this is the best the exporters can say.
+    /// The initial state of the machine: [`Graph::initial`].
     pub(crate) fn machine_initial(&self) -> Option<usize> {
-        self.roots.first().copied()
+        self.graph.initial.map(|initial| initial.index())
     }
 
     /// Whether `ancestor` is a strict ancestor of `state`.

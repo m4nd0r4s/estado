@@ -154,6 +154,7 @@ static EDGES: [EdgeInfo; 25] = [
 /// Every state kind, history kind, edge kind and target.
 pub static SAMPLE: Graph = Graph {
     machine: "Kitchen \"Sink\"",
+    initial: Some(IDLE),
     states: &STATES,
     edges: &EDGES,
 };
