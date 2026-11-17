@@ -13,17 +13,17 @@
 			source: 'AC-16 · thumbv7em-none-eabihf'
 		},
 		{
-			value: '0.9',
+			value: '1.1',
 			unit: ' s',
 			label: 'cargo check of a generated machine with 200 states and 600 transitions.',
 			source: 'BM-05 · local run · target 3 s'
 		},
 		{
-			value: '1.17',
+			value: '1.19',
 			unit: '×',
 			label:
-				'The macro-generated HTTP/1 parser against a hand-written one. Target 1.05×; still open.',
-			source: 'BM-01 · CI x86_64 · open'
+				'The macro-generated HTTP/1 parser, one event per byte, against a hand-written one. Target 1.25× (spec goal 1.05×).',
+			source: 'BM-01 · CI x86_64 · target 1.25×'
 		}
 	];
 </script>

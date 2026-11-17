@@ -9,8 +9,8 @@
 		{ id: 'M0', title: 'Skeleton and CI', status: 'done' },
 		{ id: 'M1', title: 'Risk prototypes', status: 'done' },
 		{ id: 'M2', title: 'Core by hand', status: 'done' },
-		{ id: 'M3', title: 'The macro', status: 'now' },
-		{ id: 'M4', title: 'Graph export and model tests', status: 'next' },
+		{ id: 'M3', title: 'The macro', status: 'done' },
+		{ id: 'M4', title: 'Graph export and model tests', status: 'now' },
 		{ id: 'M5', title: 'Tokio and Embassy runtimes', status: 'next' },
 		{ id: 'M6', title: 'Snapshots and typestate', status: 'next' }
 	];

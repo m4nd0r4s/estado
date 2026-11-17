@@ -1,14 +1,21 @@
 # Changelog
 
-## M3 — the macro (in progress: BM-01 open)
+## M4 — graph and testing (in progress)
+
+- `estado-graph` exports a machine's `GRAPH` to Mermaid, DOT, SCXML and JSON (schema in `docs/graph.schema.json`), with `assert_snapshot!` and `ESTADO_BLESS=1` (ADR 0018). Mermaid and DOT output is checked by rendering with mermaid-cli and Graphviz.
+- Snapshots of scenarios A, B, D and I in every format under `docs/graphs/`.
+
+## M3 — the macro
 
 - `#[machine]` on an inline module (ADR 0010) generates the code M2 wrote by hand (ADR 0011, 0012): hierarchy, constructors and views, history, `#[terminal]` with `#[on_done]`, `#[after]` and `#[invoke]`, `cx.raise` and `defer!()`, parallel regions, `#[always]`, `#[unhandled]` overrides.
 - Scenarios A, B, D and I run on the macro with the same test cases as the hand-written versions.
 - The `estado` facade works on its own (`proc-macro-crate` path resolution); the README quick start is a doctest.
 - Diagnostics: 30 error codes and warnings W0001-W0005, each with a page in `docs/errors/` and a trybuild snapshot (AC-17).
 - Core fixes from the reviews: `in_state` in `#[always]` and initial entries, implicit start drains, any start fault poisons, one livelock budget per send.
-- BM-05: about 0.9 s for a 200-state, 600-edge machine (target 3 s). BM-01 still above target (CI: macro `send_into` 1.17x, `send_batch` 1.48x), tracked in bead estado-99i.3.16.
-- `send_batch` has a dedicated loop over a live machine: the macro machine drops about 12% on Apple Silicon and 23% under Rosetta (x86_64), BM-02 unchanged. BM-01 target revised for a one-event-per-byte machine (ADR 0017, errata 18); the CI x86_64 run after this change decides.
+- BM-05: about 1.1 s for a 200-state, 600-edge machine (target 3 s).
+- `send_batch` has a dedicated loop over a live machine: the macro machine drops about 12% on Apple Silicon and 23% under Rosetta (x86_64), BM-02 unchanged. BM-01 target revised to 1.25x for a one-event-per-byte machine (ADR 0017, errata 18).
+- `send_batch` counts into one running total instead of a `Report` per event; the generated `Edge::apply` merges identical arms and a plain `goto!` carries only its data. BM-01 on CI x86_64: macro `send_batch` 1.19x the hand-written parser (from 1.48x); BM-02 at parity.
+- Fixes from the docs review: more than 32 active states is a compile error (E0018); panics in `#[after]` event expressions, effect overflows and mid-step defer overflows poison (ADR 0014); `goto_dyn!`, `edges!` and transition macros in role-less helpers report E0090; state id constants end in `_ID`; `cx.in_state` without tracking panics (ADR 0015); `#[initial(with = f)]` can take the `Cx` and the parent's fields (ADR 0016); pending completion/always flags are a bitmask.
 - Four review rounds; decisions in ADR 0013 (with amendments 1-20); errata 7-15.
 
 ## M2 — hand-written core
