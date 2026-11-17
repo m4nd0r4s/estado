@@ -125,8 +125,7 @@ fn edge_enum(generation: &Generation<'_>, handler: &HandlerModel) -> TokenStream
             }
             GotoForm::Deferred { part_types, .. } => {
                 let documentation = format!(
-                    "`goto!({target})`: carries the data of the value, which `apply` builds \
-                     because an `#[initial(with = ..)]` function needs the `Cx`."
+                    "`goto!({target})`: carries the data of the value, which `apply` builds."
                 );
                 quote! { #[doc = #documentation] #variant(#(#part_types),*) }
             }
@@ -136,10 +135,13 @@ fn edge_enum(generation: &Generation<'_>, handler: &HandlerModel) -> TokenStream
         .gotos
         .iter()
         .map(|goto| state_constant(generation, goto.target));
-    let arms = handler
-        .gotos
-        .iter()
-        .map(|goto| apply_arm(generation, goto, handler.state));
+    let arms = merged_arms(
+        handler
+            .gotos
+            .iter()
+            .map(|goto| apply_arm(generation, goto, handler.state))
+            .collect(),
+    );
     let sink_parameter = generation.sink_parameter();
     let cx_type = generation.cx_type();
     let generics = if parameters.is_empty() {
@@ -166,7 +168,7 @@ fn edge_enum(generation: &Generation<'_>, handler: &HandlerModel) -> TokenStream
                 cx: &mut #cx_type,
             ) -> bool {
                 match self {
-                    #(#arms)*
+                    #arms
                 }
             }
         }
@@ -204,12 +206,51 @@ fn region_edge_impl(
     }
 }
 
+/// The code of one variant of an edge enum, before arms that do the same are
+/// merged.
+struct Arm {
+    variant: Ident,
+    /// What the variant binds: `value`, `constructor` or the `__estado_part_N`.
+    arguments: TokenStream,
+    body: TokenStream,
+    /// The types the variant carries, which an or-pattern needs to agree on;
+    /// `None` when the arm cannot share its body (a constructor closure has a
+    /// type of its own).
+    shared_types: Option<String>,
+}
+
+/// One `match` arm per distinct body: the variants of the `goto!`s that
+/// target the same state in the same way (five `goto!(Error(..))` in one
+/// handler) become one or-pattern, so the `apply` of a handler does not grow
+/// with the number of its `goto!`s. The inliner prices a callee by its size,
+/// and `apply` of a handler with a few `goto!`s was priced just above the
+/// threshold of `#[inline]` (BM-01, ADR 0017).
+fn merged_arms(arms: Vec<Arm>) -> TokenStream {
+    let mut groups: Vec<(Vec<Ident>, Arm)> = Vec::new();
+    for arm in arms {
+        let existing = groups.iter_mut().find(|(_, first)| {
+            first.shared_types.is_some()
+                && first.shared_types == arm.shared_types
+                && first.arguments.to_string() == arm.arguments.to_string()
+                && first.body.to_string() == arm.body.to_string()
+        });
+        match existing {
+            Some((variants, _)) => variants.push(arm.variant),
+            None => groups.push((vec![arm.variant.clone()], arm)),
+        }
+    }
+    groups
+        .into_iter()
+        .map(|(variants, arm)| {
+            let arguments = &arm.arguments;
+            let body = &arm.body;
+            quote! { #(Self::#variants(#arguments))|* => #body }
+        })
+        .collect()
+}
+
 /// The code of one variant: exits, take or write, constructor, entries.
-fn apply_arm(
-    generation: &Generation<'_>,
-    goto: &GotoOccurrence,
-    handler_state: StateId,
-) -> TokenStream {
+fn apply_arm(generation: &Generation<'_>, goto: &GotoOccurrence, handler_state: StateId) -> Arm {
     let tree = generation.tree;
     let variant = &goto.variant;
     let (before, changed) = if goto.compares_leaf {
@@ -234,7 +275,8 @@ fn apply_arm(
     match &goto.form {
         GotoForm::Value | GotoForm::Deferred { .. } => {
             // A deferred value is built here, after the exits, from the data
-            // the edge carries; a plain one arrives built.
+            // the edge carries (it may need the `Cx`); a plain one arrives
+            // built.
             let (arguments, build) = match &goto.form {
                 GotoForm::Deferred { part_types, build } => {
                     let parts = (0..part_types.len()).map(part_ident);
@@ -261,14 +303,26 @@ fn apply_arm(
                     quote! { #enter(#children, #(#ancestors,)* cx); #start },
                 )
             };
-            quote! {
-                Self::#variant(#arguments) => {
-                    #before
-                    #leave
-                    #restore
-                    #arrive
-                    #changed
+            let shared_types = match &goto.form {
+                GotoForm::Deferred { part_types, .. } => {
+                    let types = part_types.iter().map(|ty| quote! { #ty });
+                    Some(quote! { #(#types),* }.to_string())
                 }
+                _ => Some(children_type(generation, goto.lca).to_string()),
+            };
+            Arm {
+                variant: variant.clone(),
+                arguments,
+                body: quote! {
+                    {
+                        #before
+                        #leave
+                        #restore
+                        #arrive
+                        #changed
+                    }
+                },
+                shared_types,
             }
         }
         GotoForm::Constructor { exiting } => {
@@ -284,8 +338,8 @@ fn apply_arm(
             let rebuilt = owned_rebuild(generation, goto.lca, quote! { #new_children });
             let owner_pattern = variant_pattern(generation, exiting, Binding::Everything);
             let conversion = exiting_conversion(generation, exiting);
-            quote! {
-                Self::#variant(constructor) => {
+            let body = quote! {
+                {
                     #before
                     {
                         #prelude
@@ -307,6 +361,12 @@ fn apply_arm(
                     }
                     #changed
                 }
+            };
+            Arm {
+                variant: variant.clone(),
+                arguments: quote! { constructor },
+                body,
+                shared_types: None,
             }
         }
     }
