@@ -5,6 +5,8 @@
 - `estado-graph` exports a machine's `GRAPH` to Mermaid, DOT, SCXML and JSON (schema in `docs/graph.schema.json`), with `assert_snapshot!` and `ESTADO_BLESS=1` (ADR 0018). Mermaid and DOT output is checked by rendering with mermaid-cli and Graphviz.
 - Snapshots of scenarios A, B, D and I in every format under `docs/graphs/`.
 - `Graph::initial` records the `#[initial]` of the root enum; the exports use it and the JSON gained `initial` (`JSON_VERSION` 2, errata 19 resolved).
+- Analyses of spec 8.3 (ADR 0019): `GraphAnalysis` with `reachable`, `dead_ends`, `edge_cover` (the minimum number of paths) and `shortest_path`, and `Graph::worst_case_actions` as a `const fn` of `estado-core`; `#[machine]` generates `Root::WORST_CASE_ACTIONS`.
+- W0001 no longer reports the other regions of a parallel state entered by an explicit path.
 
 ## M3 — the macro
 

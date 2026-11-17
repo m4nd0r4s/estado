@@ -1,6 +1,6 @@
 # Graph export
 
-The `estado-graph` crate writes the static graph of a machine as Mermaid, Graphviz DOT, SCXML or JSON, and checks the output against committed files. For a walk-through, see the [guide page](../guide/24-graphs.md).
+The `estado-graph` crate writes the static graph of a machine as Mermaid, Graphviz DOT, SCXML or JSON, checks the output against committed files, and analyses the graph. For a walk-through, see the [guide page](../guide/24-graphs.md).
 
 ```toml
 [dependencies]
@@ -16,6 +16,8 @@ estado-graph = { git = "https://github.com/m4nd0r4s/estado" }
 | [`to_scxml(&Graph)`](#scxml) | function | A W3C SCXML document. |
 | [`to_json(&Graph)`](#json) | function | JSON described by [`docs/graph.schema.json`](../graph.schema.json). |
 | [`GraphExport`](#graphexport) | trait | The four functions as methods of `Graph`. |
+| [`GraphAnalysis`](#analyses) | trait | `reachable`, `dead_ends`, `edge_cover` and `shortest_path` as methods of `Graph`. |
+| [`Path`](#path) | struct | A walk through the edges, from `shortest_path` and `edge_cover`. |
 | [`Format`](#format) | enum | Picks a format by value or by file extension. |
 | [`assert_snapshot!`](#assert_snapshot) | macro | Compares an export with a committed file. |
 | [`snapshot`](#snapshot-helpers) | module | The engine of `assert_snapshot!`, for other kinds of text. |
@@ -295,6 +297,211 @@ Timers, tasks and guards are not part of the document.
 | `edges[].event` | The event pattern as text, or `null` |
 
 The JSON is a faithful copy of the `Graph`. The tests of the crate validate the output of every example against the schema, so the schema and the exporter cannot drift apart.
+
+## Analyses
+
+`GraphAnalysis` is implemented for `Graph`; the same four functions are free functions of the crate (`estado_graph::reachable(&graph)`, and so on). Nothing here needs `std`.
+
+```rust,ignore
+pub trait GraphAnalysis {
+    fn reachable(&self) -> Vec<StateId>;
+    fn dead_ends(&self) -> Vec<StateId>;
+    fn edge_cover(&self) -> Vec<Path>;
+    fn shortest_path(&self, from: StateId, to: StateId) -> Option<Path>;
+}
+```
+
+```rust
+use estado::prelude::*;
+use estado_graph::GraphAnalysis;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Event {
+    Play,
+    Pause,
+    Stop,
+}
+
+#[estado::machine(event = Event, allow(W0001, W0002))]
+mod player {
+    use super::*;
+
+    #[root]
+    pub enum Player {
+        #[initial]
+        Idle,
+        Active(Active),
+        Failed,
+        Orphan,
+    }
+
+    #[state]
+    pub struct Active {
+        #[substates]
+        pub mode: Mode,
+    }
+
+    #[state]
+    pub enum Mode {
+        #[initial]
+        Playing,
+        Paused,
+    }
+
+    #[handlers]
+    impl Player {
+        #[on(Idle)]
+        fn on_idle(event: &Event) -> Next<Self> {
+            match event {
+                Event::Play => goto!(Active),
+                _ => unhandled!(),
+            }
+        }
+
+        #[on(Playing)]
+        fn on_playing(event: &Event) -> Next<Self> {
+            match event {
+                Event::Pause => goto!(Paused),
+                _ => bubble!(),
+            }
+        }
+
+        #[on(Active)]
+        fn on_active(_active: ActiveFields<'_>, event: &Event) -> Next<Self> {
+            match event {
+                Event::Stop => goto!(Failed),
+                _ => unhandled!(),
+            }
+        }
+
+        #[on(Orphan)]
+        fn on_orphan(_event: &Event) -> Next<Self> {
+            goto!(Idle)
+        }
+    }
+}
+
+use player::Player;
+
+fn main() {
+    let graph = <Player as Spec>::GRAPH;
+    let name = |ids: Vec<StateId>| -> Vec<&'static str> {
+        ids.into_iter().map(|id| graph.state(id).name).collect()
+    };
+
+    // `Orphan` has an edge out but none into it.
+    assert_eq!(name(graph.reachable()), ["Idle", "Active", "Playing", "Paused", "Failed"]);
+    // `Paused` is left by the handler of `Active`; `Failed` is a leaf with no edge.
+    assert_eq!(name(graph.dead_ends()), ["Failed"]);
+
+    let idle = graph.find("Idle").unwrap().id;
+    let failed = graph.find("Failed").unwrap().id;
+    let path = graph.shortest_path(idle, failed).unwrap();
+    assert_eq!(path.len(), 2);
+    assert!(graph.shortest_path(failed, idle).is_none());
+
+    // One walk takes the three reachable edges: Idle -> Active -> Paused ->
+    // Failed. The edge out of `Orphan` is in no path.
+    assert_eq!(graph.edge_cover().len(), 1);
+}
+```
+
+### Model
+
+The analyses read only what the graph records: edges, their kinds and the state tree. ADR [0019](../decisions/0019-graph-analyses.md) has the reasons.
+
+| Question | Rule |
+| --- | --- |
+| When can an edge be taken? | When the state that declares it is active. A handler of a compound or parallel state applies to everything inside it. |
+| What does entering a state activate? | The state, its ancestors, its `#[initial]` chain, every region of a parallel state, and the other regions of the parallel states above it. |
+| What is certainly active after an edge? | The target, its ancestors and what its entry activates, including the other regions of a parallel state the edge enters. A transition inside one region says nothing about the other regions. |
+| `goto!(T, history)` | Entered as if nothing had been recorded: the initial substate. |
+| Timer, `#[always]` and `#[on_done]` edges | Taken as soon as the source is active, whatever might make them fire. |
+| `goto_dyn!` | Reserved. It can land anywhere: `reachable()` includes every state. Paths do not follow it. |
+| `#[choice]` | Reserved. A choice is entered and left like a state. |
+| `reenter!()` | Not an edge of the graph, so no analysis sees it. |
+
+### reachable
+
+The states that can become active, in declaration order, starting from `Graph::initial`. An edge counts when its source is reachable. Compound states, parallel states and regions are listed when something in them is. Empty when the graph has no initial state. This is the rule behind the macro warning W0001.
+
+### dead_ends
+
+The atomic states that are not `#[terminal]` and that neither declare an edge nor have an ancestor that does, in declaration order: once the machine gets there it stays. A self-transition counts as a way out. Compound and parallel states are never listed, only their leaves. Every state is checked, reachable or not. This is the rule behind W0002.
+
+### shortest_path
+
+`shortest_path(from, to)` starts as if `from` had just been entered, so its ancestors and initial substates are active, and ends when `to` is active. It returns the path with the fewest edges; between equal ones, the edges declared first win. If `to` is already active the path is empty; if it cannot be reached the result is `None`. Both states must belong to the graph.
+
+### edge_cover
+
+The fewest paths, all starting at the initial state, that together take every edge that can be taken. The count is the minimum, not a heuristic: edges that lead back to each other are taken by one walk, and the rest form a partial order whose width is the number of paths. Paths may overlap and repeat edges and are not the shortest ones. An edge whose source can only be activated through `goto_dyn!` is in no path. The output is sorted by edges, so it is the same on every run. It is empty when the graph has no initial state or no edge can be taken.
+
+Each step of a path is declared by a state that the step before it entered, so a test can drive the machine edge by edge. After a `goto!(T, history)` the machine may be in another substate than the initial one, which the graph cannot tell.
+
+### Path
+
+```rust,ignore
+impl Path {
+    pub fn start(&self) -> StateId;          // active before the first edge
+    pub fn edges(&self) -> &[usize];         // indices into Graph::edges
+    pub fn len(&self) -> usize;
+    pub fn is_empty(&self) -> bool;
+    pub fn infos<'graph>(&'graph self, graph: &'graph Graph)
+        -> impl Iterator<Item = &'graph EdgeInfo> + 'graph;
+}
+```
+
+### worst_case_actions
+
+`Graph::worst_case_actions()` is a `const fn` of `estado-core`, so it works without `alloc`. It is the largest number of `#[entry]` and `#[exit]` calls one transition can make: for each edge, the states that exit (the active chain from the leaf up to the child of the lowest common ancestor, every region of a parallel state, and the deepest configuration below the source) plus the states that enter (down to the target, its initial chain, every region of a parallel state). Spec table 5.2 gives the exits and entries of each form of edge, and the count follows it.
+
+- Every state counts once, whether or not it declares an entry or exit handler: the graph does not say, so the result is an upper bound. Regions and `#[choice]` pseudostates count zero.
+- One transition is one microstep. The start of the machine, and the transitions that `#[always]`, `#[on_done]` or a raised event cause afterwards, are not added in.
+- `goto!(T, history)` counts the largest configuration below `T`. A target known only at run time counts as the costliest real one.
+- `Graph::edge_actions(&edge)` gives the figure of one edge and `Graph::reenter_actions(state)` that of `reenter!()` in a handler of `state`.
+
+`#[machine]` also generates the constant `Root::WORST_CASE_ACTIONS`: the graph's figure raised to the cost of every `reenter!()` in the machine, which is not an edge of the graph. It is an ordinary `const`, so it can bound a build:
+
+```rust
+use estado::prelude::*;
+
+#[estado::machine(event = ())]
+mod light {
+    use super::*;
+
+    #[root]
+    pub enum Light {
+        #[initial]
+        Off,
+        On,
+    }
+
+    #[handlers]
+    impl Light {
+        #[on(Off)]
+        fn on_off(_event: &()) -> Next<Self> {
+            goto!(On)
+        }
+
+        #[on(On)]
+        fn on_on(_event: &()) -> Next<Self> {
+            goto!(Off)
+        }
+    }
+}
+
+use light::Light;
+
+// One state exits and one enters.
+const _: () = assert!(Light::WORST_CASE_ACTIONS == 2);
+
+fn main() {
+    assert_eq!(<Light as Spec>::GRAPH.worst_case_actions(), 2);
+}
+```
+
+A machine written by hand has no such constant; it writes `const BOUND: usize = Motor::GRAPH.worst_case_actions();`.
 
 ## assert_snapshot
 
