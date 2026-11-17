@@ -123,3 +123,60 @@ Reading:
 1. Keep the in-place counting (`Tally`, `BatchTotal` counting directly) and the split of `machine/step.rs`.
 2. Keep the fair `send_into` variants as the comparison to `send_batch`.
 3. The target stays at **1.25x of the hand-written parser on the CI x86_64 runner** for the macro `send_batch`. The CI ratio of the macro `send_into`, which does the same per-byte work as the new loop with a slot test more, was 1.08x before this follow-up and the fair loop is a little slower, so the new `send_batch` should land around 1.1x-1.2x. Tightening the target to 1.10x is worth proposing only after a CI run shows it; tightening on the strength of Rosetta numbers would repeat the mistake of the first revision. If that run shows the macro `send_batch` at or under 1.10x, errata 18 gets a line saying so and the bead can close.
+
+## Generated code: why the macro machine was 30% slower than the hand-written one
+
+Date: 2026-11-17. The CI x86_64 run after the `Tally` change (quick mode, run on main after 427b42b, baseline 2.849 ms) showed the core was no longer the bottleneck: hand-written `send_batch` 2.925 ms (1.03x), macro `send_batch` 3.678 (1.29x), macro `send_into` 3.403 (1.19x), and `microstep` called directly 2.425 (hand-written) against 3.170 (macro). Same parser, same grammar functions, same `Machine`: the difference is the code `#[machine]` generates (`examples/a_http_parser_macro`) against the hand-written `Spec` (`examples/a_http_parser`). The two were compared by `cargo expand`, by the asm of `run_microstep` for both on x86_64 and aarch64, and by the inliner's own report (`-C llvm-args=-pass-remarks-missed=inline`).
+
+### Root cause
+
+The dispatch is the same shape on both sides (one match on the root discriminant, one on the substate, the handler, `resolve`). The differences are in the edges:
+
+1. **One `apply` arm per `goto!`, and the inliner priced `apply` just over its threshold.** A handler with five `goto!`s has five variants (ADR 0001) and, until now, five arms in `Edge::apply`, four of them the same code (`goto!(Error(..))` in different branches of `on_value`). The hand-written parser has two variants for that handler. The base asm on x86_64 has one out-of-line call to `ValueEdges::apply` in the hot loop, and LLVM's report (measured with the arms unmerged and the edges already small) says why: "too costly to inline (cost=340, threshold=325)" in `run_microstep`, 410 against 45 in the cold paths. A call that is not inlined takes the address of the slot: the slot can no longer be split into scalars, so the whole state (discriminant, substate, fields) lives in memory for the entire loop, and the jump table addresses are reloaded after every call. The hand-written machine inlines every `apply` and its state is in registers. (The same function was not checked on aarch64; the gap there was 8%, so whatever the inliner does there costs less.)
+2. **The edges carried whole state values.** `goto!(Error(reason))` built a `HttpParser` (32 bytes) in the handler, put it in the edge, and `apply` copied it into the slot; the hand-written edge carries the `ParseError` (1 byte) and `apply` builds the state. That is a copy of the largest variant per transition, a larger `Next` returned from every handler, and one more thing the optimizer has to see through. It is also what made the arms of point 1 expensive.
+
+Everything else the brief asked about is already as cheap as the hand-written code: the nested niche-packed enums are the same layout on both sides (the macro flattens the shared fields into the compound struct, the hand-written one keeps them in a nested struct; no difference in the asm), the dispatch decodes once per event, `Next` is constructed the same way, bubbling is the same two `resolve` calls, the exit and entry sequences of this machine are empty and fold away, `Slot::take`/`put` are not used by simple-form edges, tracking of the active configuration is off, and there is no completion or `always` flag code in a machine without them (`PendingFlags` is a constant zero). The macro also emits the `Next::Defer` arm that the hand-written `resolve` leaves `unreachable!`; it is a cold arm and costs nothing in the loop.
+
+### Changes
+
+- `generate/edges.rs`: the arms of `Edge::apply` that do the same (same bindings, same types, same code) are merged into one or-pattern (`ToError(a) | ToError2(a) | ToError3(a) => ..`). The variants stay one per `goto!`, so the graph and its event hints are unchanged; only the code of `apply` stops growing with the number of `goto!`s.
+- `handlers/goto_resolve.rs`, `goto_value.rs`, `construct_context.rs`: a plain `goto!` (data only, no `#[initial(with)]` below its target) now uses the form that errata 15 created for initializers that need the `Cx`: the handler evaluates the data the user wrote, the edge carries it, `apply` builds the value after the exits. The edge is as small as the data, as in the hand-written parser. A target whose initial chain calls a zero-parameter `#[initial(with)]` keeps building the value in the handler (ADR 0016 says that form builds where the `goto!` is written), and so do history targets. The test `crates/estado-macros/tests/edge_shape.rs` pins the edge size (2 bytes where it was 48), the data of merged variants, and the order of the zero-parameter initializer before the exits.
+- No `#[inline(always)]` was added, so spec 6.5 and errata 10 stand unchanged. `#[inline]` on `Edge::apply` and on the `exit_*`/`enter_*` sequence functions was tried and dropped: identical asm and times once the arms were merged (the plain hint matters only for a handler with many different `goto!`s).
+
+### Ablation (release, aarch64, min of 7 runs of macro `send_batch` / `send_into`)
+
+| Tree | `send_batch` | `send_into` |
+| --- | --- | --- |
+| before (427b42b) | 1.419 ms | 2.5-3.0 ms (loaded machine) |
+| arms merged, edges still carry values | 1.380 ms | |
+| arms merged and edges carry data (committed) | 1.245 ms | |
+
+Merging alone moves the aarch64 numbers by 3%; the small edges are most of it there. On x86_64 the asm of `run_microstep` for the macro machine loses its call to `apply` with the merge alone (760 lines against 673 with both), but under Rosetta the merge alone did not help (macro `send_into` 3.09 ms against 2.21 ms with both, base 3.05 ms): a call that is inlined but whose arms still copy 32-byte values is not what the hand-written code does.
+
+### Measurements
+
+Release, 1 MB of requests, criterion `--quick`, **9 runs alternating the old and the new binary** (the machine was busy, load average 12-17, so the table gives medians and ratios inside one binary run); Rosetta absolute numbers drift 10-25% between builds of identical source and its hand-written `microstep` is slower than the macro one, which CI does not show, so the Rosetta columns are a direction, not a prediction of CI.
+
+Apple M-series (aarch64, native), baseline 0.99 ms:
+
+| Measurement | Before | After |
+| --- | --- | --- |
+| hand-written `send_batch` | 1.689 ms (1.71x) | 1.673 ms (1.69x) |
+| macro `send_batch` | 1.447 ms (1.46x) | 1.124 ms (1.13x) |
+| macro `send_into` (reports read) | 1.591 ms (1.61x) | 1.335 ms (1.35x) |
+| macro `microstep` direct | 1.247 ms (1.26x) | 1.22-1.33 ms (layout noise between binaries of the same source) |
+| BM-02, estado side | 1.903 ms | 1.903 ms |
+
+x86_64 under Rosetta 2, baseline 2.4 ms:
+
+| Measurement | Before | After |
+| --- | --- | --- |
+| macro `send_batch` | 2.651 ms (1.10x) | 2.131 ms (0.89x) |
+| macro `send_into` (reports read) | 2.924 ms (1.21x) | 1.972 ms (0.82x) |
+| hand-written `send_batch` (same source, other binary) | 2.326 ms | 2.648 ms |
+
+The macro `send_batch` is now faster than the hand-written estado `send_batch` on aarch64 (1.12 against 1.67 ms), and the macro `send_into` gains 16-33% on both architectures. BM-02 is a core-only benchmark and did not move. BM-05 (`scripts/bm05.sh`): 1.10 s for 200 states and 600 edges (1.07 s before), under the 3 s target.
+
+### What is left
+
+On aarch64 the macro machine called through `microstep` directly is still 1.2-1.3x of the baseline, like the hand-written one (1.20x): that part is the representation of ADR 0017 above, not the generator. Whether the CI x86_64 ratio lands at or under 1.10x (the figure at which errata 18 can be withdrawn and the bead closed) is for the next CI run; the target of 1.25x stays until then.

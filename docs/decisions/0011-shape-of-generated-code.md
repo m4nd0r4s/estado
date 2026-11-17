@@ -25,7 +25,7 @@ M2 wrote scenarios A, B, D and I by hand against `estado-core`, as the macro wou
   - `-> Next<Self>` becomes `-> Next<Self, __estado::<Handler>Edges<..>>` when the handler has no constructor-form `goto!`, else `-> Next<Self, impl Edge<Self> + use<'event, S>>` (ADR 0001);
   - `-> Result<Next<Self>, E>` keeps the `Result` around the rewritten `Next` (spec 6.4).
 - Parameters are recognised by type, in the order of spec 6.2: own data (`&mut T`, `TMut<'_>`, or nothing), ancestor `*Fields` (nearest first), `&mut Cx<Self>`, `&Event`. A compound's own handler receives its `*Fields`, never `&mut` to the whole struct (R3, ADR 0007).
-- One edge enum per handler, one variant per `goto!` occurrence; simple-form variants carry the already-built value of the LCA child; constructor-form variants carry the closure, one generic parameter each.
+- One edge enum per handler, one variant per `goto!` occurrence; simple-form variants carry the already-built value of the LCA child (since ADR 0017, only when the value calls a zero-parameter `#[initial(with)]` or the target is a history; otherwise they carry the data and `apply` builds the value); constructor-form variants carry the closure, one generic parameter each.
 - `stay!()`, `bubble!()`, `unhandled!()`, `defer!()`, `reenter!()` expand to the `Next` variants; `goto!` outside a handler is E0040.
 
 ### Transition code (4.3)
