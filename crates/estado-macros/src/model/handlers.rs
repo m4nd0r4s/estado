@@ -51,10 +51,11 @@ pub enum GotoForm {
     /// `exiting` is `X`, the child of the LCA on the active path, whose value
     /// the constructor receives by value.
     Constructor { exiting: StateId },
-    /// A simple form whose value contains an `#[initial(with = f)]` call that
-    /// needs `cx` (errata 15): the handler only evaluates the data the user
-    /// wrote, the edge carries it as `part_types`, and `Edge::apply` builds
-    /// the value with `build` after the exits.
+    /// A simple form whose value is plain data, or contains an
+    /// `#[initial(with = f)]` call that needs `cx` (errata 15): the handler
+    /// only evaluates the data the user wrote, the edge carries it as
+    /// `part_types`, and `Edge::apply` builds the value with `build` after
+    /// the exits. The edge is then as small as the data (BM-01, ADR 0017).
     Deferred {
         /// The types of the values the edge variant carries, in order.
         part_types: Vec<syn::Type>,

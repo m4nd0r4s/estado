@@ -1,12 +1,16 @@
 //! The value of the child of the LCA that a `goto!` carries: built by the
-//! handler, or, when it contains an `#[initial(with = f)]` call that needs
-//! `cx`, by the edge (errata 15).
+//! handler when it calls a zero-parameter `#[initial(with = f)]` (or the
+//! target is a history), otherwise by the edge.
 //!
-//! In that second case the initializer must run when the state is entered, after the exits of the
-//! transition, with the fields of its parent, so the handler cannot build the
-//! value. It evaluates the data the user wrote (in the user's scope, where
-//! the user's expressions belong) and the edge carries those values. The
-//! `apply` of the edge builds the value from them, with `cx` in scope.
+//! The edge builds it when the value is plain data (it then carries only the
+//! data, as small as a hand-written edge, and `apply` writes the state; BM-01,
+//! ADR 0017) and when it contains an `#[initial(with = f)]` call that needs
+//! `cx` (errata 15): that initializer must run when the state is entered,
+//! after the exits of the transition, with the fields of its parent, so the
+//! handler cannot build the value. In both cases the handler evaluates the
+//! data the user wrote (in the user's scope, where the user's expressions
+//! belong) and the edge carries those values. The `apply` of the edge builds
+//! the value from them, with `cx` in scope.
 
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
@@ -15,7 +19,9 @@ use syn::{Expr, FieldValue, Ident, Member, Token, Type};
 use super::goto_resolve::{ResolvedPayload, malformed, missing_data_error};
 use super::goto_syntax::LevelSyntax;
 use crate::construct::{MissingData, SuppliedData, initial_value, variant_value};
-use crate::construct_context::{composite_value_in, initial_value_in, needs_context, part_ident};
+use crate::construct_context::{
+    calls_initializer, composite_value_in, initial_value_in, needs_context, part_ident,
+};
 use crate::generate::naming::fields_binding;
 use crate::model::{Diagnostic, Extent, Payload, StateId, StateKind, StateTree, TransitionKind};
 
@@ -101,8 +107,29 @@ pub fn entered_levels(tree: &StateTree, lca: StateId, target: StateId) -> Vec<St
 
 /// Whether the value of this transition calls an initializer that needs `cx`.
 pub fn needs_context_path(tree: &StateTree, lca: StateId, target: StateId) -> bool {
+    path_reaches(tree, lca, target, needs_context)
+}
+
+/// Whether the value of this transition calls any `#[initial(with = f)]`
+/// function. Without one the value is plain data, which the edge can carry
+/// in pieces and `apply` can assemble: the edge stays as small as the data
+/// of the target (BM-01, ADR 0017). With a zero-parameter one the handler
+/// builds the value where the `goto!` is written (ADR 0016).
+pub fn calls_initializer_path(tree: &StateTree, lca: StateId, target: StateId) -> bool {
+    path_reaches(tree, lca, target, calls_initializer)
+}
+
+/// Whether `reaches` holds for a level the value of the transition builds
+/// through its `#[initial]`: the substates of the target, or a region of an
+/// entered parallel state that the path does not choose.
+fn path_reaches(
+    tree: &StateTree,
+    lca: StateId,
+    target: StateId,
+    reaches: fn(&StateTree, StateId) -> bool,
+) -> bool {
     let entered = entered_levels(tree, lca, target);
-    if tree.node(target).kind == StateKind::Compound && needs_context(tree, target) {
+    if tree.node(target).kind == StateKind::Compound && reaches(tree, target) {
         return true;
     }
     entered.iter().any(|&node| {
@@ -111,7 +138,7 @@ pub fn needs_context_path(tree: &StateTree, lca: StateId, target: StateId) -> bo
                 .node(node)
                 .children
                 .iter()
-                .any(|&region| !entered.contains(&region) && needs_context(tree, region))
+                .any(|&region| !entered.contains(&region) && reaches(tree, region))
     })
 }
 

@@ -7,7 +7,9 @@ use syn::spanned::Spanned;
 use syn::{Expr, ExprClosure, Ident, Pat, PatType, Type};
 
 use super::goto_syntax::{GotoExtra, GotoSyntax, LevelSyntax, MALFORMED_TRANSITION};
-use super::goto_value::{build_value, deferred_payload, needs_context_path};
+use super::goto_value::{
+    build_value, calls_initializer_path, deferred_payload, needs_context_path,
+};
 use crate::construct::{MissingData, SuppliedData};
 use crate::model::{
     Diagnostic, Extent, HistoryKind, Payload, StateId, StateKind, StateTree, TransitionKind,
@@ -19,9 +21,9 @@ pub enum ResolvedPayload {
     /// The value of the child of the LCA (simple form).
     Value(Box<Expr>),
     /// The data of the value, which `Edge::apply` builds with a `Cx` in scope
-    /// (an `#[initial(with = ..)]` function that takes `cx` or the parent
-    /// fields): the values to carry, their types, and the expression that
-    /// builds the value from them.
+    /// (plain data, or an `#[initial(with = ..)]` function that takes `cx` or
+    /// the parent fields): the values to carry, their types, and the
+    /// expression that builds the value from them.
     Deferred {
         arguments: Vec<Expr>,
         types: Vec<Type>,
@@ -111,7 +113,12 @@ pub fn resolve_goto(
             }
             constructor_payload(tree, closure, exiting, exiting_type)?
         }
-        _ if needs_context_path(tree, lca, target) => {
+        // Data only, or an initializer that needs `cx`: the edge carries the
+        // data and `apply` builds the value. A zero-parameter initializer, or
+        // a history target, is built here (ADR 0016).
+        _ if needs_context_path(tree, lca, target)
+            || (kind != TransitionKind::History && !calls_initializer_path(tree, lca, target)) =>
+        {
             deferred_payload(tree, lca, target, &chain, syntax.levels, kind, macro_span)?
         }
         _ => ResolvedPayload::Value(Box::new(build_value(

@@ -40,6 +40,26 @@ pub fn needs_context(tree: &StateTree, owner: StateId) -> bool {
     }
 }
 
+/// Whether building the `#[initial]` value of the children of `owner` calls
+/// any `#[initial(with = f)]` function, with or without parameters.
+pub fn calls_initializer(tree: &StateTree, owner: StateId) -> bool {
+    let Some(initial) = tree.node(owner).initial else {
+        return false;
+    };
+    let state = tree.node(initial);
+    if state.initial_with.is_some() {
+        return true;
+    }
+    match state.kind {
+        StateKind::Compound => calls_initializer(tree, initial),
+        StateKind::Parallel => state
+            .children
+            .iter()
+            .any(|&region| calls_initializer(tree, region)),
+        _ => false,
+    }
+}
+
 /// `__estado_part_0`: the binding of the first value an edge carries when its
 /// value is built in `apply`.
 pub fn part_ident(index: usize) -> Ident {
