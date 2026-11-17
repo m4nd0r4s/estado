@@ -41,6 +41,7 @@ mod stub;
 mod tasks;
 mod views;
 mod walk;
+mod worst_case;
 
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -71,6 +72,7 @@ pub fn generated_items(model: &MachineModel, valid: bool) -> TokenStream {
     let entries = entries::entry_exit_functions(&generation);
     let dispatch = dispatch::dispatch_items(&generation);
     let graph = graph::graph_items(&generation);
+    let worst_case = worst_case::worst_case_constant(&generation);
     let spec = spec::spec_impl(&generation);
     let completion = completion::completion_functions(&generation);
     let always = always::always_items(&generation);
@@ -83,6 +85,7 @@ pub fn generated_items(model: &MachineModel, valid: bool) -> TokenStream {
     quote! {
         #core_alias
         #state_ids
+        #worst_case
         #views
         #runtime
 

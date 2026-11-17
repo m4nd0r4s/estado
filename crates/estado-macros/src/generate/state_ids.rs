@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 
-use crate::model::{MachineModel, TypeDecl};
+use crate::model::{MachineModel, StateTree, TypeDecl};
 use crate::naming::state_constant_name;
 
 /// One associated constant per state and region, valued with the runtime id
@@ -14,11 +14,7 @@ use crate::naming::state_constant_name;
 pub fn state_id_constants(model: &MachineModel) -> TokenStream {
     let tree = &model.tree;
     let root_name = &tree.root().name;
-    let generics = tree.types.iter().find_map(|declaration| match declaration {
-        TypeDecl::Enum(item) if item.ident == *root_name => Some(&item.generics),
-        _ => None,
-    });
-    let Some(generics) = generics else {
+    let Some(generics) = root_generics(tree) else {
         return TokenStream::new();
     };
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
@@ -42,4 +38,13 @@ pub fn state_id_constants(model: &MachineModel) -> TokenStream {
             #(#constants)*
         }
     }
+}
+
+/// The generics of the root enum, `None` when its declaration is missing.
+pub fn root_generics(tree: &StateTree) -> Option<&syn::Generics> {
+    let root_name = &tree.root().name;
+    tree.types.iter().find_map(|declaration| match declaration {
+        TypeDecl::Enum(item) if item.ident == *root_name => Some(&item.generics),
+        _ => None,
+    })
 }

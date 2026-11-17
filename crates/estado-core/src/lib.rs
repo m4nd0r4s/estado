@@ -19,6 +19,7 @@ mod driver;
 mod effect;
 mod error;
 mod graph;
+mod graph_actions;
 mod ids;
 mod machine;
 mod next;
